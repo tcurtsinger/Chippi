@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chippi Phase 7: Port manager mockups</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;margin:0}
+svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+
+/* tokens: Chippi.UI/Themes Dark.xaml / Light.xaml, as in wave-1.html */
+.dark{--fill:rgba(40,40,44,.961);--bord:rgba(255,255,255,.09);--hair:rgba(255,255,255,.078);--face:rgba(255,255,255,.024);--faceh:rgba(255,255,255,.10);--cardb:rgba(255,255,255,.059);
+ --btn:rgba(255,255,255,.071);--ctlb:rgba(255,255,255,.09);--hov:rgba(255,255,255,.059);--track:rgba(255,255,255,.16);
+ --tx:#FFFFFF;--tx2:#C9C9C9;--tx3:#9A9A9A;--acc:#B79CFF;--accf:linear-gradient(135deg,#B78FFF,#82AEFF);--tint:rgba(183,156,255,.14);--onacc:#170F2E;--cau:#FCE100;--cautint:rgba(252,225,0,.10);--crit:#C42B1C;--ok:#6CCB5F;--oktint:rgba(108,203,95,.16);
+ --shadow:0 16px 40px rgba(0,0,0,.5);--pop:#2C2C2F;
+ --win:#202020;--surf:#2B2B2B;--sbord:rgba(255,255,255,.031);--div:rgba(255,255,255,.059);--st1:#FFFFFF;--st2:#C5C5C5;--st3:#ABABAB;--st4:#9D9D9D;--scau:#FCE100;
+ --ssel:rgba(255,255,255,.059);--sbtn:rgba(255,255,255,.059);--sbtnb:rgba(255,255,255,.09);--sacc:#B79CFF;--sonacc:#000;--field:rgba(255,255,255,.059);--kcap:rgba(255,255,255,.09);--stint:rgba(183,156,255,.12)}
+.light{--fill:rgba(245,245,246,.961);--bord:rgba(0,0,0,.078);--hair:rgba(0,0,0,.078);--face:rgba(255,255,255,.45);--faceh:#FFFFFF;--cardb:rgba(0,0,0,.059);
+ --btn:rgba(255,255,255,.86);--ctlb:rgba(0,0,0,.09);--hov:rgba(0,0,0,.043);--track:rgba(0,0,0,.14);
+ --tx:#1A1A1A;--tx2:#5C5C5C;--tx3:#707070;--acc:#7444F0;--accf:linear-gradient(135deg,#8F5CFF,#5B86FF);--tint:rgba(116,68,240,.10);--onacc:#FFFFFF;--cau:#9D5D00;--cautint:rgba(157,93,0,.10);--crit:#C42B1C;--ok:#0F7B0F;--oktint:rgba(15,123,15,.10);
+ --shadow:0 16px 40px rgba(0,0,0,.2);--pop:#F9F9F9;
+ --win:#F3F3F3;--surf:#FBFBFB;--sbord:rgba(0,0,0,.059);--div:rgba(0,0,0,.071);--st1:#1A1A1A;--st2:#404040;--st3:#5D5D5D;--st4:#616161;--scau:#9D5D00;
+ --ssel:rgba(0,0,0,.055);--sbtn:#FFFFFF;--sbtnb:rgba(0,0,0,.10);--sacc:#6B4FBB;--sonacc:#FFF;--field:#FFFFFF;--kcap:rgba(0,0,0,.06);--stint:rgba(107,79,187,.10)}
+
+.sheet{display:inline-flex;flex-direction:column;gap:28px;padding:32px;background:#161616;color:#E6E6E6}
+.sheet.lt{background:#D9D9D9;color:#1A1A1A}
+.srow{display:flex;gap:28px;align-items:flex-start}
+.cap{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;width:576px}
+.cap small{display:none;font-weight:400;font-size:12px;opacity:.7}
+.stage{background:#1F1F1F;padding:24px 32px 32px;border-radius:2px;width:576px}
+.lt .stage{background:#C8CBD2}
+
+/* island panel 520x360 */
+.panel{position:relative;width:520px;height:360px;padding:12px;background:var(--fill);border:1px solid var(--bord);border-radius:8px;box-shadow:var(--shadow);color:var(--tx);font-size:12px;line-height:16px;overflow:hidden}
+.hdr{display:flex;align-items:center;height:24px;margin-bottom:8px;gap:6px}
+.hdr.s{height:32px}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:4px;background:transparent;color:var(--tx2);flex:none}
+.ib.back{margin:0 0 0 -4px}
+.ttl{flex:1;font-size:13px;font-weight:600;line-height:20px;white-space:nowrap}
+.body{position:relative;width:494px;height:302px}
+.ibtn{height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);font-size:12px;color:var(--tx);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-width:64px;justify-content:center;flex:none}
+.ibtn.crit{background:#C42B1C;border-color:transparent;color:#fff;font-weight:600}
+.ibtn.sm{height:24px;min-width:0;padding:0 8px;font-size:11px}
+.ibtn.foc{outline:2px solid var(--tx);outline-offset:1px}
+.t3{color:var(--tx3);font-size:11px}
+.cau{color:var(--cau)}
+.ok{color:var(--ok)}
+
+/* Search (command bar): 32 field, 34 rows, 24 line, as DESIGN.md */
+.sfield{flex:1;height:32px;border-radius:4px;border:1px solid var(--ctlb);border-bottom:2px solid var(--acc);background:var(--btn);display:flex;align-items:center;padding:0 10px;font-size:13px;gap:1px;white-space:pre}
+.sfield .caret{width:1px;height:16px;background:var(--tx);margin-left:1px}
+.isr{height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:4px}
+.isr.sel{background:var(--tint)}
+.isr.dim{opacity:.6}
+.isr .ld{width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:var(--tx2);flex:none}
+.isr .tx{flex:1;min-width:0}
+.isr .nm{font-size:12px;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.isr .dt{font-size:11px;line-height:14px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.isr.sel .dt{color:var(--tx);opacity:.82}
+.isr .dt.cau{color:var(--cau);opacity:1}
+.adm{width:16px;display:flex;justify-content:center;flex:none}
+.prow .ibtn.sm{min-width:44px}
+.isr .vb{font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;white-space:nowrap;flex:none}
+.sline{height:24px;display:flex;align-items:center;padding:0 10px;font-size:11px;color:var(--tx2)}
+.plus{display:inline-block;margin-left:6px;height:16px;padding:0 5px;border-radius:4px;background:var(--btn);font-size:11px;font-weight:600;color:var(--tx2);line-height:16px;vertical-align:1px}
+
+/* centered question / state (as the Cleaner's confirm) */
+.q{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:var(--fill);text-align:center;padding:0 24px}
+.q .qt{font-size:16px;font-weight:600;line-height:22px}
+.q .qd{font-size:11px;color:var(--tx3);margin-top:-6px}
+.q .qb{display:flex;gap:8px;margin-top:4px}
+.q .trk{width:180px;height:4px;border-radius:2px;background:var(--track);overflow:hidden}
+.q .trk i{display:block;height:100%;background:var(--accf);border-radius:2px}
+
+/* process icons: a name-specific monogram where the real icon can't be read */
+.mono{display:inline-flex;align-items:center;justify-content:center;border-radius:5px;color:#fff;font-weight:700;flex:none;font-family:'Segoe UI Variable Display','Segoe UI',sans-serif}
+.mono.gen{background:var(--btn);color:var(--tx2);box-shadow:inset 0 0 0 1px var(--ctlb)}
+.sw1 .mono.gen{background:var(--ssel);color:var(--st2);box-shadow:inset 0 0 0 1px var(--sbtnb)}
+
+/* picker rows (App updates: 46) */
+.prow{height:46px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:4px}
+.prow.sel{background:var(--tint)}
+.prow .tx{flex:1;min-width:0}
+.prow .nm{font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .dt{font-size:11px;line-height:15px;color:var(--tx2);white-space:nowrap}
+.pfoot{position:absolute;left:0;right:0;bottom:0;height:28px;display:flex;align-items:center;gap:8px;color:var(--tx2);font-size:11px}
+.pfoot .sp{flex:1}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--tx3);font-size:12px}
+
+/* Settings (Chippi.UI general theme), as wave-1.html */
+.sw1.nar{width:860px}
+.rail{width:48px;flex:none;padding:6px 6px;display:flex;flex-direction:column;gap:2px;align-items:center;color:var(--st2)}
+.rail .nv{position:relative;width:36px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.rail .nv.sel{background:var(--ssel);color:var(--st1)}
+.rail .nv.sel::before{content:"";position:absolute;left:-6px;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.rail .hr{height:1px;width:28px;background:var(--div);margin:4px 0}
+.nar .tr .tag{display:none}
+.sw1{width:1120px;background:var(--win);color:var(--st1);font-size:14px;line-height:20px;border:1px solid rgba(128,128,128,.35);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.tbar{height:40px;display:flex;align-items:center;flex:none;font-size:12px}
+.tbar .logo{width:16px;height:16px;border-radius:8px;background:linear-gradient(135deg,#B78FFF,#82AEFF);margin:0 9px 0 16px}
+.tbar .tt{flex:1}
+.tbar .cb{width:46px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--st2)}
+.shell{display:flex;flex:1}
+.side{width:272px;flex:none;padding:6px 12px 16px}
+.find{height:32px;margin:0 0 8px;padding:0 10px;border-radius:4px;background:var(--field);border:1px solid var(--sbtnb);display:flex;align-items:center;gap:10px;font-size:14px;color:var(--st4)}
+.gl{font-size:12px;color:var(--st2);padding:10px 12px 2px;line-height:16px}
+.nav{position:relative;height:32px;margin:2px 4px;padding:0 12px;border-radius:4px;display:flex;align-items:center;gap:12px;white-space:nowrap;color:var(--st1)}
+.nav.sel{background:var(--ssel);font-weight:600}
+.nav.sel::before{content:"";position:absolute;left:-4px;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.page{flex:1;padding:4px 40px 28px 40px;min-width:0}
+.ptitle{font-family:'Segoe UI Variable Display','Segoe UI',sans-serif;font-size:20px;font-weight:600;line-height:28px;margin:0 0 8px}
+.sh{font-size:14px;font-weight:600;line-height:20px;margin:16px 0 6px}
+.scard{background:var(--surf);border:1px solid var(--sbord);border-radius:8px;margin-bottom:8px;position:relative}
+.sr{min-height:48px;display:flex;align-items:center;padding:6px 16px;gap:12px;border-top:1px solid var(--div)}
+.sr:first-child{border-top:0}
+.sr .lead{width:20px;height:20px;color:var(--st1);flex:none;display:flex;align-items:center}
+.sr .tl{flex:1;min-width:0}
+.sr.grp{min-height:36px;padding-top:12px;padding-bottom:0;font-size:12px;color:var(--st3)}
+.sbt{height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);font-size:14px;color:var(--st1);display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.sbt.sm{height:26px;padding:0 10px;font-size:12px;gap:6px}
+.sbt.crit{background:#C42B1C;border-color:transparent;color:#fff;font-weight:600}
+.sbt.foc{outline:2px solid var(--st1);outline-offset:1px}
+.ssw{width:40px;height:20px;border-radius:10px;border:1px solid var(--st3);position:relative;flex:none}
+.ssw::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--st2)}
+.ssw.on{background:var(--sacc);border-color:var(--sacc)}.ssw.on::after{left:auto;right:4px;width:12px;height:12px;top:3px;background:var(--sonacc)}
+.kc{height:26px;min-width:26px;padding:0 8px;border-radius:4px;background:var(--kcap);border:1px solid var(--sbtnb);border-bottom-width:2px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;color:var(--st1)}
+.edit{color:var(--st1);font-size:14px;display:inline-flex;align-items:center;gap:6px}
+.path{color:var(--st3);font-size:14px;white-space:nowrap}
+.keys{width:200px;display:flex;gap:4px;align-items:center;color:var(--st3);font-size:14px}
+.sseg{display:inline-flex;height:32px;padding:3px;gap:2px;border-radius:6px;background:var(--ssel);font-size:13px;flex:none}
+.sseg span{padding:0 12px;border-radius:4px;display:flex;align-items:center;color:var(--st2);white-space:nowrap}
+.sseg span.on{background:var(--sbtn);color:var(--st1);font-weight:600;box-shadow:0 0 0 1px var(--sbtnb)}
+.sfind{height:32px;width:220px;padding:0 10px;border-radius:4px;background:var(--field);border:1px solid var(--sbtnb);display:flex;align-items:center;gap:8px;font-size:13px;color:var(--st4);flex:none}
+.sfind.on{color:var(--st1);border-bottom:2px solid var(--sacc)}
+.tools{display:flex;align-items:center;gap:10px;margin:8px 0 10px}
+.tools .sp{flex:1}
+.tools .pz{display:flex;align-items:center;gap:8px;font-size:13px}
+
+/* the live table */
+.tbl{padding:2px 0 4px}
+.tr{display:grid;grid-template-columns:var(--cols);align-items:center;column-gap:8px;height:34px;padding:0 8px 0 14px;font-size:12px;position:relative}
+.tr.h{height:30px;font-size:11px;color:var(--st3);border-bottom:1px solid var(--div)}
+.tr .c{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tr .pr{display:flex;align-items:center;gap:8px;min-width:0}
+.tr .pr b{font-weight:400;white-space:nowrap;flex:none}
+.tr .pr em{font-style:normal;color:var(--st3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.tr .vbn{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--st2)}
+.tr .mn{display:flex;justify-content:center;color:var(--st3)}
+.tr.hov{background:var(--ssel);border-radius:4px}
+.tr.hov .vbn{color:var(--st1);font-weight:600}
+.tr.new{background:var(--stint)}
+.tr.new::before{content:"";position:absolute;left:3px;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--sacc)}
+.tr.end{opacity:.42}
+.tr.end .c,.tr.end .pr b{text-decoration:line-through;text-decoration-color:var(--st3)}
+.tr.land{background:var(--stint);box-shadow:inset 0 0 0 1px var(--sacc);border-radius:4px}
+.tr .mut{color:var(--st3)}
+.strip{display:flex;align-items:center;gap:10px;height:46px;padding:0 10px 0 14px;font-size:13px;background:var(--stint);box-shadow:inset 0 0 0 1px var(--sacc);border-radius:4px;margin:2px 4px}
+.strip.cauS{background:var(--cautint);box-shadow:inset 0 0 0 1px var(--scau)}
+.strip.neuS{background:var(--ssel);box-shadow:inset 0 0 0 1px var(--sbtnb)}
+.strip.neuS .m{color:var(--st2)}
+.strip.okS{background:var(--oktint);box-shadow:inset 0 0 0 1px var(--ok)}
+.strip .m{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.strip .m small{font-size:12px;color:var(--st3);margin-left:8px}
+.strip .trk{width:120px;height:4px;border-radius:2px;background:var(--div);overflow:hidden;flex:none}
+.strip .trk i{display:block;height:100%;background:var(--sacc)}
+.foot2{display:flex;align-items:center;padding:6px 14px 10px;font-size:12px;color:var(--st3);gap:8px}
+.stip{position:absolute;z-index:3;padding:6px 8px;border-radius:4px;background:var(--pop);box-shadow:0 0 0 1px var(--sbtnb),0 4px 12px rgba(0,0,0,.3);font-size:12px;white-space:nowrap;color:var(--st1)}
+.smenu{position:absolute;z-index:3;padding:4px;border-radius:8px;background:var(--pop);box-shadow:0 0 0 1px var(--sbtnb),0 8px 24px rgba(0,0,0,.35);font-size:14px;min-width:220px}
+.smenu div{height:32px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 10px;border-radius:4px;white-space:nowrap}
+.smenu div.on{background:var(--ssel)}
+.smenu small{color:var(--st3);font-size:12px}
+.nores{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 0;color:var(--st3);font-size:13px}
+.win{width:792px;background:var(--win);padding:12px;border-radius:8px;color:var(--st1);font-size:14px;line-height:20px}
+.gap8{height:8px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="wave-1/lucide.js"></script>
+<script>
+/* Port manager mockups. Sizes are real DIPs; glyphs are Lucide (wave-1/lucide.js plus the few below).
+   Every process, port and PID is invented. The island has no Port manager page of its own: it lives in Search,
+   a "Free port" picker and its question; the live list is Settings > System > Ports. */
+Object.assign(ICONS,{
+'refresh-cw':'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+'network':'<rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>',
+'package':'<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="m7.5 4.27 9 5.15"/>',
+'circle-check':'<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+'info':'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+'menu':'<line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>',
+'globe':'<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>'});
+const g=(n,s=16,o='')=>`<svg class="g" width="${s}" height="${s}" viewBox="0 0 24 24" stroke-width="${(30/s).toFixed(3)}"${o}>${ICONS[n]}</svg>`;
+/* Windows' own stock UAC shield: it marks a verb that asks Windows for admin */
+const sh=(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 16 16" style="flex:none;display:block"><defs><clipPath id="shc"><path d="M8 .8 2 2.8v5C2 11 4.4 13.8 8 15.2c3.6-1.4 6-4.2 6-7.4v-5z"/></clipPath></defs><g clip-path="url(#shc)"><rect width="16" height="16" fill="#1B6FD0"/><rect x="8" y="0" width="8" height="8" fill="#F2C21C"/><rect x="0" y="8" width="8" height="8" fill="#F2C21C"/><path d="M8 0v16M0 8h16" stroke="#fff" stroke-opacity=".85" stroke-width=".8"/></g></svg>`;
+const q=new URLSearchParams(location.search);
+const board=q.get('board')||'sheet-search-holders', theme=q.get('theme')||'dark';
+const L=(t,html,sub)=>`<div><p class="cap">${t}${sub?`<small>${sub}</small>`:''}</p>${html}</div>`;
+const stage=h=>`<div class="stage">${h}</div>`;
+const ib=(t,o={})=>`<button class="ibtn${o.crit?' crit':''}${o.sm?' sm':''}${o.foc?' foc':''}">${o.sh?sh(13):''}${t}</button>`;
+
+/* ---------- invented processes ---------- */
+const P={
+ node:{n:'node.exe',c:'#3C873A',l:'N',path:'C:\\Program Files\\nodejs\\node.exe'},
+ vite:{n:'node.exe',c:'#3C873A',l:'N'},
+ java:{n:'java.exe',c:'#E76F00',l:'J'},
+ chrome:{n:'chrome.exe',c:'#4285F4',l:'C'},
+ edge:{n:'msedge.exe',c:'#0F7BD6',l:'E'},
+ pg:{n:'postgres.exe',c:'#336791',l:'P'},
+ redis:{n:'redis-server.exe',c:'#C02A22',l:'R'},
+ mongo:{n:'mongod.exe',c:'#13894A',l:'M'},
+ spool:{n:'spoolsv.exe',gen:1},
+ svc:{n:'svchost.exe',gen:1},
+ sys:{n:'System',gen:1},
+ lsass:{n:'lsass.exe',gen:1},
+ chippi:{n:'Chippi',chip:1},
+ defender:{n:'MsMpEng.exe',gen:2}
+};
+const ico=(k,s=20)=>{const p=P[k];
+ if(p.chip)return `<span class="mono" style="width:${s}px;height:${s}px;background:linear-gradient(135deg,#B78FFF,#82AEFF);border-radius:${Math.round(s/2)}px"></span>`;
+ if(p.gen)return `<span class="mono gen" style="width:${s}px;height:${s}px">${g(p.gen===2?'app-window':'monitor-cog',Math.round(s*.6))}</span>`;
+ return `<span class="mono" style="width:${s}px;height:${s}px;background:${p.c};font-size:${Math.round(s*.55)}px">${p.l}</span>`;};
+
+/* ---------- Search (island) ---------- */
+const vb=(v,shield)=>`<span class="adm">${shield?sh(12):''}</span><span class="vb">${v==='Open'?g('square-arrow-out-up-right',12):''}${v}</span>`;
+const isr=(lead,nm,dt,o={})=>`<div class="isr${o.sel?' sel':''}${o.dim?' dim':''}"><span class="ld">${lead}</span><span class="tx"><div class="nm">${nm}</div>${dt!=null?`<div class="dt${o.cau?' cau':''}">${dt}</div>`:''}</span>${o.sel&&o.verb?vb(o.verb,o.sh):''}</div>`;
+const settingsRow=(o={})=>isr(g('network',16),'Ports','Settings › System',{sel:o.sel,verb:'Open'});
+const search=(query,rows,o={})=>`<div class="panel"><div class="hdr s"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="sfield">${query}<span class="caret"></span></span></div><div style="position:relative;height:296px">${rows}${o.line?`<div class="sline">${o.line}</div>`:''}</div></div>`;
+const qpanel=html=>`<div class="panel"><div class="q">${html}</div></div>`;
+
+const R={
+ own:o=>isr(ico('node'),'Port 3000 · node.exe','PID 4120',{sel:1,verb:'Free',...o}),
+ svc:o=>isr(ico('spool'),'Port 9100 · Print Spooler','Service · PID 2880',{sel:1,verb:'Stop',sh:1,...o}),
+ adm:o=>isr(ico('pg'),'Port 5432 · postgres.exe','PID 3340',{sel:1,verb:'Free',sh:1,...o}),
+ sys:o=>isr(ico('sys'),'Port 445 · System','Windows · PID 4',{sel:1,verb:'Open',...o}),
+ tw:o=>isr(ico('sys'),'Port 445','Time wait',o),
+ amb:o=>isr(ico('svc'),'Port 135 · svchost.exe','Shared service · PID 1124',{sel:1,verb:'Open',...o}),
+ multi:o=>isr(ico('node'),'Port 3000 · node.exe','IPv4, IPv6 · PID 4120',{sel:1,verb:'Free',...o}),
+ multi2:o=>isr(ico('java'),'Port 8080 · 2 processes','PID 9012, 9188',{sel:1,verb:'Open',...o}),
+ chp:o=>isr(ico('chippi'),'Port 47100 · Chippi','PID 6204',{sel:1,verb:'Open',...o})
+};
+
+/* ---------- the question and its steps (island) ---------- */
+const Q=(who,title,dt,btns)=>qpanel(`${ico(who,40)}<div class="qt">${title}</div>${dt?`<div class="qd">${dt}</div>`:''}<div class="qb">${btns}</div>`);
+const cancel=ib('Cancel',{foc:1});
+const qEnd=Q('node','End node.exe?','Port 3000 · PID 4120',cancel+ib('End',{crit:1}));
+const qMulti=Q('chrome','End chrome.exe?','3 ports · PID 14220',cancel+ib('End',{crit:1}));
+const qStop=Q('spool','Stop Print Spooler?','Port 9100',cancel+ib('Stop',{crit:1,sh:1}));
+const qAdmin=Q('pg','End postgres.exe?','Port 5432 · PID 3340',cancel+ib('End',{crit:1,sh:1}));
+const qAsking=qpanel(`${ico('node',40)}<div class="qt">Closing node.exe</div><div class="trk"><i style="width:62%"></i></div><div class="qb">${cancel}</div>`);
+const qForce=Q('node','Force end node.exe?','',cancel+ib('Force end',{crit:1}));
+const qForceAdm=Q('pg','Force end postgres.exe?','',cancel+ib('Force end',{crit:1,sh:1}));
+const qWait=qpanel(`${ico('pg',40)}<div class="qt">Waiting for admin</div>`);
+
+/* ---------- results, as updated rows ---------- */
+const okR=(a,b)=>isr(`<span class="ok">${g('circle-check',18)}</span>`,a,b);
+const badR=(a,b)=>isr(`<span class="cau">${g('triangle-alert',18)}</span>`,a,b,{sel:1,verb:'Retry'});
+const res={
+ freed:search('port 3000',okR('Port 3000 freed',null)+settingsRow()),
+ stopped:search('port 9100',okR('Port 9100 freed',null)+settingsRow()),
+ respawn:search('port 3000',isr(ico('node'),'Port 3000 · node.exe','PID 5012',{sel:1,verb:'Free'})+settingsRow()),
+ endFail:search('port 3000',badR('End failed','node.exe')+settingsRow()),
+ stopFail:search('port 9100',badR('Stop failed','Print Spooler')+settingsRow()),
+ needs:search('port 5432',badR('Needs admin','postgres.exe')+settingsRow()),
+ closed:search('port 3000',isr(ico('node'),'Port 3000 · node.exe','Already closed',{dim:1})+settingsRow()),
+ changed:search('port 3000',isr(ico('node'),'Port 3000 · node.exe','Changed',{sel:1,verb:'Free'})+settingsRow()),
+ keptShared:search('port 135',isr(ico('svc'),'Port 135 · svchost.exe','Kept',{sel:1,verb:'Open',cau:1})+settingsRow()),
+ keptChanged:search('port 5432',isr(ico('pg'),'Port 5432 · postgres.exe','Kept',{sel:1,verb:'Free',sh:1,cau:1})+settingsRow())
+};
+
+/* ---------- the Free port picker (island page) ---------- */
+const PICK=[
+ ['node','3000','PID 4120','Free'],['vite','5173','PID 7788','Free'],['chrome','5353 +2','PID 14220','Free'],['pg','5432','PID 3340','Free',1],['redis','6379','PID 5520','Free'],
+ ['java','8080','PID 9012','Free'],['spool','9100','Service','Stop',1],['edge','9222','PID 10312','Free'],['mongo','27017','PID 4408','Free',1]];
+const prow=(r,sel)=>`<div class="prow${sel?' sel':''}">${ico(r[0],28)}<span class="tx"><div class="nm">${r[0]==='spool'?'Print Spooler':P[r[0]].n}</div><div class="dt">Port ${r[1]} · ${r[2]}</div></span><span class="adm">${r[4]?sh(14):''}</span>${ib(r[3],{sm:1})}</div>`;
+const picker=(page,selIdx)=>{const rows=PICK.slice(page*5,page*5+5);const first=page*5+1,last=page*5+rows.length;
+ return `<div class="panel"><div class="hdr"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="ttl">Free port</span></div><div class="body">${rows.map((r,i)=>prow(r,i===selIdx)).join('')}<div class="pfoot"><span>${first}–${last} of ${PICK.length}</span><span class="sp"></span><button class="ib" style="${page===0?'opacity:.4':''}" aria-label="Previous">${g('chevron-left',16)}</button><button class="ib" style="${page===1?'opacity:.4':''}" aria-label="Next">${g('chevron-right',16)}</button></div></div></div>`;};
+const pickerEmpty=`<div class="panel"><div class="hdr"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="ttl">Free port</span></div><div class="body"><div class="empty" style="height:270px">${g('network',24)}No ports to free</div></div></div>`;
+
+/* ---------- Settings: the live list ---------- */
+const nav=(gl,n,sel)=>`<div class="nav${sel?' sel':''}">${g(gl,16)}${n}</div>`;
+const side=s=>`<div class="side"><div class="find">${g('search',14)}Find a setting</div>
+ <div class="gl">Sound</div>${nav('music','Now Playing')}
+ <div class="gl">System</div>${nav('coffee','Keep awake')}${nav('activity','System monitor')}${nav('sun','Displays')}${nav('network','Ports',s==='ports')}
+ <div class="gl">Windows</div>${nav('app-window','App switcher')}${nav('layout-grid','Snap')}
+ <div class="gl">Capture</div>${nav('scan','Screen capture')}${nav('scan-text','Text and QR')}${nav('pipette','Color picker')}
+ <div class="gl">Apps</div>${nav('refresh-cw','App updates')}${nav('package','Uninstaller')}${nav('eraser','Cleaner')}
+ <div class="gl">Chippi</div>${nav('settings','General')}${nav('keyboard','Shortcuts')}${nav('plus','Add features')}</div>`;
+const rail=()=>`<div class="rail"><div class="nv">${g('menu',16)}</div><div class="nv">${g('search',16)}</div><div class="hr"></div><div class="nv">${g('coffee',16)}</div><div class="nv">${g('sun',16)}</div><div class="nv sel">${g('network',16)}</div><div class="hr"></div><div class="nv">${g('app-window',16)}</div><div class="nv">${g('layout-grid',16)}</div><div class="hr"></div><div class="nv">${g('scan',16)}</div><div class="hr"></div><div class="nv">${g('refresh-cw',16)}</div><div class="nv">${g('package',16)}</div><div class="hr"></div><div class="nv">${g('settings',16)}</div><div class="nv">${g('keyboard',16)}</div><div class="nv">${g('plus',16)}</div></div>`;
+const frame=(sel,content,nar)=>`<div class="sw1${nar?' nar':''}"><div class="tbar"><span class="logo"></span><span class="tt">Chippi Settings</span><span class="cb">${g('minus',12)}</span><span class="cb">${g('square',11)}</span><span class="cb">${g('x',12)}</span></div><div class="shell">${nar?rail():side(sel)}<div class="page">${content}</div></div></div>`;
+const btn=(t,o={})=>`<span class="sbt${o.sm?' sm':''}${o.foc?' foc':''}${o.crit?' crit':''}">${o.sh?sh(14):''}${o.g?g(o.g,14):''}${t}</span>`;
+const kc=k=>k.split('+').map(x=>`<span class="kc">${x}</span>`).join('');
+const editLink=`<span class="edit">Edit ${g('square-arrow-out-up-right',14)}</span>`;
+const krow=(n,k,gl)=>`<div class="sr"><span class="lead">${g(gl,20)}</span><span class="tl">${n}</span><span class="path" style="margin-right:12px">${k?'':'Not set'}</span>${k?`<span style="display:flex;gap:4px;margin-right:12px">${kc(k)}</span>`:''}${editLink}</div>`;
+const sec=t=>`<div class="sh">${t}</div>`;
+const card=r=>`<div class="scard">${r}</div>`;
+
+/* table rows: [proto, local, remote, state, process, pid, kind, flag]; kind own | adm | svc | win | amb | tw */
+const LISTEN=[
+ ['TCP','0.0.0.0:135','','Listening','svc',1124,'amb'],
+ ['TCP','0.0.0.0:445','','Listening','sys',4,'win'],
+ ['TCP','127.0.0.1:3000','','Listening','node',4120,'own'],
+ ['TCP','[::1]:3000','','Listening','node',4120,'own'],
+ ['TCP','127.0.0.1:5173','','Listening','vite',7788,'own','new'],
+ ['UDP','0.0.0.0:5353','','—','chrome',14220,'own'],
+ ['TCP','0.0.0.0:5432','','Listening','pg',3340,'adm'],
+ ['TCP','127.0.0.1:6379','','Listening','redis',5520,'own'],
+ ['TCP','127.0.0.1:8080','','Listening','java',9012,'own','end'],
+ ['TCP','0.0.0.0:9100','','Listening','spool',2880,'svc'],
+ ['TCP','127.0.0.1:9222','','Listening','edge',10312,'own'],
+ ['TCP','127.0.0.1:27017','','Listening','mongo',4408,'adm'],
+ ['TCP','127.0.0.1:47100','','Listening','chippi',6204,'chp'],
+ ['TCP','0.0.0.0:49664','','Listening','lsass',876,'win'],
+ ['TCP','127.0.0.1:49670','','Listening','defender',2644,'win']
+];
+const ALL=[
+ ['TCP','0.0.0.0:135','0.0.0.0:0','Listening','svc',1124,'amb'],
+ ['TCP','0.0.0.0:445','0.0.0.0:0','Listening','sys',4,'win'],
+ ['TCP','127.0.0.1:3000','0.0.0.0:0','Listening','node',4120,'own'],
+ ['TCP','127.0.0.1:3000','127.0.0.1:52210','Established','node',4120,'own'],
+ ['TCP','127.0.0.1:3000','127.0.0.1:52214','Established','node',4120,'own'],
+ ['TCP','[::1]:3000','[::]:0','Listening','node',4120,'own'],
+ ['TCP','127.0.0.1:5173','0.0.0.0:0','Listening','vite',7788,'own','new'],
+ ['UDP','0.0.0.0:5353','*:*','—','chrome',14220,'own'],
+ ['TCP','0.0.0.0:5432','0.0.0.0:0','Listening','pg',3340,'adm'],
+ ['TCP','127.0.0.1:5432','127.0.0.1:52301','Established','pg',3340,'adm','new'],
+ ['TCP','127.0.0.1:6379','0.0.0.0:0','Listening','redis',5520,'own'],
+ ['TCP','127.0.0.1:8080','0.0.0.0:0','Listening','java',9012,'own','end'],
+ ['TCP','0.0.0.0:9100','0.0.0.0:0','Listening','spool',2880,'svc'],
+ ['TCP','127.0.0.1:9222','0.0.0.0:0','Listening','edge',10312,'own'],
+ ['TCP','192.168.1.42:49811','142.250.80.14:443','Established','chrome',14220,'own'],
+ ['TCP','192.168.1.42:50122','20.190.151.9:443','Time wait','sys',0,'tw'],
+ ['TCP','192.168.1.42:50177','52.96.108.2:443','Established','edge',10312,'own'],
+ ['TCP','127.0.0.1:27017','0.0.0.0:0','Listening','mongo',4408,'adm'],
+ ['TCP','127.0.0.1:47100','0.0.0.0:0','Listening','chippi',6204,'chp']
+];
+const COLS_L='54px 138px 86px minmax(0,1fr) 52px 16px 40px 22px';
+const COLS_A='46px 128px 136px 78px minmax(0,1fr) 42px 16px 40px 20px';
+const tag={svc:'Service',win:'Windows',amb:'Shared service'};
+/* a verb only on the holder of a port: a listening TCP row or a bound UDP endpoint; never an established or closing connection, never an ended row */
+const verbOf=(k,r)=>{if(r[7]==='end'||!(r[3]==='Listening'||r[0]==='UDP'))return null;return k==='own'?['Free',0]:k==='adm'?['Free',1]:k==='svc'?['Stop',1]:null;};
+const trow=(r,all,o={})=>{const [pr,lo,re,st,k,pid,kind,flag]=r;const v=verbOf(kind,r);
+ const name=kind==='tw'?'Closing connection':P[k].n;
+ const dimRe=['0.0.0.0:0','[::]:0','*:*'].includes(re);
+ const cells=`<span class="c">${pr}</span><span class="c">${lo}</span>${all?`<span class="c${dimRe?' mut':''}">${re}</span>`:''}<span class="c${st==='—'?' mut':''}">${st}</span><span class="pr">${ico(k,16)}<b>${name}</b>${tag[kind]&&kind!=='tw'?`<em class="tag">· ${tag[kind]}</em>`:''}</span><span class="c mut">${pid}</span><span class="adm">${v&&v[1]?sh(13):''}</span><span class="vbn">${v?v[0]:''}</span><span class="mn">${o.menu?g('ellipsis',16):''}</span>`;
+ return `<div class="tr${flag?' '+flag:''}${o.hov?' hov':''}${o.land?' land':''}" style="--cols:${all?COLS_A:COLS_L}">${cells}</div>`;};
+const thead=all=>`<div class="tr h" style="--cols:${all?COLS_A:COLS_L}"><span>Protocol</span><span>Local</span>${all?'<span>Remote</span>':''}<span>State</span><span>Process</span><span>PID</span><span></span><span></span><span></span></div>`;
+const table=(rows,all,hovIdx)=>`<div class="tbl">${thead(all)}${rows.map((r,i)=>trow(r,all,{hov:i===hovIdx,menu:i===hovIdx})).join('')}</div>`;
+const toolbar=(o={})=>`<div class="tools"><span class="sseg"><span${o.all?'':' class="on"'}>Listening</span><span${o.all?' class="on"':''}>All connections</span></span><span class="sfind${o.q?' on':''}">${g('search',14)}${o.q||'Port or name'}</span><span class="sp"></span><span class="pz">Pause<span class="ssw${o.paused?' on':''}"></span></span>${btn('Refresh',{g:'refresh-cw'})}</div>`;
+const shortcutsSec=sec('Shortcuts')+card(krow('Find port','','search')+krow('Free port','','network'));
+const tableS=(rows,all,hovIdx,repI,repHtml)=>`<div class="tbl">${thead(all)}${rows.map((r,i)=>i===repI?repHtml:trow(r,all,{hov:i===hovIdx,menu:i===hovIdx})).join('')}</div>`;
+const portsPage=o=>`<div class="ptitle">Ports</div>${toolbar(o)}<div class="scard">${o.rep?tableS(o.all?ALL:LISTEN,o.all,o.hov,o.rep[0],o.rep[1]):table(o.all?ALL:LISTEN,o.all,o.hov)}<div class="foot2">${o.all?'19 connections':'15 listening'}</div></div>${shortcutsSec}`;
+
+/* excerpt cards for the states sheet: three rows, one optionally replaced */
+const ex=(rows,all,o={})=>`<div class="scard"><div class="tbl">${thead(all)}${rows.map((r,i)=>o.rep&&o.rep.i===i?o.rep.html:trow(r,all,{hov:i===o.hov,menu:i===o.hov,land:i===o.land})).join('')}</div></div>`;
+const around=i=>[LISTEN[i-1]||LISTEN[0],LISTEN[i],LISTEN[i+1]||LISTEN[0]];
+const strip=(inner,cls='')=>`<div class="strip ${cls}">${inner}</div>`;
+const sEnd=(who,t,vbl,shield,pid)=>strip(`${ico(who,16)}<span class="m">${t}${pid?`<small>${pid}</small>`:''}</span>${btn('Cancel',{sm:1,foc:1})}${btn(vbl,{sm:1,crit:1,sh:shield})}`);
+const stripAsk=strip(`${ico('node',16)}<span class="m">Closing node.exe</span><span class="trk"><i style="width:62%"></i></span>${btn('Cancel',{sm:1,foc:1})}`);
+const stripWait=strip(`${ico('pg',16)}<span class="m">Waiting for admin</span>`);
+const stripOk=(a,b)=>strip(`<span class="ok">${g('circle-check',16)}</span><span class="m">${a}<small>${b}</small></span>`,'okS');
+const stripBad=(a,b,v)=>strip(`<span class="cau">${g('triangle-alert',16)}</span><span class="m">${a}<small>${b}</small></span>${v?btn(v,{sm:1}):''}`,'cauS');
+const stripNeu=(a,b)=>strip(`<span style="color:var(--st3)">${g('info',16)}</span><span class="m">${a}${b?`<small>${b}</small>`:''}</span>`,'neuS');
+const stripKept=(who,t)=>strip(`${ico(who,16)}<span class="m cau">${t}</span>`,'cauS');
+const run=(i,html)=>ex(around(i),false,{rep:{i:1,html}});
+const srow=(n,k,gl)=>`<div class="sr"><span class="lead">${g(gl,20)}</span><span class="tl">${n}</span><span class="keys">${k?`<span style="display:flex;gap:4px">${kc(k)}</span>`:btn('Record')}</span><span style="width:32px;display:flex;justify-content:center;color:var(--st2)">${k?g('ellipsis',16):''}</span></div>`;
+const grp=t=>`<div class="sr grp">${t}</div>`;
+const shortcutsExcerpt=`<div class="scard">${grp('Keep awake')}${srow('Toggle keep awake','','coffee')}${grp('Ports')}${srow('Find port','','search')}${srow('Free port','','network')}${grp('Radial menu')}${srow('Radial menu','','zap')}</div>`;
+const W=h=>`<div class="win">${h}</div>`;
+
+/* ---------- boards ---------- */
+const B={
+ 'sheet-search-holders':()=>`<div class="srow">${L('Your own process',stage(search('port 3000',R.own()+settingsRow())),'Search value row. The verb sits at the right in 11 semibold, as Run and Open do; no new control')}${L('A service',stage(search('port 9100',R.svc()+settingsRow())),'Only that service stops, never its svchost host')}</div>
+ <div class="srow">${L('An admin, SYSTEM or other user\'s process',stage(search('port 5432',R.adm()+settingsRow())))}${L('Windows\' own rows: Open',stage(search('port 445',R.sys()+R.tw({})+settingsRow())),'The second row (PID 0, closing) just lists')}</div>
+ <div class="srow">${L('Shared svchost, no attributed service',stage(search('port 135',R.amb()+settingsRow())),'Nothing ends the host or guesses a service from the PID')}${L('Chippi itself',stage(search('port 47100',R.chp()+settingsRow())),'Chippi, csrss, wininit, services and smss are never ended and are never offered an End. They show with this treatment; the Settings row is tagged Chippi or Windows')}</div>
+ <div class="srow">${L('One process on IPv4 and IPv6',stage(search('port 3000',R.multi()+settingsRow())),'Same PID and start time, so Free asks the ordinary question, which names the one process')}${L('Two processes on one port',stage(search('port 8080',R.multi2()+settingsRow())),'Enter opens Settings › Ports filtered to the port, where each holder has its own row and verb')}</div>`,
+ 'sheet-search-states':()=>`<div class="srow">${L('Find port shortcut',stage(search('port ',settingsRow({sel:1}),{})))}${L('"ports": the Settings page',stage(search('ports',settingsRow({sel:1}))),'Enter opens Settings › System › Ports')}</div>
+ <div class="srow">${L('Nothing on the port',stage(search('port 3001',isr(g('network',16),'Port 3001 not in use',null)+settingsRow())))}${L('Above 65535',stage(search('port 70000',isr(g('network',16),'Invalid port',null)+settingsRow())))}</div>
+ <div class="srow">${L('Not a number: an ordinary search',stage(search('port abc',isr(g('globe',16),'Search the web','Web',{sel:1,verb:'Search'}),{line:'No results'})))}${L('A process that restarts itself',stage(res.respawn),'Chippi never loops')}</div>`,
+ 'sheet-confirm':()=>`<div class="srow">${L('Free, own process; Cancel has focus',stage(qEnd),'Cancel has the focus. The row is read again (PID and start time) after End')}${L('Stop, a service',stage(qStop))}</div>
+ <div class="srow">${L('Free, admin process',stage(qAdmin),'Goes through the admin helper')}${L('Close request, up to 3 s',stage(qAsking),'A listener with no window ends at once on End')}</div>
+ <div class="srow">${L('Still running',stage(qForce))}${L('Still running, admin process',stage(qForceAdm))}</div>
+ <div class="srow">${L('Waiting on the UAC prompt',stage(qWait),'Nothing to press here')}${L('A process on several ports',stage(qMulti),'The Free port picker shows it as +2 ports on the row')}</div>`,
+ 'sheet-results':()=>`<div class="srow">${L('Freed',stage(res.freed))}${L('A service stopped',stage(res.stopped))}</div>
+ <div class="srow">${L('End failed',stage(res.endFail))}${L('Stop failed',stage(res.stopFail))}</div>
+ <div class="srow">${L('UAC declined',stage(res.needs))}${L('Closed before the answer',stage(res.closed))}</div>
+ <div class="srow">${L('Process changed',stage(res.changed))}${L('Helper refused: shared service',stage(res.keptShared))}</div>
+ <div class="srow">${L('Helper refused: changed',stage(res.keptChanged))}</div>`,
+ 'sheet-picker':()=>`<div class="srow">${L('Free port picker',stage(picker(0,0)),'Five 46-DIP rows a page, as App updates. Windows\' own rows and Chippi are left out. A process on several ports has a row per port, with +N ports. Enter or Free asks the question')}${L('Page 2',stage(picker(1,1)))}</div>
+ <div class="srow">${L('Nothing to free',stage(pickerEmpty))}</div>`,
+ 'settings-ports':()=>frame('ports',portsPage({hov:2})),
+ 'settings-ports-all':()=>frame('ports',portsPage({all:1,hov:3})),
+ 'settings-ports-860':()=>frame('ports',portsPage({hov:2}),1),
+ 'settings-ports-all-860':()=>frame('ports',portsPage({all:1,hov:3}),1),
+ 'settings-ports-strip-860':()=>frame('ports',portsPage({rep:[2,sEnd('node','End node.exe?','End',0,'PID 4120')],hov:-1}),1),
+ 'sheet-settings-ports-states':()=>{
+  const s=[];
+  s.push(L('Search "3000": both address families',W(toolbar({q:'3000'})+ex([LISTEN[2],LISTEN[3]],false))));
+  s.push(L('Nothing matches',W(toolbar({q:'3001'})+`<div class="scard"><div class="nores">${g('network',24)}Port 3001 not in use</div></div>`)));
+  s.push(L('Opened from Search',W(toolbar()+ex(around(7),false,{land:1}))));
+  s.push(L('Row menu',W(`<div style="position:relative">${toolbar()}${ex(around(2),false,{hov:1})}<div class="smenu" style="right:12px;top:128px"><div class="on">Copy port<small>3000</small></div><div>Copy address<small>127.0.0.1:3000</small></div><div>Copy PID<small>4120</small></div></div></div>`)));
+  s.push(L('Process tooltip',W(`<div style="position:relative">${toolbar()}${ex(around(2),false,{hov:1})}<div class="stip" style="top:140px;left:300px">${P.node.path}</div></div>`)));
+  s.push(L('Paused',W(toolbar({paused:1})+ex(around(2),false)+`<div style="font-size:12px;color:var(--st3);padding:0 4px">Paused</div>`)));
+  s.push(L('Unreadable process path',W(ex([LISTEN[13],LISTEN[14],LISTEN[0]],false))));
+  s.push(L('Free, own process',W(run(2,sEnd('node','End node.exe?','End',0,'PID 4120')))));
+  s.push(L('Stop, a service',W(run(9,sEnd('spool','Stop Print Spooler?','Stop',1,'')))));
+  s.push(L('Free, admin process',W(run(6,sEnd('pg','End postgres.exe?','End',1,'PID 3340')))));
+  s.push(L('Closing, then still running',W(run(2,stripAsk)+`<div class="gap8"></div>`+run(2,sEnd('node','Force end node.exe?','Force end')))));
+  s.push(L('Waiting for admin, then freed',W(run(6,stripWait)+`<div class="gap8"></div>`+run(6,stripOk('Port 5432 freed','')))));
+  s.push(L('Failures: End failed, Stop failed, Needs admin',W(run(2,stripBad('End failed','','Retry'))+`<div class="gap8"></div>`+run(9,stripBad('Stop failed','','Retry'))+`<div class="gap8"></div>`+run(6,stripBad('Needs admin','','Retry')))));
+  s.push(L('Already closed, changed, kept',W(run(2,stripNeu('Already closed',''))+`<div class="gap8"></div>`+run(2,stripNeu('Changed',''))+`<div class="gap8"></div>`+run(0,stripKept('svc','Kept'))+`<div class="gap8"></div>`+run(6,stripKept('pg','Kept')))));
+  s.push(L('Settings › Shortcuts',W(shortcutsExcerpt)));
+  const rows=[];for(let i=0;i<s.length;i+=2)rows.push(`<div class="srow">${s[i]}${s[i+1]||''}</div>`);return rows.join('');}
+};
+document.body.className=theme;
+const html=B[board]();
+const big=/^settings-ports(-all)?(-860)?$|^settings-ports-strip-860$/.test(board);
+const wrap=big?`<div style="display:inline-block;padding:24px;background:${theme==='light'?'#D9D9D9':'#161616'}"><div class="${theme}">${html}</div></div>`:`<div class="sheet ${theme==='light'?'lt':''}"><div class="${theme}" style="display:contents">${html}</div></div>`;
+document.getElementById('root').innerHTML=wrap;
+const el=document.getElementById('root').firstElementChild;
+document.body.dataset.size=Math.ceil(el.getBoundingClientRect().width)+','+Math.ceil(el.getBoundingClientRect().height);
+</script>
+</body>
+</html>

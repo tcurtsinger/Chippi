@@ -2,6 +2,10 @@
 
 Wave 3, built first in the wave. Screens: none of its own; the four wave 3 features show its results on theirs. Full independent review is required for this first elevated code.
 
+## Approved second slice (2026-11-17)
+
+Travis approved the rest of the verbs exactly as this brief specifies them: `Uninstall` and `DeleteLeftovers` (Uninstaller), `MeasureCategory` and `CleanCategory` over the four fixed categories (Cleaner), and `CloseProcess`, `EndProcess` and `StopService` (Port manager). Each is added with its feature's PR, under the same peer checks, single-session rules and full review as the first slice. Mockups of the three features come first, for his approval.
+
 ## Approved first slice (2026-11-16)
 
 Travis approved the foundation and package-update support first, then green CI and a merge. This overrides the original all-verbs-at-once scope below. This slice implements only `UpdatePackage` and session `Done`; unknown and future verbs close the session. Uninstall, leftovers, Cleaner and Port manager handlers are added with those features. No App updates screens or commands are introduced yet.

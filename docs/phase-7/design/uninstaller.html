@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chippi Phase 7: Uninstaller mockups</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;margin:0}
+svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+
+/* tokens: Chippi.UI/Themes Dark.xaml / Light.xaml, as in wave-1.html; Caution and Success from DESIGN.md */
+.dark{--fill:rgba(40,40,44,.961);--bord:rgba(255,255,255,.09);--hair:rgba(255,255,255,.078);--face:rgba(255,255,255,.024);--faceh:rgba(255,255,255,.10);--cardb:rgba(255,255,255,.059);
+ --btn:rgba(255,255,255,.071);--ctlb:rgba(255,255,255,.09);--hov:rgba(255,255,255,.059);--track:rgba(255,255,255,.16);
+ --tx:#FFFFFF;--tx2:#C9C9C9;--tx3:#9A9A9A;--acc:#B79CFF;--accf:linear-gradient(135deg,#B78FFF,#82AEFF);--tint:rgba(183,156,255,.14);--onacc:#170F2E;
+ --warn:#FCE100;--warntint:rgba(252,225,0,.10);--good:#81CE75;
+ --shadow:0 16px 40px rgba(0,0,0,.5);--rim:rgba(255,255,255,.17);--pop:#2C2C2F;
+ --win:#202020;--surf:#2B2B2B;--sbord:rgba(255,255,255,.031);--div:rgba(255,255,255,.059);--st1:#FFFFFF;--st2:#C5C5C5;--st3:#ABABAB;--st4:#9D9D9D;
+ --ssel:rgba(255,255,255,.059);--sbtn:rgba(255,255,255,.059);--sbtnb:rgba(255,255,255,.09);--sacc:#B79CFF;--sonacc:#000;--field:rgba(255,255,255,.059);--kcap:rgba(255,255,255,.09);--sck:rgba(0,0,0,.1);--skel:rgba(255,255,255,.07)}
+.light{--fill:rgba(245,245,246,.961);--bord:rgba(0,0,0,.078);--hair:rgba(0,0,0,.078);--face:rgba(255,255,255,.45);--faceh:#FFFFFF;--cardb:rgba(0,0,0,.059);
+ --btn:rgba(255,255,255,.86);--ctlb:rgba(0,0,0,.09);--hov:rgba(0,0,0,.043);--track:rgba(0,0,0,.14);
+ --tx:#1A1A1A;--tx2:#5C5C5C;--tx3:#707070;--acc:#7444F0;--accf:linear-gradient(135deg,#8F5CFF,#5B86FF);--tint:rgba(116,68,240,.10);--onacc:#FFFFFF;
+ --warn:#9D5D00;--warntint:rgba(157,93,0,.10);--good:#0F7B0F;
+ --shadow:0 16px 40px rgba(0,0,0,.2);--rim:rgba(0,0,0,.12);--pop:#F9F9F9;
+ --win:#F3F3F3;--surf:#FBFBFB;--sbord:rgba(0,0,0,.059);--div:rgba(0,0,0,.071);--st1:#1A1A1A;--st2:#404040;--st3:#5D5D5D;--st4:#616161;
+ --ssel:rgba(0,0,0,.055);--sbtn:#FFFFFF;--sbtnb:rgba(0,0,0,.10);--sacc:#6B4FBB;--sonacc:#FFF;--field:#FFFFFF;--kcap:rgba(0,0,0,.06);--sck:#FFFFFF;--skel:rgba(0,0,0,.06)}
+
+.sheet{display:inline-flex;flex-direction:column;gap:28px;padding:32px;background:#161616;color:#E6E6E6}
+.sheet.lt{background:#D9D9D9;color:#1A1A1A}
+.srow{display:flex;gap:28px;align-items:flex-start}
+.cap{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;max-width:520px}
+.stage{background:#1F1F1F;padding:24px 32px 32px;border-radius:2px}
+.lt .stage{background:#C8CBD2}
+.desk{background:#3A3F4B;padding:16px 20px;border-radius:2px}
+.lt .desk{background:#AEB6C4}
+
+/* ---------- island panel 520x360 ---------- */
+.panel{position:relative;width:520px;height:360px;padding:12px;background:var(--fill);border:1px solid var(--bord);border-radius:8px;box-shadow:var(--shadow);color:var(--tx);font-size:12px;line-height:16px;overflow:hidden}
+.hdr{display:flex;align-items:center;height:24px;margin-bottom:8px;gap:6px}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:4px;background:transparent;color:var(--tx2);flex:none}
+.ib.back{margin:0 0 0 -4px}
+.ttl{flex:1;font-size:13px;font-weight:600;line-height:20px;white-space:nowrap}
+.body{position:relative;width:494px;height:302px}
+.ibtn{height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);font-size:12px;color:var(--tx);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-width:64px;justify-content:center;flex:none}
+.ibtn.acc{background:var(--accf);border-color:transparent;color:var(--onacc);font-weight:600}
+.ibtn.crit{background:#C42B1C;border-color:transparent;color:#fff}
+.ibtn.sm{height:24px;min-width:0;padding:0 8px;font-size:11px}
+.ibtn.foc{outline:2px solid var(--tx);outline-offset:1px}
+.ibtn.dis{opacity:.45}
+.t3{color:var(--tx3);font-size:11px}
+.t2{color:var(--tx2)}
+.warn{color:var(--warn)}
+.good{color:var(--good)}
+.lrow{height:42px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px}
+.lrow.hov{background:var(--hov)}
+.lrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{height:18px;padding:0 6px;border-radius:4px;background:var(--btn);font-size:11px;font-weight:600;color:var(--tx2);display:inline-flex;align-items:center;white-space:nowrap;flex:none}
+.badge.new{background:var(--tint);color:var(--acc)}
+.badge.w{background:var(--warntint);color:var(--warn)}
+.q{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:var(--fill)}
+.q .qt{font-size:14px;font-weight:600}
+.isr{height:36px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:4px}
+.isr.sel{background:var(--tint)}
+.isr .ld{width:22px;display:flex;justify-content:center;color:var(--tx2);flex:none}
+.isr .tt{min-width:0;flex:1}
+.isr .nm{font-size:12px;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+.isr .dt{font-size:11px;line-height:14px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.isr .adm{margin-left:auto;width:16px;display:flex;justify-content:center;flex:none}
+.adc{display:flex;justify-content:center}
+.dd{height:32px;padding:0 8px 0 11px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);display:inline-flex;align-items:center;gap:8px;font-size:14px;white-space:nowrap;flex:none;color:var(--st1)}
+.dd svg{color:var(--st2)}
+.isr .vb{font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px;flex:none}
+.sfield{flex:1;height:32px;border-radius:4px;border:1px solid var(--ctlb);border-bottom:2px solid var(--acc);background:var(--btn);display:flex;align-items:center;gap:8px;padding:0 10px;font-size:13px}
+.sfield .ph{color:var(--tx3)}
+.caret{width:1px;height:16px;background:var(--tx);margin-left:-6px}
+.foot{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:flex-end;align-items:center;height:26px}
+.ctr{height:302px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.ctr .ct{font-size:14px;font-weight:600}
+.ctr .cd{font-size:12px;color:var(--tx2)}
+.ctr .cb{display:flex;gap:8px;margin-top:8px}
+.ctr>svg{color:var(--tx2);margin-bottom:2px}
+.trk{height:4px;border-radius:2px;background:var(--track);position:relative;width:180px;overflow:hidden;margin-top:2px}
+.trk i{position:absolute;top:0;bottom:0;border-radius:2px;background:var(--accf)}
+.aic{border-radius:6px;color:#fff;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex:none;letter-spacing:-.2px}
+.menu2{display:grid;grid-template-columns:1fr 1fr;column-gap:8px;grid-template-rows:repeat(5,42px);grid-auto-flow:column}
+
+/* bar 256x50 */
+.bar{width:256px;height:50px;border-radius:25px;background:var(--fill);box-shadow:0 0 0 1px var(--rim),0 6px 16px rgba(0,0,0,.35);display:flex;align-items:center;color:var(--tx)}
+.bar .lead{width:34px;height:34px;border-radius:17px;background:var(--tint);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden}
+.bar .lead.cau{background:var(--warntint);color:var(--warn)}
+.bar .lead.ok{background:rgba(129,206,117,.16);color:var(--good)}
+.light .bar .lead.ok{background:rgba(15,123,15,.10)}
+.bar .lines{flex:1;min-width:0;display:flex;flex-direction:column}
+.bar .bt{font-size:13px;font-weight:600;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .bt.cau{color:var(--warn)}
+.bar .ba{font-size:12px;line-height:15px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pet{width:46px;height:50px;display:flex;align-items:center;justify-content:center;flex:none}
+.pet span{width:34px;height:30px;border-radius:15px 15px 13px 13px;background:linear-gradient(160deg,#C9B6FF,#8E7BE8)}
+
+/* ---------- Settings window 1120x720 (DESIGN.md default) ---------- */
+.sw1{width:1120px;height:720px;position:relative;background:var(--win);color:var(--st1);font-size:14px;line-height:20px;border:1px solid rgba(128,128,128,.35);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.sw1.nar{width:860px}
+.tbar{height:40px;display:flex;align-items:center;flex:none;font-size:12px}
+.tbar .logo{width:16px;height:16px;border-radius:8px;background:linear-gradient(135deg,#B78FFF,#82AEFF);margin:0 9px 0 16px}
+.tbar .tt{flex:1}
+.tbar .cb{width:46px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--st2)}
+.shell{display:flex;flex:1;min-height:0}
+.side{width:272px;flex:none;padding:6px 12px 16px;overflow:hidden}
+.rail{width:48px;flex:none;padding:6px 6px;display:flex;flex-direction:column;gap:2px;align-items:center;color:var(--st2)}
+.rail .nv{position:relative;width:36px;height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.rail .nv.sel{background:var(--ssel);color:var(--st1)}
+.rail .nv.sel::before{content:"";position:absolute;left:-6px;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.rail .hr{height:1px;width:28px;background:var(--div);margin:4px 0}
+.find{height:32px;margin:0 0 8px;padding:0 10px;border-radius:4px;background:var(--field);border:1px solid var(--sbtnb);display:flex;align-items:center;gap:10px;font-size:14px;color:var(--st4)}
+.gl{font-size:12px;font-weight:400;color:var(--st2);padding:10px 12px 2px;line-height:16px}
+.nav{position:relative;height:32px;margin:2px 4px;padding:0 12px;border-radius:4px;display:flex;align-items:center;gap:12px;white-space:nowrap;color:var(--st1)}
+.nav.sel{background:var(--ssel);font-weight:600}
+.nav.sel::before{content:"";position:absolute;left:-4px;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.page{flex:1;min-width:0;padding:4px 40px 0;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.ptitle{font-family:'Segoe UI Variable Display','Segoe UI',sans-serif;font-size:20px;font-weight:600;line-height:28px;margin:0 0 8px;display:flex;align-items:center;gap:8px;flex:none}
+.tabs{display:flex;height:40px;flex:none;margin:-2px 0 8px -12px}
+.tab{padding:0 12px;display:flex;align-items:center;gap:6px;color:var(--st2);position:relative;font-size:14px}
+.tab.sel{color:var(--st1);font-weight:600}
+.tab.sel::after{content:"";position:absolute;left:12px;bottom:3px;width:16px;height:3px;border-radius:2px;background:var(--sacc)}
+.tab .n{font-size:12px;color:var(--st3);font-weight:400}
+.tool{display:flex;gap:8px;align-items:center;height:32px;flex:none}
+.sfld{flex:1;min-width:0;height:32px;border-radius:4px;background:var(--field);border:1px solid var(--sbtnb);display:flex;align-items:center;gap:10px;padding:0 10px;font-size:14px}
+.sfld .ph{color:var(--st4)}
+.sfld.foc{border-bottom:2px solid var(--st1)}
+.scaret{width:1px;height:18px;background:var(--st1);margin-left:-8px}
+.chip{height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);display:inline-flex;align-items:center;gap:6px;font-size:14px;white-space:nowrap;flex:none}
+.chip.on{background:var(--sacc);border-color:var(--sacc);color:var(--sonacc)}
+.cnt{height:28px;flex:none;display:flex;align-items:center;font-size:12px;color:var(--st3);gap:6px}
+.cnt .sp{flex:1}
+.lwrap{position:relative;flex:1;min-height:0;margin-bottom:28px}
+.lcard{background:var(--surf);border:1px solid var(--sbord);border-radius:8px;overflow:hidden;position:relative;height:100%}
+.lcard.fit{height:auto}
+.lh{height:36px;display:grid;grid-template-columns:var(--cols);column-gap:10px;padding:0 16px;align-items:center;font-size:12px;color:var(--st3);border-bottom:1px solid var(--div)}
+.lh .s{display:flex;align-items:center;gap:4px}
+.lh .s.on{color:var(--st1);font-weight:600}
+.lr{height:48px;display:grid;grid-template-columns:var(--cols);column-gap:10px;padding:0 16px;align-items:center;border-top:1px solid var(--div)}
+.lr:first-of-type{border-top:0}
+.lr.hov{background:var(--ssel)}
+.lr.dim .n1,.lr.dim .pc,.lr.dim .sc{color:var(--st3)}
+.nc{min-width:0}
+.n1{font-size:14px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px;align-items:center}
+.n1 span.t{overflow:hidden;text-overflow:ellipsis}
+.n2{font-size:12px;line-height:16px;color:var(--st3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.n2.w{color:var(--warn)}
+.n2.g{color:var(--good)}
+.pc,.sc{font-size:13px;color:var(--st2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc.r{text-align:right}
+.ac{display:flex;gap:4px;justify-content:flex-end;align-items:center}
+.ac .stt{font-size:12px;color:var(--st2);white-space:nowrap;display:flex;align-items:center;gap:5px;margin-right:4px}
+.sck{width:20px;height:20px;border-radius:4px;border:1px solid var(--st3);background:var(--sck);display:inline-flex;align-items:center;justify-content:center;flex:none}
+.sck.on{background:var(--sacc);border-color:var(--sacc);color:var(--sonacc)}
+.sck.dis{opacity:.45}
+.sbt{height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);font-size:14px;color:var(--st1);display:inline-flex;align-items:center;gap:8px;white-space:nowrap;flex:none}
+.sbt.sm{height:28px;padding:0 10px;font-size:13px;gap:6px}
+.sbt.acc{background:var(--sacc);border-color:var(--sacc);color:var(--sonacc)}
+.sbt.crit{background:#C42B1C;border-color:#C42B1C;color:#fff}
+.sbt.dis{opacity:.45}
+.sbt.foc{outline:2px solid var(--st1);outline-offset:1px}
+.sib{width:28px;height:28px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:var(--st2);flex:none}
+.sib.hov{background:var(--ssel);color:var(--st1)}
+.sib.dis{opacity:.45}
+.sbadge{height:18px;padding:0 6px;border-radius:4px;background:var(--kcap);font-size:11px;font-weight:600;color:var(--st2);display:inline-flex;align-items:center;white-space:nowrap;flex:none}
+.sbadge.new{background:rgba(183,156,255,.16);color:var(--sacc)}
+.light .sbadge.new{background:rgba(107,79,187,.12)}
+.sbadge.w{background:var(--warntint);color:var(--warn)}
+.sbadge.g{background:rgba(129,206,117,.14);color:var(--good)}
+.light .sbadge.g{background:rgba(15,123,15,.10)}
+.prg{height:3px;width:160px;border-radius:2px;background:var(--div);position:relative;overflow:hidden;margin-top:3px}
+.prg i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--sacc)}
+.pbar{position:absolute;left:0;right:0;bottom:0;height:60px;background:var(--win);border-top:1px solid var(--div);padding:0 40px;display:flex;align-items:center;gap:8px;z-index:3}
+.pbar .sp{flex:1}
+.pbar .tx{font-size:14px}
+.pbar .tx small{color:var(--st3);font-size:12px;margin-left:6px}
+.spop{position:absolute;z-index:6;padding:16px;background:var(--surf);border-radius:8px;box-shadow:0 0 0 1px var(--sbtnb),0 12px 32px rgba(0,0,0,.4)}
+.spop h3{font-size:16px;line-height:24px;font-weight:600;margin:0 0 8px}
+.spop .bt{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.spop .cl{background:var(--ssel);border-radius:6px;padding:4px 10px}
+.spop .cr{display:flex;align-items:center;gap:8px;min-height:30px;font-size:13px}
+.spop .cr .v{margin-left:auto;color:var(--st3);font-size:12px}
+.spop p{margin:0;font-size:13px;line-height:18px;color:var(--st2)}
+.spop p+p{margin-top:6px}
+.fsb{position:absolute;right:2px;width:2px;border-radius:1px;background:rgba(128,128,128,.7)}
+.sk{height:10px;border-radius:5px;background:var(--skel)}
+.emptyrow{min-height:48px;display:flex;align-items:center;gap:10px;padding:6px 16px;color:var(--st3);font-size:14px}
+.sh{font-size:14px;font-weight:600;line-height:20px;margin:16px 0 6px}
+.scard{background:var(--surf);border:1px solid var(--sbord);border-radius:8px;margin-bottom:8px}
+.sr{min-height:48px;display:flex;align-items:center;padding:6px 16px;gap:12px;border-top:1px solid var(--div)}
+.sr:first-child{border-top:0}
+.sr .lead{width:20px;height:20px;color:var(--st1);flex:none;display:flex;align-items:center}
+.sr .tl{flex:1;min-width:0}
+.kc{height:26px;min-width:26px;padding:0 8px;border-radius:4px;background:var(--kcap);border:1px solid var(--sbtnb);border-bottom-width:2px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;color:var(--st1)}
+.edit{color:var(--st1);font-size:14px;display:inline-flex;align-items:center;gap:6px}
+.path{color:var(--st3);font-size:14px;white-space:nowrap}
+/* review */
+.gh{height:44px;display:grid;grid-template-columns:20px 16px minmax(0,1fr) auto;column-gap:10px;padding:0 16px;align-items:center;border-top:1px solid var(--div)}
+.gh .gt{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+.gh .gt small{font-weight:400;font-size:12px;color:var(--st3)}
+.rr{min-height:52px;display:grid;grid-template-columns:20px 20px minmax(0,1fr) 76px 24px;column-gap:10px;padding:4px 16px;align-items:center;border-top:1px solid var(--div)}
+.rr.dim{opacity:.62}
+.rr .pth{font-size:13px;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--st1)}
+.rr .why{font-size:12px;line-height:16px;color:var(--st3);display:flex;gap:6px;align-items:center}
+.rr .why.w{color:var(--warn)}
+.rr .why.g{color:var(--good)}
+.rr .ks{color:var(--st2)}
+.rr .sz{font-size:12px;color:var(--st2);text-align:right}
+.rr .stt{font-size:12px;white-space:nowrap}
+.rr .stt.w{color:var(--warn)}
+.rhd{height:36px;display:grid;grid-template-columns:20px 20px minmax(0,1fr) 76px 24px;column-gap:10px;padding:0 16px;align-items:center;font-size:12px;color:var(--st3)}
+.sum{min-height:52px;display:flex;align-items:center;gap:12px;padding:6px 16px}
+.sum .tl{flex:1;min-width:0}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="wave-1/lucide.js"></script>
+<script>
+// Uninstaller mockups. Sizes are real DIPs; glyphs are Lucide (wave-1/lucide.js plus the few added below).
+// Every app, publisher, size, path and date is invented. The "today" of these boards is Nov 17, 2026.
+Object.assign(ICONS,{
+'package-x':'<path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/><path d="m17 13 5 5m-5 0 5-5"/>',
+'trash-2':'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+'refresh-cw':'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+'circle-alert':'<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+'circle-check':'<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+'key-round':'<path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/>',
+'file':'<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+'loader':'<path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/>',
+'arrow-up':'<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
+'history':'<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+'rotate-cw':'<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+'lock':'<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+'chevron-up':'<path d="m18 15-6-6-6 6"/>',
+'scan-search':'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/><path d="m16 16-1.9-1.9"/>',
+'shopping-bag':'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>'
+});
+const g=(n,s=16,o='')=>`<svg class="g" width="${s}" height="${s}" viewBox="0 0 24 24" stroke-width="${(30/s).toFixed(3)}"${o}>${ICONS[n]||''}</svg>`;
+/* Windows' own stock UAC shield (stand-in drawn here; the app asks Windows for the real one) */
+const uac=(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 16 16" style="flex:none;display:block"><defs><clipPath id="uc${s}"><path d="M8 .8 2 2.8v4.6c0 3.5 2.4 6 6 7.8 3.6-1.8 6-4.3 6-7.8V2.8z"/></clipPath></defs><g clip-path="url(#uc${s})"><rect width="16" height="16" fill="#0A6CD0"/><rect x="8" width="8" height="8" fill="#F2BF1C"/><rect y="8" width="8" height="8" fill="#F2BF1C"/></g></svg>`;
+const q=new URLSearchParams(location.search);
+const board=q.get('board')||'sheet-entry', theme=q.get('theme')||'dark';
+const DIP=(w,h)=>`${w} × ${h} DIP`;
+const L=(t,html,dip)=>`<div><p class="cap">${t.split(/[:;(]| \. |\. /)[0]}${dip?` <span style="font-weight:400;opacity:.6">· ${dip}</span>`:''}</p>${html}</div>`;
+const LP=(t,html)=>L(t,html,DIP(520,360));
+const stage=h=>`<div class="stage">${h}</div>`;
+
+/* ---------- invented data ---------- */
+// name, publisher, version, size in MB, installed, kind: hklm (needs the admin helper) | hkcu | store | comp | self
+const APPS=[
+['7-Zip','Igor Pavlov','24.09',5.6,'2026-05-12','hklm'],
+['Adobe Acrobat Reader','Adobe','24.005.20414',438,'2026-02-08','hklm'],
+['Audacity','Audacity Team','3.7.1',94,'2026-08-21','hklm'],
+['Blender','Blender Foundation','4.3.0',1740,'2026-10-02','hklm'],
+['Calculator','Microsoft Corporation','11.2410.2.0',2.1,'2025-12-01','store'],
+['Discord','Discord Inc.','1.0.9171',348,'2026-11-14','hkcu'],
+['Docker Desktop','Docker Inc.','4.35.1',1980,'2026-10-19','hklm'],
+['Dropbox','Dropbox, Inc.','212.4.4128',612,'2026-06-30','hkcu'],
+['Epic Games Launcher','Epic Games, Inc.','1.3.80.0',178,'2026-03-14','hklm'],
+['Figma','Figma, Inc.','124.5.5',402,'2026-09-09','hkcu'],
+['Firefox','Mozilla','132.0.1',231,'2026-11-12','hklm'],
+['Git','The Git Development Community','2.47.0',312,'2026-10-11','hklm'],
+['GitHub Desktop','GitHub, Inc.','3.4.9',301,'2026-07-04','hkcu'],
+['Google Chrome','Google LLC','131.0.6778',612,'2026-11-09','hklm'],
+['HandBrake','The HandBrake Team','1.9.0',87,'2026-04-17','hklm'],
+['Inkscape','Inkscape Project','1.4',398,'2026-06-02','hklm'],
+['Krita','Krita Foundation','5.2.9',715,'2026-08-05','hklm'],
+['Microsoft Teams','Microsoft Corporation','24295.605',204,'2026-01-23','store'],
+['Node.js','Node.js Foundation','22.11.0',84,'2026-10-24','hklm'],
+['Notepad','Microsoft Corporation','11.2410.15.0',8.4,'2025-12-01','store'],
+['Notepad++','Notepad++ Team','8.7.1',12.4,'2026-09-03','hklm'],
+['Notion','Notion Labs, Inc.','4.2.0',356,'2026-07-21','hkcu'],
+['OBS Studio','OBS Project','30.2.3',328,'2026-09-30','hklm'],
+['OneNote','Microsoft Corporation','16001.14326',92,'2026-01-23','store'],
+['Paint','Microsoft Corporation','11.2410.17.0',31,'2025-12-01','store'],
+['PowerToys','Microsoft Corporation','0.85.1',804,'2026-11-11','hkcu'],
+['Python 3.13.0','Python Software Foundation','3.13.150',112,'2026-10-08','hklm'],
+['Slack','Slack Technologies','4.40.131',291,'2026-08-12','hkcu'],
+['Spotify','Spotify AB','1.2.50',263,'2026-05-27','hkcu'],
+['Steam','Valve Corporation','2.10.91',3240,'2026-02-02','hklm'],
+['Sticky Notes','Microsoft Corporation','6.0.7.0',18,'2025-12-01','store'],
+['Thunderbird','Mozilla','128.4.3',210,'2026-09-17','hklm'],
+['VLC media player','VideoLAN','3.0.21',163,'2026-03-09','hklm'],
+['Visual Studio Code','Microsoft Corporation','1.95.3',398,'2026-10-29','hkcu'],
+['WinRAR','win.rar GmbH','7.01',9.3,'2026-04-02','hklm'],
+['Windows Terminal','Microsoft Corporation','1.21.2911',62,'2026-01-14','store'],
+['Zoom Workplace','Zoom Video Communications','6.2.5',304,'2026-06-15','hklm'],
+['Chippi','Chippi','0.1.11',96,'2026-11-05','self'],
+['Microsoft .NET Runtime 8.0.10','Microsoft Corporation','8.0.10',74,'2026-10-15','comp'],
+['Microsoft Edge WebView2 Runtime','Microsoft Corporation','131.0.2903',420,'2026-11-08','comp'],
+['Microsoft Visual C++ 2015-2022 Redistributable (x64)','Microsoft Corporation','14.40.33810',20,'2026-02-02','comp']
+];
+const byName=n=>APPS.find(a=>a[0]===n);
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtDate=d=>{const [y,m,dd]=d.split('-');return `${MON[+m-1]} ${+dd}, ${y}`};
+const isNew=d=>(Date.UTC(2026,10,17)-Date.parse(d))/864e5<=7;
+const fmtSize=mb=>mb>=1024?(mb/1024).toFixed(1)+' GB':mb<10?mb.toFixed(1)+' MB':Math.round(mb)+' MB';
+const HUES=['#0B84FF','#E66000','#5865F2','#2EA043','#C2410C','#7C3AED','#0891B2','#B45309','#BE185D','#4D7C0F'];
+const hash=s=>[...s].reduce((a,c)=>(a*31+c.charCodeAt(0))>>>0,7);
+const mono=n=>{const w=n.replace(/[^A-Za-z0-9+ ]/g,' ').trim().split(/\s+/);return (w.length>1?w[0][0]+w[1][0]:w[0][0]+(n.endsWith('+')?'+':'')).toUpperCase()};
+// real icons in the build; a monogram tile stands in here (DESIGN.md: "a monogram tile when no icon is available")
+const aic=(n,s=28)=>`<span class="aic" style="width:${s}px;height:${s}px;background:${HUES[hash(n)%HUES.length]};font-size:${Math.max(9,Math.round(s*.38))}px">${mono(n)}</span>`;
+
+/* ---------- island helpers ---------- */
+const panel=(title,body,o={})=>`<div class="panel"><div class="hdr"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="ttl">${title}</span>${o.aside||''}</div><div class="body">${body}</div></div>`;
+const ib=(t,o={})=>`<button class="ibtn${o.acc?' acc':''}${o.crit?' crit':''}${o.sm?' sm':''}${o.foc?' foc':''}${o.dis?' dis':''}">${o.sh?uac(13):''}${o.g?g(o.g,14):''}${t}</button>`;
+const isr=(lead,nm,dt,o={})=>`<div class="isr${o.sel?' sel':''}"><span class="ld">${lead}</span><span class="tt"><div class="nm">${nm}${o.badge||''}</div><div class="dt${o.warn?' warn':''}">${dt}</div></span>${o.verb?`<span class="adm">${o.sh?uac(12):''}</span><span class="vb">${o.verb}${o.open?g('square-arrow-out-up-right',12):''}</span>`:''}</div>`;
+const search=(qtext,rows,o={})=>`<div class="panel"><div class="hdr" style="height:32px"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="sfield">${g('search',14)}${qtext?`<span>${qtext}</span><span class="caret"></span>`:`<span class="ph">${o.ph||'Search'}</span>`}</span></div><div style="margin-top:8px;position:relative;height:296px">${rows}${o.foot||''}</div></div>`;
+const confirm=(t,verb,o={})=>`<div class="panel"><div class="q"><span class="qt">${t}</span><span style="display:flex;gap:8px">${ib('Cancel',{foc:o.foc})}${ib(verb,{crit:1,sh:o.sh})}</span></div></div>`;
+const ctr=(icon,title,detail,btns,o={})=>panel(o.title||'Uninstall',`<div class="ctr">${icon}<div class="ct${o.warn?' warn':''}">${title}</div>${detail?`<div class="cd">${detail}</div>`:''}${o.extra||''}${btns?`<div class="cb">${btns}</div>`:''}</div>`);
+const track=f=>`<div class="trk"><i style="left:0;width:${f}%"></i></div>`;
+const trackInd=()=>`<div class="trk"><i style="left:28%;width:34%"></i></div>`;
+const bar=(lead,t,a,o={})=>`<div class="desk"><div class="bar"><span style="width:8px"></span><span class="lead${o.cau?' cau':''}${o.ok?' ok':''}">${lead}</span><span style="width:10px"></span><span class="lines"><span class="bt${o.cau?' cau':''}">${t}</span><span class="ba">${a}</span></span><span style="width:10px"></span><span class="pet"><span></span></span></div></div>`;
+const ring=f=>`<svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="var(--hair)" stroke-width="2.5"/><circle cx="12" cy="12" r="9" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="${(56.5*f).toFixed(1)} 56.5" transform="rotate(-90 12 12)"/></svg>`;
+const pager=(a,b,n)=>`<div class="foot"><span class="t3" style="margin-right:auto">${a}–${b} of ${n}</span><button class="ib" aria-label="Previous">${g('chevron-left',16)}</button><button class="ib" aria-label="Next">${g('chevron-right',16)}</button></div>`;
+
+/* ---------- island boards ---------- */
+const mrow=(glyph,n,right,o={})=>`<div class="lrow${o.hov?' hov':''}">${g(glyph,16)}<span class="nm">${n}</span>${right}${g(o.open?'square-arrow-out-up-right':'chevron-right',12)}</div>`;
+const appsMenu=panel('Apps',`<div class="menu2">${mrow('refresh-cw','Update apps','<span class="badge">5</span>')+mrow('trash-2','Clean junk files','<span class="t3">1.0 GB</span>')+mrow('package-x','Uninstall','',{open:1,hov:1})}</div>`);
+const sUninstall=search('uninstall',
+  isr(g('package-x',16),'Uninstall app','Settings',{sel:1,verb:'Open',open:1})+
+  isr(g('scan-search',16),'Scan for leftovers','Uninstaller')+
+  isr(g('package-x',16),'Uninstaller','Settings'));
+const sNotepad=search('uninstall notepad',
+  isr(aic('Notepad++',22),'Uninstall Notepad++','12.4 MB',{sel:1,verb:'Run',sh:1})+
+  isr(aic('Notepad',22),'Uninstall Notepad','Store app',{badge:''})+
+  isr(g('package-x',16),'Uninstall app','Settings'));
+const sRunning=search('uninstall firefox',
+  isr(aic('Firefox',22),'Uninstall Firefox','Running',{sel:1,warn:1})+
+  isr(g('package-x',16),'Uninstall app','Settings'));
+const sStore=search('uninstall slack',
+  isr(aic('Slack',22),'Uninstall Slack','291 MB',{sel:1,verb:'Run'})+
+  isr(g('package-x',16),'Uninstall app','Settings'));
+
+const pickRow=(n,o={})=>{const a=byName(n);return isr(aic(n,22),n,o.dt||`${a[1]} · ${fmtSize(a[3])}`,{sel:o.sel,verb:o.verb,sh:o.sh,badge:(isNew(a[4])?'<span class="badge new">New</span>':'')+(a[5]==='store'?'<span class="badge">Store</span>':'')})};
+const pickAll=['7-Zip','Adobe Acrobat Reader','Audacity','Blender','Calculator','Discord','Docker Desktop'].map((n,i)=>pickRow(n,i===0?{sel:1,verb:'Uninstall',sh:1}:{})).join('');
+const pickUninstall=search('',pickAll,{ph:'Search apps',foot:pager(1,7,41)});
+const pickType=search('note',pickRow('Notepad++',{sel:1,verb:'Uninstall',sh:1})+pickRow('Notepad')+pickRow('Notion')+pickRow('OneNote')+pickRow('Sticky Notes'),{foot:`<div class="foot"><span class="t3" style="margin-right:auto">5 apps</span></div>`});
+const pickNone=search('zzq',`<div class="ctr" style="height:262px">${g('search',24)}<div class="ct">No apps match</div></div>`);
+const scanRow=(n,when,o={})=>isr(aic(n,22),n,when,{sel:o.sel,verb:o.verb,warn:o.warn});
+const pickScan=panel('Scan for leftovers',`<div class="sfield" style="margin:0 0 8px;flex:none">${g('search',14)}<span class="ph">Search</span></div>`+
+  scanRow('Firefox','Yesterday',{sel:1,verb:'Scan'})+scanRow('Slack','Nov 14')+scanRow('Blender','Oct 17 · No record',{warn:1}));
+const pickScanEmpty=panel('Scan for leftovers',`<div class="ctr">${g('history',24)}<div class="ct">Nothing uninstalled</div></div>`);
+
+const runWait=ctr(uac(28),'Waiting for admin','');
+const runNow=ctr(g('loader',28),'Uninstalling Notepad++','','',{extra:trackInd()});
+const runWiz=ctr(g('app-window',28),'Uninstalling Notepad++','','');
+const runDone=ctr(g('circle-check',28),'Notepad++ uninstalled','',ib('Done')+ib('Scan',{acc:1}));
+const runFail=ctr(g('circle-alert',28),'Uninstall failed','',ib('Done')+ib('Retry',{acc:1}),{warn:1});
+const runAdmin=ctr(uac(28),'Needs admin','',ib('Done')+ib('Retry',{acc:1,sh:1}),{warn:1});
+const runClose=ctr(g('app-window',28),'Notepad++ is running','',ib('Done')+ib('Retry',{acc:1}),{warn:1});
+const runReboot=ctr(g('rotate-cw',28),'Restart to finish','',ib('Done',{acc:1}));
+
+const B={
+'sheet-entry':()=>`<div class="srow">${LP('Actions › Apps: Uninstall opens Settings (hover shown); the open glyph is the same as Arrangements\' Manage',stage(appsMenu))}${LP('Search "uninstall": every verb is a row; Uninstall app opens Settings with its search focused',stage(sUninstall))}</div>
+ <div class="srow">${LP('Search "uninstall notepad": the app is a row; Run asks first, and the UAC shield says the helper will be used (an HKLM app)',stage(sNotepad))}${LP('A per-user app (HKCU) has no shield: it runs as Travis, never elevated',stage(sStore))}</div>
+ <div class="srow">${LP('The app is running: the row says so and has no Run',stage(sRunning))}</div>`,
+'sheet-confirm':()=>`<div class="srow">${LP('Confirm for an app that needs the helper: Cancel has focus, the verb is Critical and carries the shield',stage(confirm('Uninstall Notepad++?','Uninstall',{sh:1,foc:1})))}${LP('Confirm for a per-user or Store app: no shield',stage(confirm('Uninstall Slack?','Uninstall')))}</div>
+ <div class="srow">${LP('Closing Chippi in the middle of a queue',stage(confirm('Stop uninstalling and quit?','Quit')))}</div>`,
+'sheet-pickers':()=>`<div class="srow">${LP('Shortcut: Uninstall app. A search list, five to seven apps a page; Enter asks the same confirm',stage(pickUninstall))}${LP('Typing filters on every keystroke',stage(pickType))}</div>
+ <div class="srow">${LP('Nothing matches',stage(pickNone))}${LP('Shortcut: Scan for leftovers. Only apps whose record Chippi still holds; Scan opens Settings at the review',stage(pickScan))}</div>
+ <div class="srow">${LP('Nothing uninstalled recently',stage(pickScanEmpty))}</div>`,
+'sheet-run':()=>`<div class="srow">${LP('Waiting for admin: the Windows prompt is open',stage(runWait))}${LP('Running its quiet uninstaller',stage(runNow))}</div>
+ <div class="srow">${LP('A wizard-only uninstaller: its window shows on screen and Travis finishes it',stage(runWiz))}${LP('Finished: Scan for leftovers opens Settings at the review',stage(runDone))}</div>
+ <div class="srow">${LP('The uninstaller failed or was cancelled: the entry is still there, so no scan is offered',stage(runFail))}${LP('UAC declined',stage(runAdmin))}</div>
+ <div class="srow">${LP('The app is running: Chippi does not end it',stage(runClose))}${LP('The uninstaller wants a restart: the scan waits',stage(runReboot))}</div>`,
+'sheet-bar':()=>`<div class="srow">${L('Quiet uninstall running',bar(ring(.3),'Uninstalling','Notepad++'),DIP(256,50))}${L('A wizard is open',bar(g('app-window'),'Uninstalling','Notepad++'),DIP(256,50))}${L('A queue',bar(ring(.5),'Uninstalling','2 of 3'),DIP(256,50))}</div>
+ <div class="srow">${L('Windows prompt open',bar(uac(18),'Waiting for admin','Notepad++'),DIP(256,50))}${L('UAC declined',bar(uac(18),'Needs admin','Notepad++',{cau:1}),DIP(256,50))}${L('The app is running',bar(g('app-window'),'Notepad++ is running','',{cau:1}),DIP(256,50))}</div>
+ <div class="srow">${L('Done: pressing it opens the review',bar(g('check'),'Uninstalled','Notepad++',{ok:1}),DIP(256,50))}${L('Uninstaller failed',bar(g('triangle-alert'),'Uninstall failed','Notepad++',{cau:1}),DIP(256,50))}${L('A restart is pending',bar(g('rotate-cw'),'Restart to finish','Notepad++'),DIP(256,50))}</div>
+ <div class="srow">${L('Scanning',bar(ring(.6),'Scanning','Firefox'),DIP(256,50))}${L('Scan found items',bar(g('scan-search'),'13 leftovers','Firefox'),DIP(256,50))}${L('Removing',bar(ring(.4),'Removing','4 of 10'),DIP(256,50))}</div>
+ <div class="srow">${L('Removed',bar(g('check'),'7 removed','3 not removed',{ok:1}),DIP(256,50))}${L('Remove failed',bar(g('triangle-alert'),'Remove failed','Firefox',{cau:1}),DIP(256,50))}${L('Helper declined at the prompt',bar(uac(18),'Needs admin','8 kept',{cau:1}),DIP(256,50))}</div>`
+};
+
+/* ---------- Settings helpers ---------- */
+const nav=(gl,n,sel)=>`<div class="nav${sel?' sel':''}">${g(gl,16)}${n}</div>`;
+const side=()=>`<div class="side"><div class="find">${g('search',14)}Find a setting</div>
+ <div class="gl">System</div>${nav('coffee','Keep awake')}${nav('sun','Displays')}
+ <div class="gl">Windows</div>${nav('app-window','App switcher')}${nav('layout-grid','Snap')}
+ <div class="gl">Capture</div>${nav('scan','Screen capture')}
+ <div class="gl">Apps</div>${nav('refresh-cw','App updates')}${nav('package-x','Uninstaller',1)}
+ <div class="gl">Chippi</div>${nav('settings','General')}${nav('keyboard','Shortcuts')}${nav('plus','Add features')}</div>`;
+const rail=()=>`<div class="rail"><div class="nv">${g('menu',16)}</div><div class="nv">${g('search',16)}</div><div class="hr"></div><div class="nv">${g('coffee',16)}</div><div class="nv">${g('sun',16)}</div><div class="hr"></div><div class="nv">${g('app-window',16)}</div><div class="nv">${g('layout-grid',16)}</div><div class="hr"></div><div class="nv">${g('scan',16)}</div><div class="hr"></div><div class="nv">${g('refresh-cw',16)}</div><div class="nv sel">${g('package-x',16)}</div><div class="hr"></div><div class="nv">${g('settings',16)}</div><div class="nv">${g('keyboard',16)}</div><div class="nv">${g('plus',16)}</div></div>`;
+ICONS.menu='<line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/>';
+const frame=(content,o={})=>`<div class="sw1${o.narrow?' nar':''}"><div class="tbar"><span class="logo"></span><span class="tt">Chippi Settings</span><span class="cb">${g('minus',12)}</span><span class="cb">${g('square',11)}</span><span class="cb">${g('x',12)}</span></div><div class="shell">${o.narrow?rail():side()}<div class="page">${content}${o.pop||''}</div></div></div>`;
+const sbt=(t,o={})=>`<span class="sbt${o.sm?' sm':''}${o.acc?' acc':''}${o.crit?' crit':''}${o.dis?' dis':''}${o.foc?' foc':''}">${o.sh?uac(o.sm?14:16):''}${o.g?g(o.g,o.sm?14:16):''}${t}</span>`;
+const sib=(gl,o={})=>`<span class="sib${o.hov?' hov':''}${o.dis?' dis':''}">${g(gl,16)}</span>`;
+const ck=(st)=>`<span class="sck${st?' on':''}">${st==='mixed'?g('minus',14,' stroke-width="2.2"'):st?g('check',14,' stroke-width="2.2"'):''}</span>`;
+const tabs=(sel,n)=>`<div class="tabs"><div class="tab${sel==='apps'?' sel':''}">Apps</div><div class="tab${sel==='unin'?' sel':''}">Uninstalled${n?` <span class="n">${n}</span>`:''}</div><div class="tab${sel==='keys'?' sel':''}">Shortcuts</div></div>`;
+const head=(sel,n)=>`<div class="ptitle">Uninstaller</div>${tabs(sel,n)}`;
+const COLS='20px 28px minmax(0,1fr) 124px 64px 108px 16px 112px';
+const toolbar=(o={})=>`<div class="tool"><div class="sfld${o.foc===false?'':' foc'}">${g('search',16)}${o.q?`<span>${o.q}</span><span class="scaret"></span>`:`<span class="ph">Search apps</span><span class="scaret"></span>`}</div><span class="dd">${o.filter||'All apps'}${g('chevron-down',14)}</span></div>`;
+const lhead=(o={})=>`<div class="lh" style="--cols:${COLS}"><span>${ck(o.all||0)}</span><span></span><span class="s${o.sort==='n'||!o.sort?' on':''}">Name ${g('arrow-up',12)}</span><span class="s">Publisher</span><span class="s" style="justify-content:flex-end">Size</span><span class="s" style="padding-left:16px">Installed</span><span></span><span></span></div>`;
+/* one app row; o: cap/capCls (second line), right (html), on (ticked), hov, dim, prog */
+const kindTag=a=>(a[5]==='store'?'<span class="sbadge">Store</span>':'')+(isNew(a[4])?'<span class="sbadge new">New</span>':'');
+const arow=(name,o={})=>{const a=byName(name);const cap=o.cap!=null?o.cap:a[2];
+ const right=o.right!=null?o.right:(a[5]==='comp'||a[5]==='self')?'':`${sbt('Uninstall',{sm:1,dis:o.dis})}${sib('folder-open',{hov:o.hovf,dis:o.dis})}`;
+ const adm=a[5]==='hklm'&&!o.noadm?uac(14):'';
+ return `<div class="lr${o.hov?' hov':''}${o.dim?' dim':''}" style="--cols:${COLS}"><span>${ck(o.on)}</span>${aic(name,28)}<span class="nc"><div class="n1"><span class="t">${name}</span>${kindTag(a)}</div><div class="n2${o.capCls?' '+o.capCls:''}">${cap}${o.prog!=null?`<span class="prg"><i style="width:${o.prog}%"></i></span>`:''}</div></span><span class="pc">${a[1]}</span><span class="sc r">${fmtSize(a[3])}</span><span class="sc" style="padding-left:16px">${fmtDate(a[4])}</span><span class="adc">${adm}</span><span class="ac">${right}</span></div>`};
+const lcard=(rows,o={})=>`<div class="lwrap"><div class="lcard${o.fit?' fit':''}">${lhead(o.head)}${rows}${o.fit?'':`<div class="fsb" style="top:44px;height:${o.sbh||96}px"></div>`}</div>${o.pop||''}</div>`;
+const FIRST=['7-Zip','Adobe Acrobat Reader','Audacity','Blender','Calculator','Discord','Docker Desktop','Dropbox','Epic Games Launcher','Figma','Firefox'];
+const plain=(names,o={})=>names.map((n,i)=>arow(n,typeof o==='function'?o(n,i):{})).join('');
+const count=(t,extra='')=>`<div class="cnt"><span>${t}</span>${extra}<span class="sp"></span></div>`;
+const pbar=(inner)=>`<div class="pbar">${inner}</div>`;
+const spop=(style,html)=>`<div class="spop" style="${style}">${html}</div>`;
+
+/* the leftover review: Firefox, with Thunderbird still installed (the brief's Mozilla case) */
+const SAFE=[
+ {k:'folder',p:'C:\\Program Files\\Mozilla Firefox',sz:'1.2 MB',why:'',adm:1,st:'ok'},
+ {k:'folder',p:'C:\\Program Files (x86)\\Mozilla Maintenance Service',sz:'312 KB',why:'',adm:1,st:'kept:changed since the scan'},
+ {k:'file',p:'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Firefox.lnk',sz:'1 KB',why:'',adm:1,st:'ok'},
+ {k:'file',p:'C:\\Users\\Public\\Desktop\\Firefox.lnk',sz:'1 KB',why:'',adm:1,st:'ok'},
+ {k:'folder',p:'C:\\ProgramData\\Mozilla-1de4eec8-1241-4177-a864-acaac3b1b5ae',sz:'38 MB',why:'',adm:1,st:'use'},
+ {k:'folder',p:'C:\\Users\\Travis\\AppData\\Local\\Mozilla\\updates\\308046B0AF4A39CB',sz:'26 MB',why:'',st:'ok'},
+ {k:'file',p:'C:\\Users\\Travis\\Desktop\\Firefox.lnk',sz:'1 KB',why:'',st:'ok'},
+ {k:'key',p:'HKLM\\SOFTWARE\\Mozilla\\Firefox\\132.0.1 (x64 en-US)',sz:'',why:'',adm:1,st:'ok'},
+ {k:'key',p:'HKLM\\SOFTWARE\\Clients\\StartMenuInternet\\Firefox-308046B0AF4A39CB',sz:'',why:'',adm:1,st:'ok'},
+ {k:'file',p:'C:\\ProgramData\\Mozilla\\updates\\308046B0AF4A39CB\\update-backup.bin',sz:'6.4 GB',why:'',tag:'<span class="sbadge w">No Recycle Bin</span>',adm:1,st:'fail'}
+];
+const CHECK=[
+ {k:'folder',p:'C:\\Users\\Travis\\AppData\\Roaming\\Mozilla\\Firefox',sz:'482 MB',why:''},
+ {k:'folder',p:'C:\\Users\\Travis\\AppData\\Local\\Mozilla\\Firefox',sz:'1.1 GB',why:''},
+ {k:'key',p:'HKCU\\Software\\Mozilla\\Firefox',sz:'',why:''}
+];
+const SHARED=[
+ {k:'folder',p:'C:\\ProgramData\\Mozilla',sz:'9 MB',why:'Thunderbird'},
+ {k:'key',p:'HKLM\\SOFTWARE\\Mozilla',sz:'',why:'Thunderbird'}
+];
+const kg=k=>g(k==='folder'?'folder':k==='key'?'key-round':'file',16);
+const rrow=(it,o={})=>{
+ let right='',whyCls='';
+ if(o.res){const [s,why]=it.st.split(':');
+   if(s==='ok')right=`<span class="stt good">${g('check',14)}</span>`;
+ }
+ const st=o.res?(it.st==='ok'?['Removed','g']:it.st==='use'?['In use','w']:it.st==='fail'?['Remove failed','w']:it.st==='admin'?['Needs admin','w']:['Kept','w']):null;
+ const second='';
+ const szcol=o.res&&st[1]!=='g'?`<span class="stt ${st[1]}">${st[0]}</span>`:`<span class="sz">${it.sz}</span>`;
+ const lead=o.res?(st[1]==='g'?`<span class="good">${g('circle-check',16)}</span>`:`<span class="warn">${g('circle-alert',16)}</span>`):(o.shared?`<span></span>`:ck(o.on));
+ const why='';
+ const whyc=o.res?(st[1]==='g'?'':'w'):'';
+ return `<div class="rr${o.shared?' dim':''}">${lead}<span class="ks">${kg(it.k)}</span><span style="min-width:0"><div class="pth">${it.p}</div>${o.shared||it.tag&&!o.res?`<div class="why">${o.shared?g('lock',12)+it.why:it.tag}</div>`:''}</span>${o.res&&st[1]!=='g'?`<span class="stt ${st[1]}" style="grid-column:4/6;text-align:right;white-space:nowrap">${st[0]}</span>`:`<span class="sz">${it.sz}</span><span>${it.adm&&!o.res&&!o.shared?`<span title="Needs admin" style="display:flex">${uac(16)}</span>`:''}</span>`}</div>`};
+const grp=(title,tagHtml,sub,st,open=true)=>`<div class="gh"><span>${st===null?'':ck(st)}</span><span style="color:var(--st3)">${g(open?'chevron-down':'chevron-right',14)}</span><span class="gt">${title}${tagHtml}<small>${sub}</small></span><span></span></div>`;
+const rhead=(m='mixed')=>`<div class="rhd"><span>${ck(m)}</span><span></span><span>Item</span><span style="text-align:right">Size</span><span></span></div>`;
+const rcard=(rows,fit)=>`<div class="lwrap" style="margin-bottom:${fit?'0':'28px'}"><div class="lcard${fit?' fit':''}">${rows}${fit?'':`<div class="fsb" style="top:60px;height:140px"></div>`}</div></div>`;
+const revHead=(t)=>`<div class="ptitle"><span class="sib" style="width:32px;height:32px;margin-left:-8px">${g('arrow-left',18)}</span>${t}</div>`;
+ICONS['arrow-left']='<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>';
+const reviewBody=(o={})=>{
+ const on=o.on!==false;
+ return `${rhead(o.mixed)}${grp('Safe','','10',on?true:false,!o.fold)}${o.fold?'':SAFE.map(it=>rrow(it,{on})).join('')}`+
+  `${grp('Check first','','3',false)}${CHECK.map(it=>rrow(it,{on:false})).join('')}`+
+  `${grp('Shared','','2',null)}${SHARED.map(it=>rrow(it,{shared:1})).join('')}`;
+};
+const BK='%APPDATA%\\Chippi\\Uninstaller\\Firefox-2026-11-17.reg';
+
+/* ---------- Settings boards ---------- */
+const listPage=(o={})=>head('apps')+toolbar(o.tool||{})+count(o.count||'38 apps',`<span style="margin-right:4px;display:flex">${g('refresh-cw',12)}</span>`)+(o.body||lcard(plain(FIRST,(n)=>({})),{}))+(o.bar||'');
+const sPop=(top,html,right=16,w=340)=>`<div class="spop" style="top:${top}px;right:${right}px;width:${w}px">${html}</div>`;
+const confirmTxt=(t,names)=>`<h3>${t}</h3>`;
+const queueRows=(states)=>['Adobe Acrobat Reader','Audacity','Blender'].map((n,i)=>states[i]).join('');
+const unRow=(n,cap,right,o={})=>{const a=byName(n);return `<div class="sr" style="min-height:56px">${aic(n,32)}<span class="tl"><div style="font-size:14px">${n}</div><div style="font-size:12px;color:var(--${o.warn?'warn':'st3'})">${cap}</div></span>${right}</div>`};
+
+B['settings-list']=()=>frame(listPage({count:'38 apps'}));
+B['settings-list-narrow']=()=>frame(listPage({body:lcard(plain(FIRST),{})}),{narrow:1});
+B['settings-search']=()=>frame(listPage({tool:{q:'note'},count:'5 of 38 apps',body:lcard(['Notepad','Notepad++','Notion','OneNote','Sticky Notes'].map(n=>arow(n,n==='Notepad++'?{hov:1,hovf:0}:{})).join(''),{fit:1})}));
+B['settings-confirm']=()=>frame(listPage({body:lcard(['Discord','Docker Desktop','Dropbox','Epic Games Launcher','Figma','Firefox','Git','GitHub Desktop','Google Chrome','HandBrake'].map(n=>n==='Git'?arow(n,{hov:1}):arow(n)).join(''),{sbh:100,pop:sPop(36+36+6*48+40,`<h3>Uninstall Git?</h3><div class="bt" style="margin-top:12px">${sbt('Cancel',{foc:1})}${sbt('Uninstall',{crit:1,sh:1})}</div>`,134,300)})}));
+B['settings-selected']=()=>frame(listPage({body:lcard(['Adobe Acrobat Reader','Audacity','Blender','Calculator','Discord','Docker Desktop','Dropbox','Epic Games Launcher','Figma','Firefox'].map(n=>arow(n,{on:['Adobe Acrobat Reader','Audacity','Blender'].includes(n)})).join(''),{head:{all:'mixed'},sbh:100}),bar:pbar(`<span class="tx">3 selected<small>2.2 GB</small></span><span class="sp"></span>${sbt('Clear')}${sbt('Uninstall',{acc:1,sh:1})}`)}));
+B['settings-confirm-queue']=()=>{
+ const names=['Adobe Acrobat Reader','Audacity','Blender'];
+ const pop=spop('right:40px;bottom:68px;width:380px',`<h3>Uninstall 3 apps?</h3><div class="cl">${names.map(n=>`<div class="cr">${aic(n,20)}<span>${n}</span><span class="v">${byName(n)[2].split('.').slice(0,3).join('.')}</span></div>`).join('')}</div><div class="bt">${sbt('Cancel',{foc:1})}${sbt('Uninstall',{crit:1,sh:1})}</div>`);
+ return frame(listPage({body:lcard(['Adobe Acrobat Reader','Audacity','Blender','Calculator','Discord','Docker Desktop','Dropbox','Epic Games Launcher','Figma','Firefox'].map(n=>arow(n,{on:names.includes(n)})).join(''),{head:{all:'mixed'},sbh:100}),bar:pbar(`<span class="tx">3 selected<small>2.2 GB</small></span><span class="sp"></span>${sbt('Clear')}${sbt('Uninstall',{acc:1,sh:1})}`)}),{pop});
+};
+B['settings-queue']=()=>frame(listPage({count:'Uninstalling 3 apps',body:lcard(
+  arow('Adobe Acrobat Reader',{on:1,cap:'Uninstalled',capCls:'g',right:`${sbt('Scan',{sm:1})}`})+
+  arow('Audacity',{on:1,cap:'Uninstalling',prog:62,right:''})+
+  arow('Blender',{on:1,cap:'Queued',right:''})+
+  ['Calculator','Discord','Docker Desktop','Dropbox','Epic Games Launcher','Figma','Firefox'].map(n=>arow(n,{dim:1,dis:1})).join(''),{head:{all:'mixed'},sbh:100}),
+  bar:pbar(`<span class="tx">Uninstalling 2 of 3</span><span class="sp"></span>`)}));
+B['settings-queue-done']=()=>frame(listPage({count:'38 apps',body:lcard(
+  arow('Adobe Acrobat Reader',{cap:'Uninstalled',capCls:'g',right:`${sbt('Scan',{sm:1})}`,noadm:1})+
+  arow('Audacity',{cap:'Uninstalled',capCls:'g',right:`${sbt('Scan',{sm:1})}`,noadm:1})+
+  arow('Blender',{cap:'Uninstall failed',capCls:'w',right:`${sbt('Uninstall',{sm:1})}${sib('folder-open')}`})+
+  ['Calculator','Discord','Docker Desktop','Dropbox','Epic Games Launcher','Figma','Firefox'].map(n=>arow(n)).join(''),{sbh:100})}));
+B['sheet-row-states']=()=>`<div class="srow">${L('Row states on Apps (each row is 48 DIP; the second line is the version until something needs saying)',`<div class="${theme}" style="width:768px;--cols:${COLS}"><div class="lcard fit" style="border-radius:8px">${lhead()}${[
+  arow('Notepad++',{}),
+  arow('Slack',{}),
+  arow('Firefox',{cap:'Running',capCls:'w',dis:1}),
+  arow('Git',{cap:'Waiting for admin',right:''}),
+  arow('Discord',{cap:'Uninstalling',prog:55,right:''}),
+  arow('Spotify',{cap:'Uninstaller open',right:''}),
+  arow('VLC media player',{cap:'Needs admin',capCls:'w'}),
+  arow('WinRAR',{cap:'Uninstall failed',capCls:'w'}),
+  arow('Zoom Workplace',{cap:'No uninstaller',capCls:'w',dis:1}),
+  arow('Python 3.13.0',{cap:'Restart to finish',right:`${sbt('Scan',{sm:1,dis:1})}`,noadm:1}),
+  arow('OBS Studio',{cap:'Uninstalled',capCls:'g',right:`${sbt('Scan',{sm:1})}`,noadm:1}),
+  arow('Calculator',{}),
+  arow('Chippi',{}),
+  arow('Microsoft .NET Runtime 8.0.10',{})
+ ].join('')}</div></div>`,DIP(768,'row'))}</div>`;
+B['sheet-list-states']=()=>{
+ const wrap=(inner)=>`<div class="${theme}" style="width:768px;color:var(--st1);font-size:14px;line-height:20px;background:var(--win);padding:16px;border-radius:8px;--cols:${COLS}">${inner}</div>`;
+ const sk=(i)=>`<div class="lr" style="--cols:${COLS};opacity:${1-i*.16}"><span>${ck(0)}</span><span class="sk" style="width:28px;height:28px;border-radius:6px"></span><span class="nc"><div class="sk" style="width:${130+(i*37)%90}px;margin-bottom:8px"></div><div class="sk" style="width:60px;height:8px"></div></span><span><div class="sk" style="width:90px"></div></span><span><div class="sk" style="width:40px;margin-left:auto"></div></span><span><div class="sk" style="width:70px"></div></span><span></span></div>`;
+ const tb=(o)=>`<div style="margin-bottom:8px">${toolbar(o)}</div>`;
+ return `<div class="srow">${L('First open with nothing cached: the toolbar is live, rows fill in as they are read. Later opens show the cached list at once and refresh behind it',wrap(tb({})+`<div class="lcard fit">${lhead()}${[0,1,2,3,4].map(sk).join('')}</div>`+``),DIP(768,'section'))}</div>
+ <div class="srow">${L('Nothing matches the search',wrap(tb({q:'zzq'})+`<div class="lcard fit">${lhead()}<div class="emptyrow">${g('search',16)}No apps match</div></div>`),DIP(768,'section'))}${L('Windows components are shown only when asked: the chip is on and rows have no verb',wrap(tb({filter:'Windows components'})+`<div class="lcard fit">${lhead()}${['Microsoft .NET Runtime 8.0.10','Microsoft Edge WebView2 Runtime','Microsoft Visual C++ 2015-2022 Redistributable (x64)'].map(n=>arow(n)).join('')}</div>`),DIP(768,'section'))}</div>
+ <div class="srow">${L('Reading the installed apps failed',wrap(tb({foc:false})+`<div class="lcard fit">${lhead()}<div class="emptyrow" style="min-height:72px"><span class="warn">${g('circle-alert',20)}</span><span class="warn" style="flex:1">Reading apps failed</span>${sbt('Retry',{sm:1})}</div></div>`),DIP(768,'section'))}${L('Uninstalled tab with nothing in it',wrap(`<div style="margin:-4px 0 8px">${tabs('unin',0)}</div><div class="scard"><div class="emptyrow">${g('history',16)}Nothing uninstalled lately</div></div>`),DIP(768,'section'))}</div>`;
+};
+B['settings-uninstalled']=()=>frame(head('unin',4)+`<div class="scard">${
+ unRow('Firefox','Yesterday',sbt('Scan',{sm:1}))+
+ unRow('Slack','Nov 14',sbt('Scan',{sm:1}))+
+ unRow('Notepad++','Nov 13',`<span class="stt good" style="display:flex;gap:5px;font-size:12px;align-items:center">${g('check',14)}Cleaned</span>`)+
+ unRow('Blender','Oct 17 · No record',sbt('Scan',{sm:1}),{warn:0})
+}</div>`);
+B['settings-shortcuts']=()=>frame(head('keys')+`<div class="scard">${
+ [['Uninstall app','','package-x'],['Scan for leftovers','','scan-search']].map(([n,k,gl])=>`<div class="sr"><span class="lead">${g(gl,20)}</span><span class="tl">${n}</span><span class="path" style="margin-right:12px">${k?'':'Not set'}</span><span class="edit">Edit ${g('square-arrow-out-up-right',14)}</span></div>`).join('')
+}</div>`);
+
+/* review boards */
+const barRev=(extra='')=>pbar(`<span class="tx">10 ticked<small>6.5 GB</small></span><span class="sp"></span>${sbt('Cancel')}${sbt('Remove',{acc:1,sh:1})}`);
+B['settings-scan']=()=>frame(revHead('Firefox leftovers')+`<div class="lcard fit"><div class="emptyrow" style="min-height:96px;flex-direction:column;justify-content:center;gap:8px;color:var(--st1)"><span style="color:var(--st2)">${g('scan-search',24)}</span><span>Scanning</span><span class="prg" style="width:200px;margin-top:0"><i style="width:46%"></i></span><span style="font-size:12px;color:var(--st3)">9 found</span></div></div>`+pbar(`<span class="sp"></span>${sbt('Cancel')}`));
+B['settings-review']=()=>frame(revHead('Firefox leftovers')+rcard(reviewBody())+barRev());
+B['settings-review-shared']=()=>frame(revHead('Firefox leftovers')+rcard(reviewBody({fold:1}),1)+barRev());
+B['settings-review-norecord']=()=>frame(revHead('Firefox leftovers')+`<div class="lwrap" style="margin-bottom:28px"><div class="lcard">${`<div class="sum"><span class="warn">${g('circle-alert',20)}</span><span class="tl"><div>No uninstall record</div></span></div>`}${rhead(0)}${grp('Check first','','3',false)}${CHECK.map(it=>rrow(it,{on:false})).join('')}</div></div>`+pbar(`<span class="tx">0 ticked</span><span class="sp"></span>${sbt('Cancel')}${sbt('Remove',{acc:1,dis:1})}`));
+B['settings-review-empty']=()=>frame(revHead('Firefox leftovers')+`<div class="lcard fit"><div class="emptyrow" style="min-height:72px;color:var(--st2)"><span class="good">${g('circle-check',20)}</span>No leftovers</div></div>`+pbar(`<span class="sp"></span>${sbt('Done',{acc:1})}`));
+B['settings-review-confirm']=()=>{
+ const pop=spop('right:40px;bottom:68px;width:300px',`<h3>Remove 10 items?</h3><div class="bt" style="margin-top:12px">${sbt('Cancel',{foc:1})}${sbt('Remove',{crit:1,sh:1})}</div>`);
+ return frame(revHead('Firefox leftovers')+rcard(reviewBody())+barRev(),{pop});
+};
+B['settings-removing']=()=>{
+ const body=`${rhead()}${grp('Safe','','Removing 4 of 10',true)}`+SAFE.map((it,i)=>{
+   if(i<3){return `<div class="rr">${`<span class="good">${g('circle-check',16)}</span>`}<span class="ks">${kg(it.k)}</span><span style="min-width:0"><div class="pth">${it.p}</div></span><span class="sz">${it.sz}</span><span></span></div>`}
+   if(i===3){return `<div class="rr"><span style="color:var(--sacc)">${g('loader',16)}</span><span class="ks">${kg(it.k)}</span><span style="min-width:0"><div class="pth">${it.p}</div></span><span class="sz">${it.sz}</span><span>${it.adm?uac(16):''}</span></div>`}
+   return `<div class="rr" style="opacity:.6"><span>${ck(1)}</span><span class="ks">${kg(it.k)}</span><span style="min-width:0"><div class="pth">${it.p}</div></span><span class="sz">${it.sz}</span><span>${it.adm?uac(16):''}</span></div>`}).join('');
+ return frame(revHead('Firefox leftovers')+rcard(body)+pbar(`<span class="tx">Removing 4 of 10</span><span class="prg" style="width:200px;margin:0 0 0 8px"><i style="width:40%"></i></span><span class="sp"></span>`));
+};
+const resBody=(admin)=>{
+ const items=SAFE.map(it=>admin&&it.adm?{...it,st:'admin'}:it);
+ const bad=items.filter(i=>i.st!=='ok'),good=items.filter(i=>i.st==='ok');
+ const head1=admin?`<div class="sum"><span class="warn">${g('circle-alert',20)}</span><span class="tl"><div>Needs admin</div><div style="font-size:12px;color:var(--st3)">8 not removed</div></span>${sbt('Remove',{sm:1,sh:1})}</div>`:`<div class="sum"><span class="good">${g('circle-check',20)}</span><span class="tl"><div>7 removed</div><div style="font-size:12px;color:var(--st3)">3 not removed</div></span></div>`;
+ const backup=`<div class="sum" style="border-top:1px solid var(--div)"><span style="color:var(--st2)">${g('file',20)}</span><span class="tl"><div>Registry backup</div><div style="font-size:12px;color:var(--st3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${BK}</div></span>${sbt('Open folder',{sm:1,g:'folder-open'})}</div>`;
+ return head1+backup+grp('Not removed','<span class="sbadge w">'+bad.length+'</span>','',null)+bad.map(it=>rrow(it,{res:1})).join('')+grp('Removed','<span class="sbadge g">'+good.length+'</span>','',null,false);
+};
+B['settings-results']=()=>frame(revHead('Firefox leftovers')+rcard(resBody(false))+pbar(`<span class="sp"></span>${sbt('Done',{acc:1})}`));
+B['settings-results-norecord']=()=>{
+ const kept=[{k:'folder',p:'C:\\Program Files\\Mozilla Firefox',sz:'1.2 MB',st:'kept:no uninstall record'},{k:'folder',p:'C:\\ProgramData\\Mozilla-1de4eec8-1241-4177-a864-acaac3b1b5ae',sz:'38 MB',st:'kept:no uninstall record'},{k:'key',p:'HKLM\\SOFTWARE\\Mozilla\\Firefox\\132.0.1 (x64 en-US)',sz:'',st:'kept:no uninstall record'}];
+ const gone=CHECK.map(it=>({...it,st:'ok'}));
+ const sum=`<div class="sum"><span class="good">${g('circle-check',20)}</span><span class="tl"><div>3 removed</div><div style="font-size:12px;color:var(--st3)">3 kept</div></span></div>`;
+ return frame(revHead('Firefox leftovers')+rcard(sum+grp('Not removed','<span class="sbadge w">3</span>','',null)+kept.map(it=>rrow(it,{res:1})).join('')+grp('Removed','<span class="sbadge g">3</span>','',null,false)+gone.map(it=>rrow(it,{res:1})).join(''))+pbar(`<span class="sp"></span>${sbt('Done',{acc:1})}`));
+};
+B['settings-results-admin']=()=>frame(revHead('Firefox leftovers')+rcard(resBody(true))+pbar(`<span class="sp"></span>${sbt('Done',{acc:1})}`));
+
+document.body.className=theme;
+const html=B[board]();
+const wrap=board.startsWith('sheet')?`<div class="sheet ${theme==='light'?'lt':''}"><div class="${theme}" style="display:contents">${html}</div></div>`:`<div style="display:inline-block;padding:24px;background:${theme==='light'?'#D9D9D9':'#161616'}"><div class="${theme}">${html}</div></div>`;
+document.getElementById('root').innerHTML=wrap;
+const el=document.getElementById('root').firstElementChild;
+document.body.dataset.size=Math.ceil(el.getBoundingClientRect().width)+','+Math.ceil(el.getBoundingClientRect().height);
+</script>
+</body>
+</html>

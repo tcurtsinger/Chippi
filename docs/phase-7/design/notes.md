@@ -50,3 +50,19 @@ The later alternatives and future feature concepts from PR #287 are preserved in
 - **Results:** Text · 31 words · Reselect · Copy all · QR code · Link · Text · Copy · Open link · "1 2 of 2" · Color · Copied · HEX · RGB · HSL · Pick again
 - **Displays:** Displays · Brightness · Contrast · All displays · Main · Brightness control failed
 - **Settings:** Shortcuts · Saving · Save folder · Change · Reset · Folder not found · File type · When a capture finishes · Do what I press · Selecting · Ctrl+drag copies on release · Magnifier · Recent captures · Keep recent captures · The last 50 you copied or saved · Clear · Copying · Copy as · Recent colors · Text · Language · Languages installed in Windows · Keep line breaks · Brightness keys · Act on · Display under the pointer · Step · Try again · "Turn on DDC/CI in the monitor's menu, or connect it without a dock" · Not set · Edit · Record · Add shortcut
+
+## Wave 3: Port manager, Cleaner, Uninstaller (2026-11-17)
+
+`port-manager.html`, `cleaner.html` and `uninstaller.html` draw the three tools from their briefs, for Travis's approval before they're built. Each board opens as `<page>.html?board=<name>&theme=dark|light`; every window, app, port and size is invented. The renders live in the session's temp folder, not here.
+
+**Copy is terse (Travis, 2026-11-17), and it overrides the briefs' copy tables:** labels, values and bare verbs only. A confirm is the verb and its object ("End node.exe?", "Clean 3.9 GB?", "Remove 10 items?") with at most one line of values under it ("Port 3000 · PID 4120"). A status is one or two words ("Kept", "In use", "Failed", "Needs admin", "Running"). No explanation, reassurance or consequence lines.
+
+**Layout:** the UAC shield sits in its own narrow column left of the verb, in lists, Search rows and the picker; only a confirm's verb and a bar's primary button carry it inside. Filters are one small dropdown ("All apps").
+
+**Color, from DESIGN.md:** failures, warnings, "Kept", "Check first" and "Needs admin" are Caution; outcomes where nothing went wrong ("Already closed", "Changed") are neutral; Critical fills only the verb inside a confirm that ends, deletes or uninstalls, and Cancel keeps focus. No new color tokens.
+
+### Calls made in the mockups
+
+- **Port manager:** Free, Stop and the shield only on listening TCP and bound UDP rows; connections, Time wait and ended rows have no verb. A process on several ports says "3 ports" in its question. Two processes on one port get Open (Settings filtered to the port). Chippi, System and the never-ended Windows processes show with no verb and never in the picker.
+- **Cleaner:** a trailing "+" marks a size that's only a lower bound. Clean is off with nothing ticked. Settings lists the categories as switches (the list's remembered ticks), then Shortcuts. Kept rows appear only in a run and its results.
+- **Uninstaller:** a file too big for the Recycle Bin is tagged "No Recycle Bin" in the review. Shared items are dimmed with a lock, no checkbox, and the other app's name. Results group "Not removed" above "Removed", with a status on each row. The Radial menu reuses Search's verb rows.

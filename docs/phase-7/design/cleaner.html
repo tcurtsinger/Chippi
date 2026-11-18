@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chippi Phase 7: Cleaner mockups</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;margin:0}
+svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+
+/* island tokens (Chippi.UI/Themes Dark.xaml / Light.xaml, as in docs/phase-6/design) */
+.dark{--fill:rgba(40,40,44,.961);--bord:rgba(255,255,255,.09);--hair:rgba(255,255,255,.078);--face:rgba(255,255,255,.024);--faceh:rgba(255,255,255,.10);--cardb:rgba(255,255,255,.059);
+ --btn:rgba(255,255,255,.071);--ctlb:rgba(255,255,255,.09);--hov:rgba(255,255,255,.059);--track:rgba(255,255,255,.16);
+ --tx:#FFFFFF;--tx2:#C9C9C9;--tx3:#9A9A9A;--acc:#B79CFF;--accf:linear-gradient(135deg,#B78FFF,#82AEFF);--tint:rgba(183,156,255,.14);--onacc:#170F2E;--cau:#FCE100;--cautint:rgba(252,225,0,.10);--crit:#C42B1C;
+ --shadow:0 16px 40px rgba(0,0,0,.5);--rim:rgba(255,255,255,.17);--pop:#2C2C2F;
+ --win:#202020;--surf:#2B2B2B;--sbord:rgba(255,255,255,.031);--div:rgba(255,255,255,.059);--st1:#FFFFFF;--st2:#C5C5C5;--st3:#ABABAB;--st4:#9D9D9D;--scau:#FCE100;
+ --ssel:rgba(255,255,255,.059);--sbtn:rgba(255,255,255,.059);--sbtnb:rgba(255,255,255,.09);--sacc:#B79CFF;--sonacc:#000;--field:rgba(255,255,255,.059);--fieldb:rgba(255,255,255,.55);--kcap:rgba(255,255,255,.09)}
+.light{--fill:rgba(245,245,246,.961);--bord:rgba(0,0,0,.078);--hair:rgba(0,0,0,.078);--face:rgba(255,255,255,.45);--faceh:#FFFFFF;--cardb:rgba(0,0,0,.059);
+ --btn:rgba(255,255,255,.86);--ctlb:rgba(0,0,0,.09);--hov:rgba(0,0,0,.043);--track:rgba(0,0,0,.14);
+ --tx:#1A1A1A;--tx2:#5C5C5C;--tx3:#707070;--acc:#7444F0;--accf:linear-gradient(135deg,#8F5CFF,#5B86FF);--tint:rgba(116,68,240,.10);--onacc:#FFFFFF;--cau:#9D5D00;--cautint:rgba(157,93,0,.10);--crit:#C42B1C;
+ --shadow:0 16px 40px rgba(0,0,0,.2);--rim:rgba(0,0,0,.12);--pop:#F9F9F9;
+ --win:#F3F3F3;--surf:#FBFBFB;--sbord:rgba(0,0,0,.059);--div:rgba(0,0,0,.071);--st1:#1A1A1A;--st2:#404040;--st3:#5D5D5D;--st4:#616161;--scau:#9D5D00;
+ --ssel:rgba(0,0,0,.055);--sbtn:#FFFFFF;--sbtnb:rgba(0,0,0,.10);--sacc:#6B4FBB;--sonacc:#FFF;--field:#FFFFFF;--fieldb:rgba(0,0,0,.45);--kcap:rgba(0,0,0,.06)}
+
+.sheet{display:inline-flex;flex-direction:column;gap:28px;padding:32px;background:#161616;color:#E6E6E6}
+.sheet.lt{background:#D9D9D9;color:#1A1A1A}
+.srow{display:flex;gap:28px;align-items:flex-start}
+.cap{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;max-width:584px}
+.stage{background:#1F1F1F;padding:24px 32px 32px;border-radius:2px}
+.lt .stage{background:#C8CBD2}
+
+/* island panel 520x360 */
+.panel{position:relative;width:520px;height:360px;padding:12px;background:var(--fill);border:1px solid var(--bord);border-radius:8px;box-shadow:var(--shadow);color:var(--tx);font-size:12px;line-height:16px;overflow:hidden}
+.hdr{display:flex;align-items:center;height:24px;margin-bottom:8px;gap:6px}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:4px;background:transparent;color:var(--tx2);flex:none}
+.ib.back{margin:0 0 0 -4px}
+.ttl{flex:1;font-size:13px;font-weight:600;line-height:20px;white-space:nowrap}
+.body{position:relative;width:494px;height:302px}
+.ibtn{height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);font-size:12px;color:var(--tx);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-width:64px;justify-content:center;flex:none}
+.ibtn.acc{background:var(--accf);border-color:transparent;color:var(--onacc);font-weight:600}
+.ibtn.crit{background:var(--crit);border-color:transparent;color:#fff}
+.ibtn.sm{height:24px;min-width:0;padding:0 8px;font-size:11px}
+.ibtn.ghost{background:transparent;border-color:transparent;color:var(--tx2)}
+.seg{display:inline-flex;height:24px;border-radius:4px;background:var(--hov);padding:2px;gap:2px;font-size:11px}
+.seg span{padding:0 8px;border-radius:3px;display:flex;align-items:center;color:var(--tx2)}
+.seg span.on{background:var(--btn);color:var(--tx);font-weight:600;box-shadow:0 0 0 1px var(--ctlb)}
+.combo{height:24px;padding:0 6px 0 8px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--tx);white-space:nowrap}
+.combo.open{border-color:var(--acc)}
+.menu{position:absolute;z-index:3;padding:4px;border-radius:8px;background:var(--pop);box-shadow:0 0 0 1px var(--bord),0 8px 24px rgba(0,0,0,.35);font-size:12px;min-width:132px}
+.menu div{height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px;white-space:nowrap}
+.menu div.on{background:var(--tint)}
+.menu div .ck{width:14px;color:var(--acc)}
+.grid6{display:grid;grid-template-columns:repeat(6,76px);gap:8px}
+.cc{height:64px;border:1px solid var(--cardb);border-radius:6px;background:var(--face);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--tx2);font-size:12px;position:relative}
+.cc span{color:var(--tx)}
+.cc.pri{background:var(--accf);border-color:transparent;color:var(--onacc)}
+.cc.pri span{color:var(--onacc);font-weight:600}
+.cc.hov{background:var(--faceh)}
+.cc.foc{outline:2px solid var(--tx);outline-offset:1px}
+.tip{position:absolute;z-index:3;padding:6px 8px;border-radius:4px;background:var(--pop);box-shadow:0 0 0 1px var(--bord),0 4px 12px rgba(0,0,0,.3);font-size:12px;white-space:nowrap;color:var(--tx)}
+.sub{display:flex;align-items:center;height:28px;margin-top:12px}
+.sub b{flex:1;font-size:12px;font-weight:600}
+.thumbs{display:grid;grid-template-columns:repeat(4,118px);gap:8px;margin-top:4px}
+.th .img{height:66px;border-radius:6px;border:1px solid var(--hair);position:relative;overflow:hidden}
+.th .n{font-size:11px;line-height:14px;color:var(--tx2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th .m{font-size:11px;line-height:14px;color:var(--tx3)}
+.dur{position:absolute;right:4px;bottom:4px;height:16px;padding:0 4px;border-radius:3px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;line-height:16px}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--tx3);font-size:12px}
+.card{border:1px solid var(--cardb);border-radius:6px;background:var(--face)}
+.foot{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.foot .l{margin-right:auto;display:flex;gap:6px;align-items:center}
+.big{font-size:20px;font-weight:600;line-height:26px}
+.t3{color:var(--tx3);font-size:11px}
+.t2{color:var(--tx2)}
+.cau{color:var(--cau)}
+.slider{flex:1;height:18px;position:relative}
+.slider::before{content:"";position:absolute;left:0;right:0;top:7px;height:4px;border-radius:2px;background:var(--track)}
+.slider i{position:absolute;left:0;top:7px;height:4px;border-radius:2px;background:var(--accf)}
+.slider b{position:absolute;top:0;width:18px;height:18px;margin-left:-9px;border-radius:9px;background:var(--fill);box-shadow:0 0 0 1px var(--ctlb),0 1px 3px rgba(0,0,0,.3)}
+.slider b::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--acc)}
+.drow{height:44px;display:flex;align-items:center;gap:10px;padding:0 10px;margin-bottom:8px;color:var(--tx2)}
+.drow .nm{width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
+.drow .pc{width:34px;text-align:right;color:var(--tx2)}
+.lrow{height:36px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px}
+.lrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* bar 256x50 */
+.desk{background:#3A3F4B;padding:16px 20px;border-radius:2px}
+.lt .desk{background:#AEB6C4}
+.bar{width:256px;height:50px;border-radius:25px;background:var(--fill);box-shadow:0 0 0 1px var(--rim),0 6px 16px rgba(0,0,0,.35);display:flex;align-items:center;color:var(--tx)}
+.bar .lead{width:34px;height:34px;border-radius:17px;background:var(--tint);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden}
+.bar .lead.cau{background:var(--cautint);color:var(--cau)}
+.bar .lines{flex:1;min-width:0;display:flex;flex-direction:column}
+.bar .bt{font-size:13px;font-weight:600;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .bt.cau{color:var(--cau)}
+.bar .ba{font-size:12px;line-height:15px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pet{width:46px;height:50px;display:flex;align-items:center;justify-content:center;flex:none}
+.pet span{width:34px;height:30px;border-radius:15px 15px 13px 13px;background:linear-gradient(160deg,#C9B6FF,#8E7BE8)}
+
+/* the frozen screen, at real size (DIPs) */
+.scr{position:relative;width:1100px;height:640px;overflow:hidden;border-radius:2px;background:linear-gradient(160deg,#2C3E57,#1B2838);font-size:12px}
+.scr.sm{width:620px;height:380px}
+.w{position:absolute;border-radius:8px;background:#F3F3F3;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden}
+.w .tb{height:32px;background:#E8E8E8;display:flex;align-items:center;padding:0 12px;font-size:12px;color:#333}
+.w .ln{height:10px;margin:12px 16px 0;border-radius:3px;background:#D5D5D5}
+.w .ln.s{width:40%}
+.w.dk{background:#1E1E1E}.w.dk .tb{background:#2B2B2B;color:#ddd}.w.dk .ln{background:#3A3A3A}
+.dim{position:absolute;background:rgba(0,0,0,.45)}
+.selx{position:absolute;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.hdl{position:absolute;width:8px;height:8px;background:#fff;border:1px solid #7444F0;margin:-4px 0 0 -4px}
+.whl{position:absolute;border:2px solid #B79CFF;border-radius:8px}
+.spill{position:absolute;height:22px;padding:0 8px;border-radius:4px;background:rgba(32,32,36,.92);color:#fff;font-size:11px;line-height:22px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.mag{position:absolute;width:112px;height:112px;border-radius:56px;border:2px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.5);overflow:hidden;background:
+ repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 8px),repeating-linear-gradient(90deg,rgba(0,0,0,.22) 0 1px,transparent 1px 8px),linear-gradient(90deg,#F3F3F3 0 46%,#2C3E57 46%)}
+.mag::after{content:"";position:absolute;left:52px;top:52px;width:8px;height:8px;box-shadow:0 0 0 1px #000,0 0 0 2px #fff}
+.ptr{position:absolute;width:16px;height:16px;color:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+.ptr svg{fill:#fff;stroke:#000}
+.tools{position:absolute;width:40px;padding:4px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);display:flex;flex-direction:column;color:var(--tx2)}
+.tools .t{width:32px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:4px}
+.tools .t.on{background:var(--tint);color:var(--acc)}
+.tools .sep{height:1px;background:var(--hair);margin:4px 2px}
+.swd{width:14px;height:14px;border-radius:7px;box-shadow:0 0 0 2px var(--fill),0 0 0 3px var(--ctlb)}
+.acts{position:absolute;height:40px;padding:6px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);display:flex;gap:6px;align-items:center;color:var(--tx)}
+.acts .vsep{width:1px;height:20px;background:var(--hair)}
+.pop{position:absolute;z-index:4;padding:8px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);color:var(--tx)}
+.mk{position:absolute;overflow:visible}
+
+/* Settings, from the real window (r2 snapshots on main 9a978b7) */
+.sw1{width:1120px;background:var(--win);color:var(--st1);font-size:14px;line-height:20px;border:1px solid rgba(128,128,128,.35);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.tbar{height:40px;display:flex;align-items:center;flex:none;font-size:12px}
+.tbar .logo{width:16px;height:16px;border-radius:8px;background:linear-gradient(135deg,#B78FFF,#82AEFF);margin:0 9px 0 16px}
+.tbar .tt{flex:1}
+.tbar .cb{width:46px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--st2)}
+.shell{display:flex;flex:1}
+.side{width:272px;flex:none;padding:6px 12px 16px}
+.find{height:32px;margin:0 0 8px;padding:0 10px;border-radius:4px;background:var(--field);border:1px solid var(--sbtnb);display:flex;align-items:center;gap:10px;font-size:14px;color:var(--st4)}
+.gl{font-size:12px;font-weight:400;color:var(--st2);padding:10px 12px 2px;line-height:16px}
+.nav{position:relative;height:32px;margin:2px 4px;padding:0 12px;border-radius:4px;display:flex;align-items:center;gap:12px;white-space:nowrap;color:var(--st1)}
+.nav.sel{background:var(--ssel);font-weight:600}
+.nav.sel::before{content:"";position:absolute;left:-4px;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.page{flex:1;padding:4px 40px 28px 40px;min-width:0}
+.ptitle{font-family:'Segoe UI Variable Display','Segoe UI',sans-serif;font-size:20px;font-weight:600;line-height:28px;margin:0 0 8px}
+.sh{font-size:14px;font-weight:600;line-height:20px;margin:16px 0 6px}
+.scard{background:var(--surf);border:1px solid var(--sbord);border-radius:8px;margin-bottom:8px}
+.sr{min-height:48px;display:flex;align-items:center;padding:6px 16px;gap:12px;border-top:1px solid var(--div)}
+.sr:first-child{border-top:0}
+.sr.cap2{min-height:60px}
+.sr .lead{width:20px;height:20px;color:var(--st1);flex:none;display:flex;align-items:center}
+.sr .tl{flex:1;min-width:0}
+.sr .tl small{display:block;font-size:12px;line-height:16px;color:var(--st3)}
+.sr .tl small.cau{color:var(--scau)}
+.sbadge.cau{background:var(--cautint);box-shadow:none;color:var(--scau)}
+.sr.dep{padding-left:50px}
+.sr.grp{min-height:36px;padding-top:12px;padding-bottom:0;font-size:12px;color:var(--st3)}
+.sbt{height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);font-size:14px;color:var(--st1);display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.scombo{height:32px;min-width:200px;padding:0 10px 0 11px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);display:inline-flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;white-space:nowrap}
+.ssw{width:40px;height:20px;border-radius:10px;border:1px solid var(--st3);position:relative;flex:none}
+.ssw::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--st2)}
+.ssw.on{background:var(--sacc);border-color:var(--sacc)}.ssw.on::after{left:auto;right:4px;width:12px;height:12px;top:3px;background:var(--sonacc)}
+.onl{font-size:14px;color:var(--st1)}
+.kc{height:26px;min-width:26px;padding:0 8px;border-radius:4px;background:var(--kcap);border:1px solid var(--sbtnb);border-bottom-width:2px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;color:var(--st1)}
+.keys{width:200px;display:flex;gap:4px;align-items:center;color:var(--st3);font-size:14px}
+.edit{color:var(--st1);font-size:14px;display:inline-flex;align-items:center;gap:6px}
+.path{color:var(--st3);font-size:14px;white-space:nowrap}
+.sthumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 16px 16px}
+.sthumbs div{height:70px;border-radius:4px;border:1px solid var(--div)}
+.palette{display:flex;gap:6px}
+.palette span{width:22px;height:22px;border-radius:11px;box-shadow:0 0 0 1px var(--div)}
+
+/* ---- Cleaner additions ---- */
+.dark{--ok:#6CCB5F}
+.light{--ok:#0F7B0F}
+.hov{background:var(--hov)}
+.badge{height:18px;padding:0 6px;border-radius:4px;background:var(--btn);box-shadow:0 0 0 1px var(--ctlb) inset;font-size:11px;font-weight:600;color:var(--tx2);display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.badge.cau{background:var(--cautint);box-shadow:none;color:var(--cau)}
+.chk{width:16px;height:16px;border-radius:3px;border:1px solid var(--tx3);flex:none;display:inline-flex;align-items:center;justify-content:center}
+.chk.on{background:var(--accf);border-color:transparent;color:var(--onacc)}
+.chk.dis{opacity:.4}
+.ibtn.dis{opacity:.45}
+.ibtn.foc{outline:2px solid var(--tx);outline-offset:1px}
+.meta{display:flex;align-items:center;gap:6px;height:24px;margin-bottom:4px;font-size:12px;color:var(--tx3)}
+.meta b{font-weight:400;color:var(--tx)}
+.crow{display:flex;align-items:center;gap:10px;height:36px;padding:0 8px;border-radius:4px;position:relative}
+.crow.two{height:44px}
+.crow.hov{background:var(--hov)}
+.crow .lead{width:16px;height:16px;display:flex;align-items:center;justify-content:center;flex:none}
+.crow .cn{flex:1;min-width:0;display:flex;flex-direction:column}
+.crow .cnm{font-size:12px;line-height:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .cd{font-size:11px;line-height:15px;color:var(--tx2);white-space:nowrap}
+.crow .cd.cau{color:var(--cau)}
+.crow .tg{width:80px;display:flex;justify-content:flex-end;flex:none}
+.crow .adm{width:16px;display:flex;justify-content:center;flex:none}
+.crow .cs{width:76px;text-align:right;color:var(--tx2);flex:none;white-space:nowrap}
+.sr .adm{width:20px;display:flex;justify-content:center;flex:none}
+.crow .cs.na{color:var(--tx3)}
+.crow .cs.cau{color:var(--cau)}
+.crow.dim .cs,.crow.dim .cnm{color:var(--tx3)}
+.skel{display:inline-block;width:46px;height:8px;border-radius:4px;background:var(--track)}
+.prog{height:3px;border-radius:2px;background:var(--track);width:180px;margin-top:3px}
+.prog i{display:block;height:100%;border-radius:2px;background:var(--accf)}
+.qwrap{padding:8px 12px 0}
+.qwrap h2{margin:0 0 10px;font-size:16px;line-height:24px;font-weight:600}
+.qlist{border:1px solid var(--cardb);border-radius:6px;background:var(--face);padding:4px 10px}
+.qrow{display:flex;align-items:center;height:29px;font-size:12px;gap:8px}
+.qrow .nm{flex:1}
+.qrow .sz{color:var(--tx2)}
+.qnote{margin:10px 0 0;font-size:12px;line-height:16px;color:var(--tx2)}
+.qctr{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+.qctr .qt{font-size:14px;font-weight:600}
+.cen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.cen .ct{font-size:14px;font-weight:600}
+.cen svg.g{color:var(--tx2);margin-bottom:2px}
+.isr{height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:4px}
+.isr.sel{background:var(--tint)}
+.isr .ld{width:20px;display:flex;justify-content:center;color:var(--tx2)}
+.isr .nm{font-size:12px;line-height:15px}
+.isr .dt{font-size:11px;line-height:14px;color:var(--tx2)}
+.isr .vb{margin-left:auto;font-size:11px;font-weight:600;display:flex;align-items:center;gap:4px}
+.sfield{flex:1;height:32px;border-radius:4px;border:1px solid var(--ctlb);border-bottom:2px solid var(--acc);background:var(--btn);display:flex;align-items:center;padding:0 10px;font-size:13px}
+.lrow{height:42px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px}
+.lrow .nm{flex:1;min-width:0;white-space:nowrap}
+.dip{font-weight:400;color:#8A8A8A;margin-left:8px}
+.sbadge{height:22px;padding:0 8px;border-radius:4px;background:var(--sbtn);box-shadow:0 0 0 1px var(--sbtnb) inset;font-size:12px;color:var(--st2);display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.sr.cat{min-height:76px;padding-top:10px;padding-bottom:10px}
+.sr.cat .tl small{margin-top:1px}
+.sr.cat .tl .nv u{text-decoration:none;color:var(--st2)}
+.sr.big1{min-height:64px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><clipPath id="uacshield"><path d="M8 .8 2.2 2.9v4.6c0 3.3 2.3 5.9 5.8 7.4 3.5-1.5 5.8-4.1 5.8-7.4V2.9z"/></clipPath></defs></svg>
+<script src="wave-1/lucide.js"></script>
+<script>
+// Cleaner mockups. Sizes are real DIPs; glyphs are Lucide (wave-1/lucide.js) plus the few added below. Every size and name is invented.
+Object.assign(ICONS,{
+'trash-2':'<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/>',
+'refresh-cw':'<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+'loader-circle':'<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+'circle-alert':'<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+'circle-check':'<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+'shield':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+'shield-check':'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+'package':'<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.29 7 8.71 5 8.71-5"/>'
+});
+const g=(n,s=16,o='')=>`<svg class="g" width="${s}" height="${s}" viewBox="0 0 24 24" stroke-width="${(30/s).toFixed(3)}"${o}>${ICONS[n]}</svg>`;
+// Windows' own UAC shield (blue and gold quarters): the one mark on a verb that brings up the permission prompt
+const uac=(s=14)=>`<svg width="${s}" height="${s}" viewBox="0 0 16 16" style="flex:none;display:block"><g clip-path="url(#uacshield)"><rect x="0" y="0" width="8" height="8" fill="#1F78D1"/><rect x="8" y="0" width="8" height="8" fill="#F2B100"/><rect x="0" y="8" width="8" height="8" fill="#F2B100"/><rect x="8" y="8" width="8" height="8" fill="#1F78D1"/></g></svg>`;
+const q=new URLSearchParams(location.search);
+const board=q.get('board')||'island-list', theme=q.get('theme')||'dark';
+const L=(t,html)=>`<div><p class="cap">${t}<span class="dip"></span></p>${html}</div>`;
+const stage=h=>`<div class="stage">${h}</div>`;
+const panel=(title,body,o={})=>`<div class="panel"><div class="hdr"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="ttl">${title}</span>${o.aside||''}</div><div class="body">${body}</div></div>`;
+const ib=(t,o={})=>`<button class="ibtn${o.acc?' acc':''}${o.crit?' crit':''}${o.sm?' sm':''}${o.dis?' dis':''}${o.foc?' foc':''}">${o.uac?uac(14):''}${t}</button>`;
+const chk=(on,dis)=>`<span class="chk${on?' on':''}${dis?' dis':''}">${on?g('check',12):''}</span>`;
+const tag=t=>t==='Check first'?`<span class="badge cau">Check first</span>`:'';
+
+/* ---------- the categories (brief: Categories in the first build) ---------- */
+const CATS=[
+ {id:'temp',n:'User temp files',s:'820 MB',on:1},
+ {id:'thumb',n:'Thumbnail and icon caches',s:'210 MB',on:1},
+ {id:'app',n:'App caches',t:'Check first',s:'1.2 GB'},
+ {id:'wtemp',n:'Windows temp',adm:1,s:null},
+ {id:'wu',n:'Windows Update cache',adm:1,s:'1.6 GB+'},
+ {id:'do',n:'Delivery Optimization cache',adm:1,s:null},
+ {id:'dump',n:'Crash dumps and logs',adm:1,s:'190 MB+'}
+];
+// o[id] = {on, s, dim, dis, lead, notag, right, rightCls, action, prog}
+// Columns: lead | name | tag or action | admin shield | size or status
+const crow=(c,o={})=>{
+ const x=Object.assign({on:c.on,s:c.s},o[c.id]||{});
+ const lead=x.lead!==undefined?x.lead:chk(x.on,x.dis);
+ const size=x.right!==undefined?x.right:(x.s?x.s:'—');
+ const sc=x.rightCls||(x.s||x.right!==undefined?'':'na');
+ return `<div class="crow${x.prog?' two':''}${x.dim?' dim':''}"><span class="lead">${lead}</span><span class="cn"><span class="cnm">${c.n}</span>${x.prog?`<span class="prog"><i style="width:${x.prog}%"></i></span>`:''}</span><span class="tg">${x.action||(x.notag?'':tag(c.t))}</span><span class="adm">${c.adm?uac(14):''}</span><span class="cs ${sc}">${size}</span></div>`;
+};
+const rows=(o={},only)=>CATS.filter(c=>!only||only.includes(c.id)).map(c=>crow(c,o)).join('');
+const meta=(a,b,spin)=>`<div class="meta">${spin?g('loader-circle',12,' style="color:var(--acc)"'):''}<b>${a}</b>${b?`<span>· ${b}</span>`:''}</div>`;
+const headBtns=(o={})=>ib('Scan',{dis:o.scanDis})+ib('Clean',{acc:1,uac:o.uac,dis:o.cleanDis});
+const list=(m,o,h={})=>panel('Clean junk files',m+rows(o),{aside:headBtns(h)});
+
+/* ---------- island: the list ---------- */
+const skel='<span class="skel"></span>';
+const listMain=list(meta('1.0 GB'),{});
+const listOpening=list(meta('1.0 GB','',1),{temp:{dim:1},thumb:{dim:1},app:{dim:1},wu:{dim:1},dump:{dim:1}},{cleanDis:1});
+const listMeasuring=list(meta('Measuring','',1),{app:{right:skel},wtemp:{right:skel},wu:{right:skel},do:{right:skel},dump:{right:skel}},{cleanDis:1,scanDis:1});
+const listNone=list(meta('0 B'),{temp:{on:0},thumb:{on:0}},{cleanDis:1});
+const listAdmin=list(meta('2.6 GB+'),{wtemp:{on:1},wu:{on:1}},{uac:1});
+const listAppOpen=list(meta('1.0 GB'),{app:{on:1,right:'In use',rightCls:'cau'}});
+const listNA=list(meta('1.0 GB'),{do:{right:'Unavailable',rightCls:'na',dis:1,on:0}});
+const listEmpty=panel('Clean junk files',`<div class="cen">${g('circle-check',28)}<span class="ct">Nothing to clean</span></div>`,{aside:ib('Scan')});
+
+/* ---------- island: asking, waiting, running ---------- */
+const nm=(n,s)=>`<div class="qrow"><span class="nm">${n}</span><span class="sz">${s}</span></div>`;
+const confirm=(t,items,uacOn)=>panel('Clean junk files',`<div class="qwrap"><h2>${t}</h2><div class="qlist">${items}</div></div><div class="foot">${ib('Cancel',{foc:1})}${ib('Clean',{crit:1,uac:uacOn})}</div>`);
+const confStd=confirm('Clean 1.0 GB?',nm('User temp files','820 MB')+nm('Thumbnail and icon caches','210 MB'));
+const confAdmin=confirm('Clean 3.9 GB?',nm('User temp files','820 MB')+nm('Windows temp','1.4 GB')+nm('Windows Update cache','1.7 GB'),1);
+const waitAdmin=panel('Clean junk files',`<div class="cen">${g('shield',28)}<span class="ct">Waiting for admin</span></div>`);
+const shortMeasuring=panel('Clean junk files',`<div class="cen">${g('loader-circle',28,' style="color:var(--acc)"')}<span class="ct">Measuring</span></div>`);
+const okLead=g('check',14,' style="color:var(--ok)"'), spinLead=g('loader-circle',14,' style="color:var(--acc)"'), cauLead=g('circle-alert',14,' style="color:var(--cau)"'), idleLead='<span style="width:8px;height:8px;border-radius:4px;border:1px solid var(--tx3)"></span>';
+const kept={lead:cauLead,right:'Kept',rightCls:'cau',notag:1};
+const running=panel('Clean junk files',meta('1.1 GB freed','',1)+rows({
+ temp:{lead:okLead,right:'802 MB',notag:1},thumb:{lead:okLead,right:'206 MB',notag:1},wtemp:kept,
+ wu:{lead:spinLead,right:'62%',prog:62,notag:1},dump:{lead:idleLead,right:'Queued',rightCls:'na',notag:1}},['temp','thumb','wtemp','wu','dump']));
+const quit=panel('Clean junk files',`<div class="qctr"><span class="qt" style="margin-bottom:10px">Stop cleaning and quit?</span><span style="display:flex;gap:8px">${ib('Cancel',{foc:1})}${ib('Quit',{crit:1})}</span></div>`);
+
+/* ---------- island: results ---------- */
+const res=(m,o,only)=>panel('Clean junk files',m+rows(o,only),{aside:ib('Scan')});
+const RD={temp:{lead:okLead,right:'802 MB',notag:1},thumb:{lead:okLead,right:'206 MB',notag:1}};
+const resOk=res(meta('1.0 GB freed'),Object.assign({},RD,{wu:{lead:okLead,right:'1.5 GB',notag:1},dump:{lead:okLead,right:'184 MB',notag:1}}),['temp','thumb','wu','dump']);
+const bad=act=>({lead:cauLead,right:'Failed',rightCls:'cau',action:act});
+const needs=act=>({lead:cauLead,right:'Needs admin',rightCls:'cau',action:act});
+const resFail=res(meta('1.0 GB freed','1 failed'),Object.assign({},RD,{wu:bad(ib('Retry',{sm:1})),wtemp:kept}),['temp','thumb','wu','wtemp']);
+const resDeclined=res(meta('1.0 GB freed'),Object.assign({},RD,{wu:needs(ib('Clean',{sm:1})),wtemp:needs(ib('Clean',{sm:1}))}),['temp','thumb','wu','wtemp']);
+const resHelper=res(meta('1.0 GB freed','Admin helper failed'),Object.assign({},RD,{wu:bad(ib('Retry',{sm:1})),dump:bad(ib('Retry',{sm:1}))}),['temp','thumb','wu','dump']);
+const resAppOpen=res(meta('1.0 GB freed'),Object.assign({},RD,{app:{lead:cauLead,right:'In use',rightCls:'cau',notag:1}}),['temp','thumb','app']);
+
+/* ---------- Actions > Apps, Search, the bar ---------- */
+const mrow=(glyph,n,right,o={})=>`<div class="lrow${o.hov?' hov':''}">${g(glyph,16)}<span class="nm">${n}</span>${right}${g(o.open?'square-arrow-out-up-right':'chevron-right',12)}</div>`;
+const appsMenu=panel('Apps',`<div style="display:grid;grid-template-columns:1fr 1fr;column-gap:8px;grid-auto-flow:column;grid-template-rows:repeat(5,42px)">${mrow('refresh-cw','Update apps','<span class="badge">5</span>')+mrow('trash-2','Clean junk files','<span class="t3">1.0 GB</span>',{hov:1})+mrow('package','Uninstall','',{open:1})}</div>`);
+const isr=(lead,n,d,o={})=>`<div class="isr${o.sel?' sel':''}"><span class="ld">${lead}</span><span><div class="nm">${n}</div><div class="dt">${d}</div></span>${o.verb?`<span class="vb">${o.sh?uac(12):''}${o.verb}</span>`:''}</div>`;
+const search=(t,r)=>`<div class="panel"><div class="hdr" style="height:32px"><button class="ib back" aria-label="Back">${g('chevron-left',16)}</button><span class="sfield">${t}</span></div><div style="margin-top:8px">${r}</div></div>`;
+const sNo=search('clean',isr(g('search'),'Scan for junk files','Cleaner',{sel:1,verb:'Run'})+isr(g('trash-2'),'Clean junk files','Cleaner')+isr(g('trash-2'),'Cleaner','Settings'));
+const sAdmin=search('clean',isr(g('search'),'Scan for junk files','Cleaner')+isr(g('trash-2'),'Clean junk files','Cleaner',{sel:1,verb:'Run',sh:1})+isr(g('trash-2'),'Cleaner','Settings'));
+const bar=(lead,t,a,o={})=>`<div class="desk"><div class="bar"><span style="width:8px"></span><span class="lead${o.cau?' cau':''}">${lead}</span><span style="width:10px"></span><span class="lines"><span class="bt${o.cau?' cau':''}">${t}</span><span class="ba">${a}</span></span><span class="pet"><span></span></span></div></div>`;
+
+/* ---------- Settings ---------- */
+const nav=(gl,n,sel)=>`<div class="nav${sel?' sel':''}">${g(gl,16)}${n}</div>`;
+const side=()=>`<div class="side"><div class="find">${g('search',14)}Find a setting</div>
+ <div class="gl">System</div>${nav('coffee','Keep awake')}${nav('sun','Displays')}
+ <div class="gl">Windows</div>${nav('app-window','App switcher')}${nav('layout-grid','Snap')}
+ <div class="gl">Capture</div>${nav('scan','Screen capture')}${nav('pipette','Color picker')}
+ <div class="gl">Apps</div>${nav('refresh-cw','App updates')}${nav('package','Uninstaller')}${nav('trash-2','Cleaner',1)}
+ <div class="gl">Chippi</div>${nav('settings','General')}${nav('keyboard','Shortcuts')}${nav('plus','Add features')}</div>`;
+const frame=(c,w)=>`<div class="sw1"${w?` style="width:${w}px"`:''}><div class="tbar"><span class="logo"></span><span class="tt">Chippi Settings</span><span class="cb">${g('minus',12)}</span><span class="cb">${g('square',11)}</span><span class="cb">${g('x',12)}</span></div><div class="shell">${side()}<div class="page">${c}</div></div></div>`;
+const kc=k=>k.split('+').map(x=>`<span class="kc">${x}</span>`).join('');
+const editLink=`<span class="edit">Edit ${g('square-arrow-out-up-right',14)}</span>`;
+const krow=(n,k,gl)=>`<div class="sr"><span class="lead">${g(gl,20)}</span><span class="tl">${n}</span>${k?`<span style="display:flex;gap:4px;margin-right:12px">${kc(k)}</span>`:`<span class="path" style="margin-right:12px">Not set</span>`}${editLink}</div>`;
+const swc=on=>`<span class="onl">${on?'On':'Off'}</span><span class="ssw${on?' on':''}"></span>`;
+const crowS=(n,adm,on)=>`<div class="sr"><span class="tl">${n}</span>${adm==='chk'?`<span class="sbadge cau">Check first</span>`:''}<span class="adm">${adm===1?uac(16):''}</span>${swc(on)}</div>`;
+const sec=t=>`<div class="sh">${t}</div>`;
+const card=r=>`<div class="scard">${r}</div>`;
+const cleanerPage=k=>`<div class="ptitle">Cleaner</div>
+ ${sec('Categories')}${card(
+  crowS('User temp files',0,1)+
+  crowS('Thumbnail and icon caches',0,1)+
+  crowS('App caches','chk',0)+
+  crowS('Windows temp',1,0)+
+  crowS('Windows Update cache',1,0)+
+  crowS('Delivery Optimization cache',1,0)+
+  crowS('Crash dumps and logs',1,0))}
+ ${sec('Shortcuts')}${card(krow('Scan for junk files',k?'Ctrl+Alt+J':'','search')+krow('Clean junk files','','trash-2'))}`;
+
+const one=(c,h)=>L(c,stage(h));
+const B={
+ 'island-list':()=>one('Actions › Apps › Clean junk files: last ticks remembered; admin rows have no size until cleaned',listMain),
+ 'island-list-opening':()=>one('Opening: last sizes dimmed while measuring',listOpening),
+ 'island-list-measuring':()=>one('First measure',listMeasuring),
+ 'island-list-admin':()=>one('An admin category ticked; + marks a partial size',listAdmin),
+ 'island-list-app-open':()=>one('App caches ticked while Chrome runs',listAppOpen),
+ 'island-list-unavailable':()=>one('A folder missing or unreadable',listNA),
+ 'island-empty':()=>one('Nothing to clean',listEmpty),
+ 'island-measuring-shortcut':()=>one('Clean junk files shortcut: measures, then asks',shortMeasuring),
+ 'island-confirm':()=>one('Confirm; Cancel has focus',confStd),
+ 'island-waiting-admin':()=>one('Waiting on the UAC prompt',waitAdmin),
+ 'island-confirm-admin':()=>one('Confirm after the prompt, admin categories measured',confAdmin),
+ 'island-running':()=>one('Cleaning',running),
+ 'island-quit':()=>one('Quitting Chippi mid-clean',quit),
+ 'island-result':()=>one('Result',resOk),
+ 'island-result-app-open':()=>one('Result with Chrome running',resAppOpen),
+ 'island-result-failed':()=>one('One failed, one kept by the helper',resFail),
+ 'island-result-declined':()=>one('UAC prompt declined',resDeclined),
+ 'island-result-helper':()=>one('Admin helper failed',resHelper),
+ 'island-actions-apps':()=>one('Actions › Apps: Clean junk files shows the last size',appsMenu),
+ 'island-search':()=>`${one('Search: each verb is a row, Run',sNo)}${one('With an admin category ticked, Clean junk files\' Run carries the shield',sAdmin)}`,
+ 'island-bar':()=>`${L('Cleaned, 6 seconds',bar(g('trash-2'),'1.0 GB freed','Cleaner'))}${L('Admin declined',bar(g('shield'),'1.0 GB freed','2 need admin',{cau:1}))}${L('Clean failed',bar(g('triangle-alert'),'Clean failed','Windows Update cache',{cau:1}))}`,
+ 'settings-cleaner':()=>L('Settings › Apps › Cleaner',frame(cleanerPage(0))),
+ 'settings-cleaner-narrow':()=>L('Settings › Apps › Cleaner at 860 wide',frame(cleanerPage(0),860)),
+ 'island-list-none':()=>one('Nothing ticked',listNone),
+ 'settings-cleaner-keys':()=>L('Settings › Apps › Cleaner, with Scan for junk files set',frame(cleanerPage(1)))
+};
+document.body.className=theme;
+document.getElementById('root').innerHTML=`<div class="sheet ${theme==='light'?'lt':''}"><div class="${theme}" style="display:contents"><div class="srow">${B[board]()}</div></div></div>`;
+document.querySelectorAll('.cap').forEach(c=>{const t=c.nextElementSibling.querySelector('.panel,.bar,.sw1');if(t){const r=t.getBoundingClientRect();c.querySelector('.dip').textContent=Math.round(r.width)+' × '+Math.round(r.height)+' DIP';}});
+const el=document.getElementById('root').firstElementChild;
+document.body.dataset.size=Math.ceil(el.getBoundingClientRect().width)+','+Math.ceil(el.getBoundingClientRect().height);
+</script>
+</body>
+</html>
