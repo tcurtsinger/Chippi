@@ -82,7 +82,7 @@ public sealed class PortSessionTests
         var result = await helper.EndProcessAsync(Endpoint);
         Assert.Equal(new AdminPortResult(AdminPortVerb.End, expected, "why"), result);
         Assert.Equal(1, factory.Opens);
-        await helper.EndPortSessionAsync();
+        await helper.EndSessionAsync();
         await factory.Finished.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
@@ -94,7 +94,7 @@ public sealed class PortSessionTests
         await helper.StopServiceAsync("Spooler", new(AdminProtocol.Udp, "::1", 9100, 7, 42));
         var seen = Assert.Single(factory.Seen);
         Assert.Equal(new AdminRequest(seen.Id, "StopService", Protocol: "Udp", LocalAddress: "::1", LocalPort: 9100, Pid: 7, StartTime: 42, ServiceName: "Spooler"), seen);
-        await helper.EndPortSessionAsync();
+        await helper.EndSessionAsync();
         await factory.Finished.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
@@ -108,9 +108,9 @@ public sealed class PortSessionTests
         Assert.Equal(new[] { "CloseProcess", "EndProcess" }, factory.Seen.Select(r => r.Verb));
         Assert.Equal(1, factory.Opens);
         Assert.False(factory.Finished.IsCompleted);   // the helper is still waiting for its next job
-        await helper.EndPortSessionAsync();
+        await helper.EndSessionAsync();
         await factory.Finished.WaitAsync(TimeSpan.FromSeconds(5));   // Done ended the helper's session
-        await helper.EndPortSessionAsync();           // nothing open: harmless
+        await helper.EndSessionAsync();           // nothing open: harmless
         await helper.EndProcessAsync(Endpoint);       // a later flow is a new session
         Assert.Equal(2, factory.Opens);
     }
@@ -120,7 +120,7 @@ public sealed class PortSessionTests
     {
         var clock = new Clock();
         await using var factory = new Factory((_, r) => new AdminReply(r.Id, "Done"));
-        using var helper = new AdminHelper(factory, NullLogger.Instance, portIdle: TimeSpan.FromSeconds(50), time: clock);
+        using var helper = new AdminHelper(factory, NullLogger.Instance, sessionIdle: TimeSpan.FromSeconds(50), time: clock);
         await helper.CloseProcessAsync(Endpoint);
         clock.Advance(TimeSpan.FromSeconds(49));
         await helper.EndProcessAsync(Endpoint);   // inside the idle time: reused, and the idle clock starts over
@@ -140,7 +140,7 @@ public sealed class PortSessionTests
     {
         var clock = new Clock();
         await using var factory = new Factory((_, r) => new AdminReply(r.Id, "Done"));
-        using var helper = new AdminHelper(factory, NullLogger.Instance, portIdle: TimeSpan.FromSeconds(50), time: clock);
+        using var helper = new AdminHelper(factory, NullLogger.Instance, sessionIdle: TimeSpan.FromSeconds(50), time: clock);
         await helper.CloseProcessAsync(Endpoint);
         clock.Advance(TimeSpan.FromSeconds(51));
         await helper.EndProcessAsync(Endpoint);

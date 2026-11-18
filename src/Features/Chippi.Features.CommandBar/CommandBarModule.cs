@@ -78,7 +78,7 @@ public sealed class CommandBarModule : IFeatureModule
         SettingsError = null;
         Settings = context.Settings.Get<CommandBarSettings>().Normalize();
         _pc = _createPc();
-        Search = new CommandSearch(_pc, () => [.. context.Commands().Where(c => c.Key != OpenCommand)], context.SearchCommands, () => Settings,
+        Search = new CommandSearch(_pc, () => [.. context.Commands().Where(c => c.Key != OpenCommand && !c.MenuOnly)], context.SearchCommands, () => Settings,
             new Uses(Path.Combine(context.DataDirectory, "uses.json")), CopyAsync);
         context.Ui.AddCommands(() => [new ChippiCommand(OpenCommand, Descriptor.Name, nameof(LucideIcons.Search), () =>
         {

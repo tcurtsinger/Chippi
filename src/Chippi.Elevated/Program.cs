@@ -26,7 +26,8 @@ internal static class Program
             failedStage = 6;
             var runner = new PackageUpdater(peer.StandardToken);
             var ports = new PortActions(new NativePortSystem(), [Environment.ProcessId, (int)peerPid], Path.GetFullPath(chippiPath));
-            await new HelperSession(runner, ports: ports).RunAsync(pipe).ConfigureAwait(false);
+            var categories = new CategoryActions(CategoryRoots.ForWindows());
+            await new HelperSession(runner, ports: ports, categories: categories).RunAsync(pipe).ConfigureAwait(false);
             return 0;
         }
         catch (Exception)

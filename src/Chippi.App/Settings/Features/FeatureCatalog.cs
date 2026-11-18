@@ -114,7 +114,9 @@ public static class FeatureCatalog
         },
         new("cleaner", "Cleaner", "Clears temp files, caches and other space hogs", FeatureGroup.Apps)
         {
-            Icon = "Trash",
+            Icon = "Trash2",
+            Requires = [Capability.Admin],
+            Badges = [FeatureBadge.Needs("Admin for some categories")],
         },
     ];
 
