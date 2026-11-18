@@ -111,11 +111,23 @@ public sealed class ReviewFixTests
         clock.Now = 10;   // inside both the snapshot's and the cache's life
         Assert.Empty(engine.Lookup(3000));
         system.Listen(3000, 4120);
-        int caller = Environment.CurrentManagedThreadId, before = system.ReadThreads.Count;
-        Assert.Single(await engine.LookupFreshAsync(3000));
+        int before = system.ReadThreads.Count;
+        var (caller, found) = await OnOwnThread(() => engine.LookupFreshAsync(3000));
+        Assert.Single(found);
         Assert.DoesNotContain(caller, system.ReadThreads.Skip(before));
         Assert.Single(engine.Lookup(3000));   // the fresh read is what the next keystroke is answered from
     }
+
+    /// <summary>
+    /// Starts <paramref name="run"/> on a dedicated thread no pool work can borrow, so "read off the caller's thread" is
+    /// testable: on a pool thread the read could legitimately land on the very thread that called.
+    /// </summary>
+    private static Task<(int Caller, T Result)> OnOwnThread<T>(Func<Task<T>> run) =>
+        Task.Factory.StartNew(() =>
+        {
+            int caller = Environment.CurrentManagedThreadId;
+            return (caller, run().GetAwaiter().GetResult());
+        }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
     [Fact]
     public async Task The_enders_rechecks_and_verification_reads_leave_the_calling_thread()
@@ -124,8 +136,9 @@ public sealed class ReviewFixTests
         system.Listen(3000, 4120);
         var row = new PortScanner(system).Scan().Single();
         var ender = new PortEnder(system, null, (_, _) => Task.CompletedTask, () => 0);
-        int caller = Environment.CurrentManagedThreadId, before = system.ReadThreads.Count;
-        Assert.Equal(PortEndState.Freed, (await ender.FreeAsync(row)).State);
+        int before = system.ReadThreads.Count;
+        var (caller, result) = await OnOwnThread(() => ender.FreeAsync(row));
+        Assert.Equal(PortEndState.Freed, result.State);
         Assert.True(system.ReadThreads.Count - before >= 2);   // the recheck and the verification
         Assert.DoesNotContain(caller, system.ReadThreads.Skip(before));
     }
