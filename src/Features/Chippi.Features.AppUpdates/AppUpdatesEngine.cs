@@ -22,13 +22,14 @@ public sealed class AppUpdatesEngine
     private readonly HashSet<VersionIdentity> _completedVersions = [];
     private readonly HashSet<string> _finishedBatch = new(StringComparer.OrdinalIgnoreCase);
     private readonly Action<Exception>? _onError;
+    private readonly Action<string>? _onSourceError;
     private bool _loadFailed;
     private int _batchRevision;
 
     public AppUpdatesEngine(IPackageSource source, IAdminHelper? admin, IAppUpdatesStore store,
-        Action<Action>? dispatch = null, TimeProvider? time = null, Action<Exception>? onError = null)
+        Action<Action>? dispatch = null, TimeProvider? time = null, Action<Exception>? onError = null, Action<string>? onSourceError = null)
     {
-        _onError = onError;
+        _onError = onError; _onSourceError = onSourceError;
         _source = source; _admin = admin; _store = store;
         _dispatch = dispatch ?? (action => action()); _time = time ?? TimeProvider.System;
         try { Preferences = Normalize(store.Load()); }
@@ -75,11 +76,21 @@ public sealed class AppUpdatesEngine
                 if (!_loadFailed) Error = (_source as IPackageSourceStatus)?.Warning;
                 if (!IsRunning && revision == _batchRevision) RefreshRows(resetBatch: true);
             });
+            LogSourceErrors();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or Win32Exception or System.Runtime.InteropServices.COMException or InvalidCastException or DllNotFoundException or TypeInitializationException)
-        { Change(() => Error = ex is WingetUnavailableException ? "App updates need winget" : "Check failed"); }
+        {
+            Change(() => Error = ex is WingetUnavailableException ? "App updates need winget" : "Check failed");
+            LogSourceErrors();
+        }
         finally { Change(() => IsChecking = false); }
+    }
+
+    private void LogSourceErrors()
+    {
+        if (_onSourceError is null || _source is not IPackageSourceStatus status) return;
+        foreach (string error in status.SourceErrors) _onSourceError(error);
     }
 
     /// <summary>User/Store operations precede the machine group so one helper session preserves the reviewed order.</summary>

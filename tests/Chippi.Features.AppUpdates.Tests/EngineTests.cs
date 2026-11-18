@@ -37,6 +37,26 @@ public sealed class EngineTests
     }
 
     [Fact]
+    public async Task A_failed_source_shows_its_warning_and_logs_why_on_partial_and_total_failure()
+    {
+        var source = new StatusSource
+        {
+            Packages = [App("A")], Warning = "Check failed · Microsoft Store",
+            SourceErrors = ["msstore: InvalidOperationException 0x80131509 Package source unavailable (SourceAgreementsNotAccepted, 0x8A150046)."]
+        };
+        var logged = new List<string>();
+        var engine = new AppUpdatesEngine(source, null, new Store(), onSourceError: logged.Add);
+        await engine.CheckAsync();
+        Assert.Equal("Check failed · Microsoft Store", engine.Error); Assert.Single(engine.Updates);
+        Assert.Contains("SourceAgreementsNotAccepted", Assert.Single(logged));
+        source.SourceErrors = ["winget: InvalidOperationException 0x80131509 Package check failed.", "msstore: COMException 0x8A15000F Source unavailable."];
+        source.Error = new InvalidOperationException("Package check failed."); await engine.CheckAsync();
+        Assert.Equal("Check failed", engine.Error); Assert.Equal(3, logged.Count); Assert.StartsWith("winget:", logged[1]);
+        source.SourceErrors = []; source.Error = new WingetUnavailableException("Unavailable"); await engine.CheckAsync();
+        Assert.Equal(3, logged.Count);
+    }
+
+    [Fact]
     public async Task Concurrent_checks_join_one_read_and_a_later_check_reads_again()
     {
         var gate = new TaskCompletionSource<IReadOnlyList<PackageUpdate>>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -357,6 +377,16 @@ public sealed class EngineTests
         { Checks++; if (Error is not null) throw Error; return Read?.Invoke(ct) ?? Task.FromResult(Packages); }
         public Task<PackageInstallResult> UpdateAsync(PackageUpdate package, IProgress<PackageInstallProgress>? progress = null, CancellationToken ct = default)
         { Installed.Add(package); return Install?.Invoke(package, progress, ct) ?? Task.FromResult(new PackageInstallResult(UpdateState.Updated)); }
+    }
+    private sealed class StatusSource : IPackageSource, IPackageSourceStatus
+    {
+        public IReadOnlyList<PackageUpdate> Packages = []; public Exception? Error;
+        public string? Warning { get; init; }
+        public IReadOnlyList<string> SourceErrors { get; set; } = [];
+        public Task<IReadOnlyList<PackageUpdate>> CheckAsync(bool includeUnknown, CancellationToken ct = default)
+            => Error is not null ? throw Error : Task.FromResult(Packages);
+        public Task<PackageInstallResult> UpdateAsync(PackageUpdate package, IProgress<PackageInstallProgress>? progress = null, CancellationToken ct = default)
+            => Task.FromResult(new PackageInstallResult(UpdateState.Updated));
     }
     private sealed class Admin : IAdminHelper
     {
