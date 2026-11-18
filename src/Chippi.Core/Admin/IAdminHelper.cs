@@ -21,8 +21,24 @@ public interface IAdminHelper
     Task<AdminPortResult> StopServiceAsync(string serviceName, AdminEndpoint endpoint, CancellationToken ct = default);
 
     /// <summary>
-    /// A port action leaves the helper session open for the next one (Close, then End: one prompt). The flow that asked calls this when it
-    /// finishes or is cancelled, and on stop; the session also ends on its own after about 50 seconds idle. Safe with no session open.
+    /// Read-only: what the Cleaner's rule would delete in each category (files over a day old). The first call of a flow shows the one UAC
+    /// prompt; the session then stays open for <see cref="CleanCategoriesAsync"/>. A declined prompt answers NeedsAdmin for every name.
     /// </summary>
-    Task EndPortSessionAsync() => Task.CompletedTask;
+    Task<IReadOnlyList<AdminCategoryResult>> MeasureCategoriesAsync(IReadOnlyList<AdminCategory> names, CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AdminCategoryResult>>([.. names.Select(n => new AdminCategoryResult(n, AdminCategoryState.NeedsAdmin))]);
+
+    /// <summary>
+    /// Deletes for good, in the session the measure opened (no second prompt), and ends that session when done. Cancel stops between files,
+    /// reports what was freed so far and ends the session with Done. Cancelling before a category starts leaves it Cancelled.
+    /// </summary>
+    Task<IReadOnlyList<AdminCategoryResult>> CleanCategoriesAsync(IReadOnlyList<AdminCategory> names, IProgress<AdminCategoryProgress>? progress = null,
+        CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<AdminCategoryResult>>([.. names.Select(n => new AdminCategoryResult(n, AdminCategoryState.NeedsAdmin))]);
+
+    /// <summary>
+    /// A port action or a category measure leaves the helper session open for the next job (Close, then End; measure, then clean: one prompt).
+    /// The flow that asked calls this when it finishes or is cancelled, and on stop; the session also ends on its own after about 50 seconds
+    /// idle. Safe with no session open.
+    /// </summary>
+    Task EndSessionAsync() => Task.CompletedTask;
 }

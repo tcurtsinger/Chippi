@@ -47,7 +47,7 @@ internal sealed partial class ActionsPage
         ListPageCount = Math.Max(1, (count + ListRows * MaxListColumns - 1) / (ListRows * MaxListColumns));
         _listPage = Math.Clamp(_listPage, 0, ListPageCount - 1);
         string built = $"menu:{tile.Key}:{_listPage}:" + string.Join(",", tile.Commands.Select(c =>
-            $"{c.Key}|{c.Name}|{c.IsOn}|{_commandsRunning.Contains(c.Key)}|{_commandsFailed.Contains(c.Key)}"));
+            $"{c.Key}|{c.Name}|{c.MenuNote}|{c.IsOn}|{_commandsRunning.Contains(c.Key)}|{_commandsFailed.Contains(c.Key)}"));
         _listFailed.Visibility = Visibility.Collapsed;
         if (_built == built)
             return;
@@ -70,7 +70,15 @@ internal sealed partial class ActionsPage
         {
             var labels = Labels(command.Name, detail, failed);
             labels.Margin = new Thickness(8, 0, 0, 0);
-            var button = ListButton(new System.Windows.Controls.DockPanel { Children = { icon, labels } }, command.Name);
+            var content = new System.Windows.Controls.DockPanel { Children = { icon, labels } };
+            if (command.MenuNote is { Length: > 0 } note)
+            {
+                var value = Ui.Text(note, 11, "IslandTextTertiaryBrush");
+                value.Margin = new Thickness(8, 0, 0, 0);
+                System.Windows.Controls.DockPanel.SetDock(value, System.Windows.Controls.Dock.Right);
+                content.Children.Insert(0, value);
+            }
+            var button = ListButton(content, command.Name);
             button.Tag = "command:" + command.Key;
             button.IsEnabled = !_commandsRunning.Contains(command.Key);
             button.Click += (_, _) => RunCommand(command);

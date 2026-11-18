@@ -299,6 +299,8 @@ public partial class App : Application
         shell.Registry.Register(shell.AppUpdates);
         shell.PortManager = new Chippi.Features.PortManager.PortManagerModule();
         shell.Registry.Register(shell.PortManager);
+        shell.Cleaner = new Chippi.Features.Cleaner.CleanerModule();
+        shell.Registry.Register(shell.Cleaner);
         if (shell.Capture is Chippi.UI.Capture.CaptureLayer layer)
             layer.CanStart = () => recording.Model?.Active != true;
         shell.CapturePanel = new Chippi.App.Island.CapturePanelHost(shell, screenCapture, screenText, colorPicker, recording, mediaTools);
@@ -364,6 +366,12 @@ public partial class App : Application
             return;
         if (Shell.AppUpdates?.Engine?.IsRunning == true && System.Windows.MessageBox.Show("Stop updating and quit?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
+        if (Shell.Cleaner is { Engine.IsCleaning: true } cleaner)
+        {
+            bool? quit = await cleaner.AskQuitAsync();
+            quit ??= System.Windows.MessageBox.Show("Stop cleaning and quit?", "Chippi", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+            if (quit != true) return;
+        }
         _quitting = true;
         // Stopping isn't removing: a Print Screen shortcut keeps Windows' setting off for the next start.
         Shell.Shortcuts.Closing();

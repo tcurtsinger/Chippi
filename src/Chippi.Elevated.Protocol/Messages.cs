@@ -12,8 +12,11 @@ namespace Chippi.Elevated.Protocol;
 /// literal, which also fixes the family), LocalPort, Pid and StartTime (the process's creation time as a FILETIME). StopService adds ServiceName.
 /// </remarks>
 public sealed record AdminRequest(Guid Id, string Verb, string? PackageId = null, string? ExpectedVersion = null, bool IncludeUnknown = false,
-    string? Protocol = null, string? LocalAddress = null, int? LocalPort = null, int? Pid = null, long? StartTime = null, string? ServiceName = null);
-public sealed record AdminReply(Guid Id, string State, string? PackageId = null, int? ExitCode = null, string? Reason = null);
+    string? Protocol = null, string? LocalAddress = null, int? LocalPort = null, int? Pid = null, long? StartTime = null, string? ServiceName = null,
+    string? Category = null);
+/// <summary>A category reply echoes Category and carries Bytes, Files and InUse (files skipped because something held them open).</summary>
+public sealed record AdminReply(Guid Id, string State, string? PackageId = null, int? ExitCode = null, string? Reason = null,
+    string? Category = null, long? Bytes = null, int? Files = null, int? InUse = null);
 
 [JsonSourceGenerationOptions(UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
 [JsonSerializable(typeof(AdminRequest))]
@@ -40,20 +43,34 @@ public static class Messages
     public static bool IsPortVerb(string? verb) => verb is CloseProcess or EndProcess or StopService;
     public static bool PortStateAllowed(string? state) => state is PortDone or PortGone or PortChanged or PortKept or PortFailed;
 
+    public const string MeasureCategory = "MeasureCategory", CleanCategory = "CleanCategory";
+    /// <summary>The closed list of Cleaner categories. The helper maps each name to folders fixed in its own code; no path ever crosses the pipe.</summary>
+    public const string WindowsTemp = "WindowsTemp", WindowsUpdateDownloads = "WindowsUpdateDownloads", DeliveryOptimization = "DeliveryOptimization",
+        SystemCrashDumps = "SystemCrashDumps";
+    public static readonly IReadOnlyList<string> Categories = [WindowsTemp, WindowsUpdateDownloads, DeliveryOptimization, SystemCrashDumps];
+    /// <summary>Reply states of a category verb: Measured answers MeasureCategory, Cleaned answers CleanCategory (Reason "Cancelled" when it stopped early).</summary>
+    public const string CategoryMeasured = "Measured", CategoryCleaned = "Cleaned", CategoryUnavailable = "Unavailable", CategoryFailed = "Failed";
+    public const string CancelledReason = "Cancelled";
+    public static bool IsCategoryVerb(string? verb) => verb is MeasureCategory or CleanCategory;
+    public static bool CategoryAllowed(string? name) => name is not null && Categories.Contains(name);
+    public static bool CategoryStateAllowed(string? state) => state is CategoryMeasured or CategoryCleaned or CategoryUnavailable or CategoryFailed;
+
     public static bool ServiceNameAllowed(string? name) => name is { Length: > 0 and <= 256 } && name.All(c => !char.IsControl(c) && c is not ('/' or '\\'));
     public static bool ProtocolAllowed(string? protocol) => protocol is "Tcp" or "Udp";
     public static bool LocalAddressAllowed(string? address) => address is { Length: > 0 and <= 64 } && System.Net.IPAddress.TryParse(address, out var ip)
         && ip.AddressFamily is System.Net.Sockets.AddressFamily.InterNetwork or System.Net.Sockets.AddressFamily.InterNetworkV6;
     private static bool EndpointAllowed(AdminRequest r) => ProtocolAllowed(r.Protocol) && LocalAddressAllowed(r.LocalAddress)
         && r.LocalPort is > 0 and <= 65535 && r.Pid is >= 0 && r.StartTime is > 0;
-    private static bool NoEndpoint(AdminRequest r) => r.Protocol is null && r.LocalAddress is null && r.LocalPort is null && r.Pid is null && r.StartTime is null && r.ServiceName is null;
+    private static bool NoEndpoint(AdminRequest r) => r.Protocol is null && r.LocalAddress is null && r.LocalPort is null && r.Pid is null && r.StartTime is null && r.ServiceName is null && r.Category is null;
 
     public static bool RequestAllowed(AdminRequest r) => r.Id != Guid.Empty && r.Verb switch
     {
         "UpdatePackage" => PackageIdAllowed(r.PackageId) && VersionAllowed(r.ExpectedVersion) && NoEndpoint(r),
         "Done" => r.PackageId is null && r.ExpectedVersion is null && !r.IncludeUnknown && NoEndpoint(r),
-        CloseProcess or EndProcess => r.PackageId is null && r.ExpectedVersion is null && !r.IncludeUnknown && r.ServiceName is null && EndpointAllowed(r),
-        StopService => r.PackageId is null && r.ExpectedVersion is null && !r.IncludeUnknown && ServiceNameAllowed(r.ServiceName) && EndpointAllowed(r),
+        MeasureCategory or CleanCategory => CategoryAllowed(r.Category) && r.PackageId is null && r.ExpectedVersion is null && !r.IncludeUnknown
+            && r.Protocol is null && r.LocalAddress is null && r.LocalPort is null && r.Pid is null && r.StartTime is null && r.ServiceName is null,
+        CloseProcess or EndProcess => r.Category is null && r.PackageId is null && r.ExpectedVersion is null && !r.IncludeUnknown && r.ServiceName is null && EndpointAllowed(r),
+        StopService => r.Category is null && r.PackageId is null && r.ExpectedVersion is null && !r.IncludeUnknown && ServiceNameAllowed(r.ServiceName) && EndpointAllowed(r),
         _ => false,
     };
 

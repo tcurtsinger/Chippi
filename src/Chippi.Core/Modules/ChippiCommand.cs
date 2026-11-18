@@ -65,6 +65,12 @@ public sealed record ChippiCommand(string Key, string Name, string Icon, Func<Ta
     /// <summary>The verb asks Windows for admin: the row shows the UAC shield beside it.</summary>
     public bool NeedsAdmin { get; init; }
 
+    /// <summary>A short value an Actions menu row shows at its right ("1.0 GB"); null for none. Search shows <see cref="Detail"/> only.</summary>
+    public string? MenuNote { get; init; }
+
+    /// <summary>Only an Actions menu row: Search and the action picker leave it out (Cleaner's row opens its list; its Search verb asks).</summary>
+    public bool MenuOnly { get; init; }
+
     /// <summary>A program whose own icon the row shows in place of <see cref="Icon"/> (Port manager's holder); null for the glyph.</summary>
     public string? IconPath { get; init; }
 }

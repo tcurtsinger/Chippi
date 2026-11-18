@@ -186,6 +186,9 @@ public static class LucideIcons
     // Port manager (wave 3).
     public static Geometry Network { get; } = G("M17,16 H21 a1,1 0 0 1 1,1 V21 a1,1 0 0 1 -1,1 H17 a1,1 0 0 1 -1,-1 V17 a1,1 0 0 1 1,-1 Z M3,16 H7 a1,1 0 0 1 1,1 V21 a1,1 0 0 1 -1,1 H3 a1,1 0 0 1 -1,-1 V17 a1,1 0 0 1 1,-1 Z M10,2 H14 a1,1 0 0 1 1,1 V7 a1,1 0 0 1 -1,1 H10 a1,1 0 0 1 -1,-1 V3 a1,1 0 0 1 1,-1 Z M5,16 v-3 a1,1 0 0 1 1,-1 h12 a1,1 0 0 1 1,1 v3 M12,12 V8");
     public static Geometry CircleCheck { get; } = G("M12,2 a10,10 0 1 0 0,20 a10,10 0 1 0 0,-20 Z M9,12 l2,2 l4,-4");
+    public static Geometry Trash2 { get; } = G("M3,6 H21 M19,6 V20 c0,1 -1,2 -2,2 H7 c-1,0 -2,-1 -2,-2 V6 M8,6 V4 c0,-1 1,-2 2,-2 h4 c1,0 2,1 2,2 v2 M10,11 V17 M14,11 V17");
+    public static Geometry CircleAlert { get; } = G("M12,2 a10,10 0 1 0 0,20 a10,10 0 1 0 0,-20 Z M12,8 V12 M12,16 h0.01");
+    public static Geometry LoaderCircle { get; } = G("M21,12 a9,9 0 1 1 -6.219,-8.56");
     public static Geometry Timer { get; } = G("M10,2 h4 M12,14 l3,-3 M20,14 a8,8 0 1 0 -16,0 a8,8 0 1 0 16,0 Z");
 
     private static readonly FrozenDictionary<string, Geometry> ByKey = typeof(LucideIcons)

@@ -95,7 +95,7 @@ internal sealed class FakeAdmin : IAdminHelper
     public Queue<AdminPortResult> Results { get; } = [];
     public Action<string>? OnCall { get; set; }
     public int EndSessions { get; private set; }
-    public Task EndPortSessionAsync() { EndSessions++; return Task.CompletedTask; }
+    public Task EndSessionAsync() { EndSessions++; return Task.CompletedTask; }
 
     private AdminPortResult Next(string call, AdminPortVerb verb)
     {

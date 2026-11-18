@@ -214,9 +214,9 @@ public sealed class ActionPicker : ContentControl
                 yield return SettingsLayout.Row("Command", line);
                 break;
             case ActionKind.Chippi:
-                var commands = _source.Commands();
+                var commands = _source.Commands().Where(c => !c.MenuOnly).ToList();
                 var chippi = PickerUi.Combo("Action", commands.Select(c => c.Name));
-                chippi.SelectedIndex = commands.ToList().FindIndex(c => c.Key == action.Value);
+                chippi.SelectedIndex = commands.FindIndex(c => c.Key == action.Value);
                 chippi.SelectionChanged += (_, _) =>
                 {
                     if (chippi.SelectedIndex >= 0)

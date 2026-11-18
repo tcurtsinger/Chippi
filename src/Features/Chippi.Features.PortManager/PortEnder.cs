@@ -92,7 +92,7 @@ public sealed class PortEnder(IPortSystem system, IAdminHelper? admin = null, Fu
     public async Task EndAdminSessionAsync()
     {
         if (admin is null) return;
-        try { await admin.EndPortSessionAsync(); }
+        try { await admin.EndSessionAsync(); }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or ObjectDisposedException or OperationCanceledException) { }
     }
 

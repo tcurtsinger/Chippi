@@ -1,0 +1,16 @@
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- Cleaner (Phase 7, wave 3): measures and clears temp files and caches. The engine works on folders fixed in code as the user;
+     the Windows categories go through the admin helper. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Chippi.Features.Cleaner</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Chippi.Core/Chippi.Core.csproj" />
+    <ProjectReference Include="../../Chippi.UI/Chippi.UI.csproj" />
+    <InternalsVisibleTo Include="Chippi.Features.Cleaner.Tests" />
+    <InternalsVisibleTo Include="Chippi.Island.Tests" />
+  </ItemGroup>
+</Project>
