@@ -72,33 +72,49 @@ public sealed class RecordingSettingsViewTests
     });
 
     [Fact]
-    public void Shortcuts_are_read_only_rows_with_edit() => WithPage((view, _, _, edited) =>
+    public void Shortcuts_are_read_only_rows_with_edit() => WithPage((view, _, _, fixture) =>
     {
         Assert.Equal("Ctrl+Alt+R", view.ShortcutOf("Record screen").KeysText);
         Assert.Equal("Not set", view.ShortcutOf("Stop recording").KeysText);
         view.ShortcutOf("Stop recording").EditButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-        Assert.Equal(["Stop recording"], edited);
+        Assert.Equal(["Stop recording"], fixture.Edited);
+    });
+
+    [Fact]
+    public void A_shown_page_follows_changes_made_elsewhere_until_it_closes() => WithPage((view, model, _, fixture) =>
+    {
+        view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));
+        fixture.Keys["Stop recording"].Register(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x53), () => { });
+        Assert.Equal("Ctrl+Alt+S", view.ShortcutOf("Stop recording").KeysText);
+        Assert.True(model.SaveSettings(model.Settings with { FrameRate = 60 })); // the island's picker
+        Assert.Equal(1, view.FrameRate.SelectedIndex);
+
+        view.RaiseEvent(new RoutedEventArgs(FrameworkElement.UnloadedEvent));
+        Assert.True(model.SaveSettings(model.Settings with { FrameRate = 30 }));
+        fixture.Keys["Stop recording"].Unregister();
+        Assert.Equal((1, "Ctrl+Alt+S"), (view.FrameRate.SelectedIndex, view.ShortcutOf("Stop recording").KeysText));
     });
 
     [Fact]
     public void Folders_read_short() =>
         Assert.Equal(@"Videos\Chippi", RecordingSettingsView.Display(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Chippi")));
 
-    internal static void WithPage(Action<RecordingSettingsView, RecordingModel, Settings, List<string>> test, bool defaultFolder = false) => WpfTestThread.Run(() =>
+    internal static void WithPage(Action<RecordingSettingsView, RecordingModel, Settings, Fixture> test, bool defaultFolder = false) => WpfTestThread.Run(() =>
     {
         string folder = Path.Combine(Path.GetTempPath(), "chippi-record-settings-" + Guid.NewGuid());
         Directory.CreateDirectory(folder);
         var settings = new Settings { Value = new() { SaveFolder = defaultFolder ? null : folder } };
         var shortcuts = new ShortcutService(new Registrar());
         var edited = new List<string>();
+        var keys = new Dictionary<string, IHotkey>();
         var context = new ModuleContext(RecordingModule.Id, settings, NullLogger.Instance, null!, null!) { Shortcuts = shortcuts, EditShortcut = edited.Add };
         foreach (string name in RecordingModule.ShortcutNames)
         {
-            var key = shortcuts.Add(RecordingModule.Id, name);
+            var key = keys[name] = shortcuts.Add(RecordingModule.Id, name);
             if (name == "Record screen") key.Register(new KeyShortcut(ShortcutModifiers.Control | ShortcutModifiers.Alt, 0x52), () => { });
         }
         using var model = new RecordingModel(context, new NoBackend(), new NoStore());
-        try { test(new RecordingSettingsView(model, context), model, settings, edited); }
+        try { test(new RecordingSettingsView(model, context), model, settings, new(edited, keys)); }
         finally { WpfTestThread.Wait(model.ShutdownAsync()); Directory.Delete(folder, true); }
     });
 
@@ -125,6 +141,8 @@ public sealed class RecordingSettingsViewTests
         using var stream = File.Create(path);
         encoder.Save(stream);
     }
+
+    internal sealed record Fixture(List<string> Edited, Dictionary<string, IHotkey> Keys);
 
     internal sealed class Settings : IModuleSettings
     {

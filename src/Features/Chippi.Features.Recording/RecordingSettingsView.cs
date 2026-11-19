@@ -130,6 +130,7 @@ public sealed class RecordingSettingsView : UserControl
     // The model changes every second while recording; redraw only when its settings did (the island's quality pickers).
     private void OnModelChanged()
     {
+        if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(() => { if (_listening) OnModelChanged(); }); return; }
         if (!ReferenceEquals(_shown, _model.Settings)) Refresh();
     }
 
