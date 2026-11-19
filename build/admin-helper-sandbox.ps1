@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
-param([Parameter(Mandatory)][string]$App,[Parameter(Mandatory)][string]$Out,[switch]$AppUpdates)
+param([Parameter(Mandatory)][string]$App,[Parameter(Mandatory)][string]$Out,[switch]$AppUpdates,[switch]$Tools)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 $App=(Resolve-Path -LiteralPath $App).Path
@@ -15,10 +15,13 @@ $Out=(Resolve-Path -LiteralPath $Out).Path
 $script=(Resolve-Path -LiteralPath (Join-Path $repo 'tests/Chippi.Elevated.Tests/Sandbox')).Path
 $escape={ param($value) [Security.SecurityElement]::Escape($value) }
 $wsb=Join-Path $Out 'admin-helper.wsb'
-$guestArguments=if ($AppUpdates) { ' -AppUpdates' } else { '' }
+if ($AppUpdates -and $Tools) { throw 'Pass -AppUpdates or -Tools, not both.' }
+$guestArguments=if ($AppUpdates) { ' -AppUpdates' } elseif ($Tools) { ' -Tools' } else { '' }
+# The tools check installs nothing, so its guest has no network.
+$networking=if ($Tools) { 'Disable' } else { 'Enable' }
 @"
 <Configuration>
-  <Networking>Enable</Networking><ClipboardRedirection>Disable</ClipboardRedirection>
+  <Networking>$networking</Networking><ClipboardRedirection>Disable</ClipboardRedirection>
   <AudioInput>Disable</AudioInput><VideoInput>Disable</VideoInput><PrinterRedirection>Disable</PrinterRedirection>
   <MappedFolders>
     <MappedFolder><HostFolder>$(& $escape $App)</HostFolder><SandboxFolder>C:\source-app</SandboxFolder><ReadOnly>true</ReadOnly></MappedFolder>

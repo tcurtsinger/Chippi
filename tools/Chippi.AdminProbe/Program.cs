@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 using System.Security.Principal;
 using Chippi.Features.AppUpdates;
 
-if (Environment.UserName != "WDAGUtilityAccount" || args.Length != 1 || args[0] is not ("--sandbox" or "--preflight" or "--handshake" or "--guard" or "--app-updates")) return 2;
+if (Environment.UserName != "WDAGUtilityAccount" || args.Length != 1 || args[0] is not ("--sandbox" or "--preflight" or "--handshake" or "--guard" or "--app-updates" or "--tools")) return 2;
 string report = @"C:\results\helper.json";
 try
 {
@@ -41,6 +41,12 @@ try
         return 0;
     }
     using var helper = new AdminHelper(BrokerFactory.Create(), new ProbeLogger());
+    if (args[0] == "--tools")
+    {
+        bool toolsPassed = await ToolsCheck.RunAsync(helper, () => BrokerFactory.LaunchCount);
+        File.WriteAllText(report, JsonSerializer.Serialize(new { passed = toolsPassed }));
+        return toolsPassed ? 0 : 1;
+    }
     if (args[0] == "--app-updates")
     {
         var source = new SandboxUpdatesSource();

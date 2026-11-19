@@ -21,3 +21,13 @@ Sandbox's UAC-disabled `runas` path does not elevate this filtered token: the re
 One batch upgrades the older machine-scope 7-Zip fixture, then requests a nonexistent package. The first must succeed, the second must fail without retry, and the guest confirms the installed version advanced. `token.json`, `preflight.json`, `handshake.json`, `helper.json`, `results.json` and `guest.log` retain the results, connection time and batch duration. Client errors include helper startup stage/exit codes. No private owner data is read.
 
 Sandbox may not show a UAC prompt. Its success cannot establish the owner's real Yes/No consent flow; that live check remains separate. If network/bootstrap or guest elevation fails, report it as unverified rather than substituting host operations.
+
+## Port manager, Cleaner and Uninstaller
+
+Same probe folder, with `-Tools`. The guest has no network and installs nothing:
+
+```powershell
+./build/admin-helper-sandbox.ps1 -App "$env:TEMP\chippi-admin-session\app" -Out "$env:TEMP\chippi-admin-session\tools" -Tools
+```
+
+`tools-fixture.ps1` builds throwaway things in the guest, elevated: two listeners on `127.0.0.1` (one with a window, one without), a service `ChippiFixtureSvc` on 47013, old and new files in each Cleaner folder (a held file, a junction to a folder that must survive), and five apps (an HKLM app with leftovers and a junction in its install folder, one whose uninstaller relaunches itself from Temp, one whose uninstaller Users can write, Firefox with a Thunderbird sharing the Mozilla folders, and an HKCU app). The medium-integrity probe then drives each feature's own engine with the real helper (`ToolsCheck.cs`): Free and Stop, refusals of RpcSs, a service not owning the port and System; measure and clean; one uninstall queue, then leftovers in a new session, then Dismiss. `tools-verify.ps1` reads the results elevated. `results.json` lists every failure, the timings, the Recycle Bin, the registry exports and the environment each uninstaller saw.

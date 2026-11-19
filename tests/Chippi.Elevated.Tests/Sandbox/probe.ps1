@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
-param([switch]$AppUpdates)
+param([switch]$AppUpdates,[switch]$Tools)
 $ErrorActionPreference='Stop'
 if ($env:USERNAME -ne 'WDAGUtilityAccount' -or !(Test-Path 'C:\source-app\Chippi.Elevated.exe')) { throw 'Windows Sandbox only.' }
 Start-Transcript C:\results-out\guest.log
@@ -19,6 +19,14 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Guest result permissions failed.' }
     & C:\probe\medium.ps1 -Mode '--preflight'
     & C:\probe\medium.ps1 -Mode '--handshake'
+    if ($Tools) {
+        # Port manager, Cleaner and Uninstaller on throwaway fixtures; no network, nothing installed.
+        & C:\probe\tools-fixture.ps1
+        $probeError=$null
+        try { & C:\probe\medium.ps1 -Mode '--tools' } catch { $probeError=$_.Exception.Message }
+        & C:\probe\tools-verify.ps1 -ProbeError $probeError
+        return
+    }
     # All installation is inside this disposable guest, never on the host.
     [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
     Install-PackageProvider NuGet -Force -Scope CurrentUser | Out-Null

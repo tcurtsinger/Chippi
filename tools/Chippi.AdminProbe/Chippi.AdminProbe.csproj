@@ -5,5 +5,5 @@
     <UseWPF>true</UseWPF><PublishSingleFile>true</PublishSingleFile><SelfContained>true</SelfContained>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../src/Chippi.UI/Chippi.UI.csproj" /><ProjectReference Include="../../src/Features/Chippi.Features.AppUpdates/Chippi.Features.AppUpdates.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../src/Chippi.UI/Chippi.UI.csproj" /><ProjectReference Include="../../src/Features/Chippi.Features.AppUpdates/Chippi.Features.AppUpdates.csproj" /><ProjectReference Include="../../src/Features/Chippi.Features.PortManager/Chippi.Features.PortManager.csproj" /><ProjectReference Include="../../src/Features/Chippi.Features.Cleaner/Chippi.Features.Cleaner.csproj" /><ProjectReference Include="../../src/Features/Chippi.Features.Uninstaller/Chippi.Features.Uninstaller.csproj" /></ItemGroup>
 </Project>

@@ -54,8 +54,10 @@ public sealed class PortScanner(IPortSystem system)
         string name = process.Name;
         if (row.Pid == system.CurrentPid || (system.CurrentPath is { Length: > 0 } own && string.Equals(process.Path, own, StringComparison.OrdinalIgnoreCase)))
             return With(HolderKind.Chippi, PortVerb.None, name);
-        if (process.Unreadable || process.Protected || PortRules.ProtectedNames.Contains(PortRules.BaseName(name))) return With(HolderKind.Windows, PortVerb.None, name);
-        if (services.Length > 0)
+        if (process.Protected || PortRules.ProtectedNames.Contains(PortRules.BaseName(name))) return With(HolderKind.Windows, PortVerb.None, name);
+        // A service process is usually one the owner's standard token can't open (LocalSystem, NetworkService): the service list and the process
+        // list's start time are enough to offer Stop, which the helper attributes again before it stops anything.
+        if (services.Length > 0 && !(process.Unreadable && process.StartTime == 0))
         {
             ServiceInfo? match;
             if (row.IsHeld)
@@ -70,7 +72,7 @@ public sealed class PortScanner(IPortSystem system)
             if (PortRules.CoreServices.Contains(match.Name)) return With(HolderKind.Windows, PortVerb.None, name, match);
             return With(HolderKind.Service, PortVerb.Stop, name, match);
         }
-        if (PortRules.IsSvchost(name)) return With(HolderKind.Windows, PortVerb.None, name);
+        if (process.Unreadable || PortRules.IsSvchost(name)) return With(HolderKind.Windows, PortVerb.None, name);
         return process.CanTerminate ? With(HolderKind.Own, PortVerb.Free, name) : With(HolderKind.Elevated, PortVerb.Free, name);
     }
 
