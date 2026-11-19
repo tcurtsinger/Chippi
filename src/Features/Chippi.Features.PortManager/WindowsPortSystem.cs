@@ -77,10 +77,10 @@ public sealed unsafe class WindowsPortSystem : IPortSystem
         if (process.IsInvalid)
         {
             int error = Marshal.GetLastPInvokeError();
-            return error == InvalidParameter ? null : new ProcessInfo(pid, 0, NameFromList(names, pid), null, Unreadable: true);
+            return error == InvalidParameter ? null : new ProcessInfo(pid, names.StartOf(pid), NameFromList(names, pid), null, Unreadable: true);
         }
         if (!GetExitCodeProcess(process, out uint code) || code != StillActive) return null;
-        if (!GetProcessTimes(process, out long created, out _, out _, out _)) return new ProcessInfo(pid, 0, NameFromList(names, pid), null, Unreadable: true);
+        if (!GetProcessTimes(process, out long created, out _, out _, out _)) return new ProcessInfo(pid, names.StartOf(pid), NameFromList(names, pid), null, Unreadable: true);
         string? path = ImagePath(process);
         string name = path is null ? NameFromList(names, pid) : Path.GetFileName(path);
         return new ProcessInfo(pid, created, name, path, Unreadable: false, CanTerminate: CanTerminate(pid), Protected: IsProtected(process));
@@ -236,4 +236,54 @@ public sealed unsafe class WindowsPortSystem : IPortSystem
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CloseServiceHandle(nint handle);
     [DllImport("advapi32.dll", EntryPoint = "EnumServicesStatusExW", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool EnumServicesStatusEx(nint manager, int infoLevel, uint serviceType, uint serviceState, byte* services, uint size, out uint needed, out uint count, ref uint resume, string? group);
+}
+
+/// <summary>
+/// Every process's id, image name and creation time from NtQuerySystemInformation(SystemProcessInformation): what Task Manager reads, with
+/// no handle to any process, so it works for processes a standard user can't open (services running as LocalSystem or NetworkService).
+/// </summary>
+internal static unsafe class SystemProcesses
+{
+    public sealed record Snapshot(IReadOnlyDictionary<int, string> Names, IReadOnlyDictionary<int, long> Starts);
+
+    private const int SystemProcessInformation = 5;
+    private const uint InfoLengthMismatch = 0xC0000004;
+
+    public static Snapshot Read()
+    {
+        var names = new Dictionary<int, string>();
+        var starts = new Dictionary<int, long>();
+        if (IntPtr.Size != 8) return new(names, starts);   // the offsets below are the 64-bit layout; Chippi ships x64 and ARM64 only
+        uint size = 512 * 1024;
+        for (int attempt = 0; attempt < 6; attempt++)
+        {
+            byte* buffer = (byte*)NativeMemory.Alloc(size);
+            try
+            {
+                uint status = NtQuerySystemInformation(SystemProcessInformation, buffer, size, out uint needed);
+                if (status == InfoLengthMismatch) { size = Math.Max(size * 2, needed + 64 * 1024); continue; }
+                if (status != 0) break;
+                for (byte* entry = buffer; ; )
+                {
+                    long created = *(long*)(entry + 32);
+                    ushort length = *(ushort*)(entry + 56);
+                    char* text = *(char**)(entry + 64);
+                    int pid = (int)*(nint*)(entry + 80);
+                    string name = pid == 0 ? "Idle" : text is null ? "" : new string(text, 0, length / 2);
+                    if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) name = name[..^4];
+                    names[pid] = name;
+                    starts[pid] = created;
+                    uint next = *(uint*)entry;
+                    if (next == 0) break;
+                    entry += next;
+                }
+                break;
+            }
+            finally { NativeMemory.Free(buffer); }
+        }
+        return new(names, starts);
+    }
+
+    [DllImport("ntdll.dll")]
+    private static extern uint NtQuerySystemInformation(int infoClass, void* buffer, uint length, out uint returned);
 }

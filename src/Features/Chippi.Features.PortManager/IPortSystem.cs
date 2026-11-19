@@ -41,23 +41,29 @@ public interface IPortSystem
 }
 
 /// <summary>
-/// The process list's names for one scan, read once and lazily (only a protected process needs it). Each scan makes its own, so two
-/// scans on different threads never share or overwrite a map.
+/// The process list's names and start times for one scan, read once and lazily (only a protected or unreadable process needs it). Each scan
+/// makes its own, so two scans on different threads never share or overwrite a map. The list needs no access to any process: it is how a
+/// service process a standard user can't open still gets the start time the helper checks.
 /// </summary>
-public sealed class ProcessNames(Func<IReadOnlyDictionary<int, string>>? load = null)
+public sealed class ProcessNames
 {
-    private readonly Func<IReadOnlyDictionary<int, string>> _load = load ?? Read;
+    private readonly Func<IReadOnlyDictionary<int, string>> _load;
+    private readonly Func<IReadOnlyDictionary<int, long>> _starts;
     private IReadOnlyDictionary<int, string>? _map;
+    private IReadOnlyDictionary<int, long>? _startMap;
+    private SystemProcesses.Snapshot? _snapshot;
+
+    public ProcessNames(Func<IReadOnlyDictionary<int, string>>? load = null, Func<IReadOnlyDictionary<int, long>>? starts = null)
+    {
+        _load = load ?? (() => Snap().Names);
+        _starts = starts ?? (() => Snap().Starts);
+    }
+
+    private SystemProcesses.Snapshot Snap() => _snapshot ??= SystemProcesses.Read();
 
     /// <summary>The process list is read the first time a name is asked for.</summary>
     public string? Get(int pid) => (_map ??= _load()).GetValueOrDefault(pid);
 
-    private static Dictionary<int, string> Read()
-    {
-        var map = new Dictionary<int, string>();
-        foreach (var process in System.Diagnostics.Process.GetProcesses())
-            using (process)
-                map[process.Id] = process.ProcessName;
-        return map;
-    }
+    /// <summary>The process's creation time (FILETIME) from the list, or 0 when it isn't there.</summary>
+    public long StartOf(int pid) => (_startMap ??= _starts()).GetValueOrDefault(pid);
 }

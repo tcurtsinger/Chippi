@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) Chippi contributors
-param([ValidateSet('--preflight','--handshake','--guard','--sandbox','--app-updates')][string]$Mode)
+param([ValidateSet('--preflight','--handshake','--guard','--sandbox','--app-updates','--tools')][string]$Mode)
 if ($env:USERNAME -ne 'WDAGUtilityAccount' -or !(Test-Path 'C:\chippi\Chippi.exe')) { throw 'Windows Sandbox only.' }
 Add-Type @'
 using System;
@@ -29,7 +29,7 @@ public static class AdminMedium {
     static extern bool CreateProcessAsUser(IntPtr token,string app,StringBuilder line,IntPtr pa,IntPtr ta,bool inherit,uint flags,IntPtr env,string directory,ref Startup startup,out ProcessInfo process);
     static void Check(bool success,string step) { if(!success) { int code=Marshal.GetLastWin32Error(); throw new Win32Exception(code,step+" ("+code+")"); } }
     public static void Run(string mode) {
-        if(mode!="--preflight" && mode!="--handshake" && mode!="--guard" && mode!="--sandbox" && mode!="--app-updates")throw new ArgumentException("Invalid probe mode");
+        if(mode!="--preflight" && mode!="--handshake" && mode!="--guard" && mode!="--sandbox" && mode!="--app-updates" && mode!="--tools")throw new ArgumentException("Invalid probe mode");
         IntPtr original=IntPtr.Zero,token=IntPtr.Zero,sid=IntPtr.Zero;
         var helpers=new System.Collections.Generic.List<System.Diagnostics.Process>();
         try {
@@ -45,12 +45,13 @@ public static class AdminMedium {
             CloseHandle(process.Thread);
             try {
                 uint waited=258;
-                var deadline=DateTime.UtcNow.AddMinutes(5);
+                var deadline=DateTime.UtcNow.AddMinutes(mode=="--tools"?15:5);
+                int bound=mode=="--tools"?10:4;
                 while((waited=WaitForSingleObject(process.Process,50))==258 && DateTime.UtcNow<deadline) {
                     foreach(var request in System.IO.Directory.GetFiles(@"C:\results","broker-*.request")) {
                         var pipe=System.IO.File.ReadAllText(request).Trim();
                         if(!System.Text.RegularExpressions.Regex.IsMatch(pipe,@"\Achippi-admin-[0-9a-f]{32}\z"))throw new Exception("Invalid broker pipe");
-                        if(helpers.Count>=4)throw new Exception("Too many helper requests");
+                        if(helpers.Count>=bound)throw new Exception("Too many helper requests");
                         var helper=System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(@"C:\chippi\Chippi.Elevated.exe","--pipe "+pipe){UseShellExecute=false,CreateNoWindow=true});
                         helpers.Add(helper);
                         var response=@"C:\results\"+pipe+".pid";

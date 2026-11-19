@@ -255,6 +255,8 @@ public sealed class UninstallerEngine : IDisposable
 
     private async Task<AppOutcome> FinishMachineAsync(AppEntry app, AppRecord record, AdminUninstallResult result)
     {
+        // Logged here, in order: the helper's start progress posts to the thread pool and may land after the queue has returned.
+        _log?.LogInformation("Uninstall of {App}: {State}", app.Name, result.State);
         switch (result.State)
         {
             case AdminUninstallState.NeedsAdmin: Set(app, AppRunState.NeedsAdmin); return new(app, new AppStatus(AppRunState.NeedsAdmin, app.Name));

@@ -41,9 +41,14 @@ public sealed partial class LeftoverScanner(UninstallerSystem system, LeftoverRo
         {
             ct.ThrowIfCancellationRequested();
             if (Forbidden(c)) continue;
+            // The helper removes a machine key only when the record names it; any other would always come back Kept, so it isn't offered.
+            if (c is { Kind: LeftoverKind.Key, Reason: "App key" } && c.Hive != RegHive.User && !NamedByRecord(record, c.KeyPath!)) continue;
             string? shared = SharedWith(c, others, publisher, record);
             var klass = shared is not null ? LeftoverClass.Shared : !hasRecord && c.Class == LeftoverClass.Safe ? LeftoverClass.CheckFirst : c.Class;
-            items.Add(ToItem(c, klass, shared, ct));
+            var item = ToItem(c, klass, shared, ct);
+            // The helper's Safe is inside the record's folders only: an all-users shortcut goes to it as the owner's choice.
+            if (item is { Class: LeftoverClass.Safe, Kind: LeftoverKind.File, NeedsAdmin: true } && c.Reason == "Shortcut") item = item with { Class = LeftoverClass.CheckFirst };
+            items.Add(item);
         }
         // An item inside another listed item of the same kind is part of it, never its own row.
         var kept = items.Where(i => !items.Any(o => !ReferenceEquals(o, i) && o.Class != LeftoverClass.Shared && Inside(o, i))).ToList();
@@ -159,6 +164,18 @@ public sealed partial class LeftoverScanner(UninstallerSystem system, LeftoverRo
                 }
             }
         }
+    }
+
+    /// <summary>The helper's rule for machine keys (admin-helper.md): Software\&lt;name&gt; or Software\&lt;publisher&gt;\&lt;name&gt;, or under them.</summary>
+    internal static bool NamedByRecord(AppRecord record, string path)
+    {
+        static bool Segment(string? text) => !string.IsNullOrWhiteSpace(text) && !text.Contains('\\');
+        static bool Under(string root, string key) =>
+            string.Equals(root, key, StringComparison.OrdinalIgnoreCase) || key.StartsWith(root + "\\", StringComparison.OrdinalIgnoreCase);
+        path = path.TrimEnd('\\');
+        if (!Segment(record.Name)) return false;
+        if (Under("Software\\" + record.Name, path)) return true;
+        return Segment(record.Publisher) && Under("Software\\" + record.Publisher + "\\" + record.Name, path);
     }
 
     /// <summary>The path the review shows and the item's id is made of. The 32-bit view reads as WOW6432Node, so the two views of one key are two items.</summary>

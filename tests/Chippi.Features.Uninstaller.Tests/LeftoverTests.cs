@@ -36,6 +36,8 @@ public sealed class LeftoverTests : IDisposable
         _f.Shortcuts.Targets[_f.WriteFile(Path.Combine(menu, "Thunderbird.lnk"), 1)] = Path.Combine(thunderbird, "thunderbird.exe");
         _f.Shortcuts.Targets[_f.WriteFile(Path.Combine(_f.Roots.Desktops[0], "Firefox.lnk"), 1)] = Path.Combine(firefox, "firefox.exe");
 
+        // The helper removes a machine key only when the record names it (Software\<publisher>\<name>); the other is never offered.
+        _f.Keys.Add(RegHive.Machine64, @"Software\Mozilla\Mozilla Firefox (x64 en-US)\132.0.1");
         _f.Keys.Add(RegHive.Machine64, @"Software\Mozilla\Firefox\132.0.1 (x64 en-US)");
         _f.Keys.Add(RegHive.Machine64, @"Software\Mozilla\Thunderbird\128.4.3");
         _f.Keys.Add(RegHive.User, @"Software\Mozilla\Firefox");
@@ -82,13 +84,14 @@ public sealed class LeftoverTests : IDisposable
     public async Task A_folder_named_like_the_app_is_Check_first_and_a_shortcut_into_the_install_folder_is_Safe()
     {
         var scan = await ScanAsync(Mozilla());
-        Assert.Equal(new[] { "HKCU\\Software\\Mozilla\\Firefox", "HKLM\\Software\\Mozilla\\Firefox", _f.Local("Mozilla", "Firefox"), _f.Roaming("Mozilla", "Firefox") }
+        Assert.Equal(new[] { "HKCU\\Software\\Mozilla\\Firefox", "HKLM\\Software\\Mozilla\\Mozilla Firefox (x64 en-US)", _f.Local("Mozilla", "Firefox"), _f.Roaming("Mozilla", "Firefox") }
             .Order(StringComparer.OrdinalIgnoreCase), scan.CheckFirst.Select(i => i.Path).Order(StringComparer.OrdinalIgnoreCase));
         Assert.All(scan.CheckFirst, i => Assert.False(i.TickedByDefault));
         Assert.Equal(new[] { Path.Combine(_f.Roots.Desktops[0], "Firefox.lnk"), Path.Combine(_f.Roots.StartMenuPrograms[0], "Firefox.lnk"), _f.ProgramFiles("Mozilla Firefox") }
             .Order(StringComparer.OrdinalIgnoreCase), scan.Safe.Select(i => i.Path).Order(StringComparer.OrdinalIgnoreCase));
         Assert.All(scan.Safe, i => Assert.True(i.TickedByDefault));
-        Assert.True(Find(scan, @"HKLM\Software\Mozilla\Firefox").NeedsAdmin);
+        Assert.True(Find(scan, @"HKLM\Software\Mozilla\Mozilla Firefox (x64 en-US)").NeedsAdmin);
+        Assert.DoesNotContain(scan.Items, i => i.Path.Equals(@"HKLM\Software\Mozilla\Firefox", StringComparison.OrdinalIgnoreCase));
         Assert.False(Find(scan, @"HKCU\Software\Mozilla\Firefox").NeedsAdmin);
     }
 
@@ -191,5 +194,43 @@ public sealed class LeftoverTests : IDisposable
         Assert.Equal("mozilla", LeftoverScanner.ShortKey("Mozilla Corporation"));
         Assert.Equal("Python", LeftoverScanner.StripVersion("Python 3.13.0 (64-bit)"));
         Assert.Equal("Mozilla Firefox", LeftoverScanner.StripVersion("Mozilla Firefox (x64 en-US)"));
+    }
+
+    [Fact]
+    public async Task A_machine_key_the_record_does_not_name_is_never_offered_and_one_it_names_is()
+    {
+        var record = Mozilla();
+        _f.Keys.Add(RegHive.Machine64, @"Software\Mozilla Firefox (x64 en-US)");
+        _f.Keys.Add(RegHive.Machine32, @"Software\Mozilla\Firefox");
+        var scan = await ScanAsync(record);
+        Assert.Equal(LeftoverClass.CheckFirst, Find(scan, @"HKLM\Software\Mozilla Firefox (x64 en-US)").Class);
+        Assert.Equal(LeftoverClass.CheckFirst, Find(scan, @"HKLM\Software\Mozilla\Mozilla Firefox (x64 en-US)").Class);
+        Assert.DoesNotContain(scan.Items, i => i.Kind == LeftoverKind.Key && i.Hive != RegHive.User && i.Path.EndsWith(@"\Mozilla\Firefox", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(LeftoverClass.CheckFirst, Find(scan, @"HKCU\Software\Mozilla\Firefox").Class);   // the owner's own key stays: Chippi removes it
+    }
+
+    [Fact]
+    public async Task An_all_users_shortcut_goes_to_the_helper_as_Check_first_and_the_owners_own_stays_Safe()
+    {
+        var record = Mozilla();
+        string common = _f.WriteFile(Path.Combine(_f.Roots.StartMenuPrograms[1], "Firefox.lnk"), 1);
+        _f.Shortcuts.Targets[common] = Path.Combine(record.InstallLocation!, "firefox.exe");
+        var scan = await ScanAsync(record);
+        var all = Find(scan, common);
+        Assert.Equal((LeftoverClass.CheckFirst, true, false), (all.Class, all.NeedsAdmin, all.TickedByDefault));
+        var own = Find(scan, Path.Combine(_f.Roots.StartMenuPrograms[0], "Firefox.lnk"));
+        Assert.Equal((LeftoverClass.Safe, false), (own.Class, own.NeedsAdmin));
+    }
+
+    [Fact]
+    public void The_machine_key_rule_matches_the_helpers()
+    {
+        var record = new AppRecord(Guid.NewGuid(), "Fixture Notes", "Fixture Labs", "1.0", AppSource.Machine64, "K", null, null, [], null, DateTime.UtcNow, Guid.NewGuid());
+        Assert.True(LeftoverScanner.NamedByRecord(record, @"Software\Fixture Notes"));
+        Assert.True(LeftoverScanner.NamedByRecord(record, @"Software\Fixture Labs\Fixture Notes\Window"));
+        Assert.False(LeftoverScanner.NamedByRecord(record, @"Software\Fixture Labs\Notes"));
+        Assert.False(LeftoverScanner.NamedByRecord(record, @"Software\Fixture Labs"));
+        Assert.False(LeftoverScanner.NamedByRecord(record, @"Software\Fixture NotesExtra"));
+        Assert.False(LeftoverScanner.NamedByRecord(record with { Name = @"A\B" }, @"Software\A\B"));
     }
 }

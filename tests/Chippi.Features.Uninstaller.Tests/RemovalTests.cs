@@ -36,7 +36,7 @@ public sealed class RemovalTests : IDisposable
         Assert.Equal(scan.Record.HelperRecordId, id);
         Assert.Equal(
             [(AdminLeftoverKind.Folder, F.ProgramFiles("Mozilla Firefox"), AdminLeftoverClass.Safe, (AdminRegistryView?)null),
-             (AdminLeftoverKind.RegistryKey, @"Software\Mozilla\Firefox", AdminLeftoverClass.CheckFirst, AdminRegistryView.Registry64)],
+             (AdminLeftoverKind.RegistryKey, @"Software\Mozilla\Mozilla Firefox (x64 en-US)", AdminLeftoverClass.CheckFirst, AdminRegistryView.Registry64)],
             sent.Select(i => (i.Kind, i.Path, i.Class, i.View)));
         Assert.All(sent, i => Assert.True(i.Ticked));
         // The owner's own folders and keys never went to the helper: the Recycle Bin and reg.exe took them.
@@ -71,11 +71,11 @@ public sealed class RemovalTests : IDisposable
         F.Admin.Leftover = i => i.Kind == AdminLeftoverKind.Folder
             ? new AdminLeftoverResult(i, AdminLeftoverState.Yours)
             : new AdminLeftoverResult(i, AdminLeftoverState.Kept, "Kept: changed since the scan");
-        var run = await engine.RemoveAsync(scan, Ids(scan, F.ProgramFiles("Mozilla Firefox"), @"HKLM\Software\Mozilla\Firefox"));
+        var run = await engine.RemoveAsync(scan, Ids(scan, F.ProgramFiles("Mozilla Firefox"), @"HKLM\Software\Mozilla\Mozilla Firefox (x64 en-US)"));
         Assert.Contains(F.ProgramFiles("Mozilla Firefox"), F.Recycler.Recycled);   // Yours: the owner can delete it himself
         Assert.Equal(["Kept: changed since the scan", "Removed"], run.Results.Select(r => r.Text).Order(StringComparer.Ordinal));
         Assert.Equal(["Kept: changed since the scan"], run.Results.Where(r => !r.Ok).Select(r => r.Text));
-        Assert.True(F.Keys.Exists(RegHive.Machine64, @"Software\Mozilla\Firefox\132.0.1 (x64 en-US)"));   // a kept key stays
+        Assert.True(F.Keys.Exists(RegHive.Machine64, @"Software\Mozilla\Mozilla Firefox (x64 en-US)\132.0.1"));   // a kept key stays
     }
 
     [Theory]
@@ -90,6 +90,16 @@ public sealed class RemovalTests : IDisposable
         var run = await engine.RemoveAsync(scan, Ids(scan, F.ProgramFiles("Mozilla Firefox")));
         Assert.Equal(text, Assert.Single(run.Results).Text);
         Assert.Contains("end", F.Admin.Calls);
+    }
+
+    [Fact]
+    public async Task A_machine_key_the_helper_removed_names_the_helpers_backup_folder()
+    {
+        var (scan, engine) = await Prepare();
+        using var _ = engine;
+        var run = await engine.RemoveAsync(scan, Ids(scan, @"HKLM\Software\Mozilla\Mozilla Firefox (x64 en-US)"));
+        Assert.Equal("Removed", Assert.Single(run.Results).Text);
+        Assert.Equal(LeftoverRemover.HelperBackupFolder, run.BackupFolder);
     }
 
     [Fact]
@@ -174,10 +184,10 @@ public sealed class RemovalTests : IDisposable
     {
         var (scan, engine) = await Prepare(helperRecord: false);
         using var _ = engine;
-        var run = await engine.RemoveAsync(scan, Ids(scan, @"HKLM\Software\Mozilla\Firefox", F.Roaming("Mozilla", "Firefox")));
+        var run = await engine.RemoveAsync(scan, Ids(scan, @"HKLM\Software\Mozilla\Mozilla Firefox (x64 en-US)", F.Roaming("Mozilla", "Firefox")));
         Assert.Empty(F.Admin.LeftoverCalls);
         Assert.Equal(["Kept: no uninstall record", "Removed"], run.Results.Select(r => r.Text).Order(StringComparer.Ordinal));
-        Assert.True(F.Keys.Exists(RegHive.Machine64, @"Software\Mozilla\Firefox\132.0.1 (x64 en-US)"));
+        Assert.True(F.Keys.Exists(RegHive.Machine64, @"Software\Mozilla\Mozilla Firefox (x64 en-US)\132.0.1"));
     }
 
     [Fact]

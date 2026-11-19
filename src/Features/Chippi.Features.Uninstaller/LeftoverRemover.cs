@@ -32,13 +32,13 @@ public sealed record LeftoverRun(IReadOnlyList<LeftoverResult> Results, string? 
 
     /// <summary>
     /// This run with a later one (a retry of what failed) laid over it: an item the later run did again takes its new result in its place, and the
-    /// backup folder of either survives. What the first run removed stays removed.
+    /// backup folder the first run named stays (else the later one's). What the first run removed stays removed.
     /// </summary>
     public LeftoverRun Merge(LeftoverRun later)
     {
         var again = later.Results.ToDictionary(r => r.Item.Id);
         var merged = Results.Select(r => again.Remove(r.Item.Id, out var fresh) ? fresh : r).Concat(again.Values).ToList();
-        return new LeftoverRun(merged, later.BackupFolder ?? BackupFolder);
+        return new LeftoverRun(merged, BackupFolder ?? later.BackupFolder);   // the first named folder stays: Chippi's own before the helper's
     }
 }
 
@@ -52,6 +52,10 @@ public sealed class LeftoverRemover(UninstallerSystem system, IAdminHelper? admi
 {
     private static readonly TimeSpan ExportLimit = TimeSpan.FromMinutes(2);
     private readonly TimeProvider _time = time ?? TimeProvider.System;
+
+    /// <summary>Where the admin helper puts its .reg exports (NativeLeftovers.cs): the owner's local app data, fixed in the helper.</summary>
+    public static string HelperBackupFolder { get; } =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chippi", "leftovers-backup");
 
     public async Task<LeftoverRun> RemoveAsync(LeftoverScan scan, IReadOnlyCollection<string> ticked, IProgress<LeftoverResult>? progress = null, CancellationToken ct = default)
     {
@@ -70,6 +74,7 @@ public sealed class LeftoverRemover(UninstallerSystem system, IAdminHelper? admi
             else standard.Add(item);
         }
 
+        bool helperKey = false;
         if (helper.Count > 0)
         {
             var sent = helper.Select(ToAdmin).ToArray();
@@ -82,7 +87,7 @@ public sealed class LeftoverRemover(UninstallerSystem system, IAdminHelper? admi
                 switch (answer.State)
                 {
                     case AdminLeftoverState.Yours: standard.Add(helper[i]); break;
-                    case AdminLeftoverState.Removed: Done(new(helper[i], LeftoverState.Removed)); break;
+                    case AdminLeftoverState.Removed: Done(new(helper[i], LeftoverState.Removed)); helperKey |= helper[i].Kind == LeftoverKind.Key; break;
                     case AdminLeftoverState.Kept: Done(new(helper[i], LeftoverState.Kept, answer.Text)); break;
                     case AdminLeftoverState.InUse: Done(new(helper[i], LeftoverState.InUse)); break;
                     case AdminLeftoverState.NeedsAdmin: Done(new(helper[i], LeftoverState.NeedsAdmin)); break;
@@ -115,7 +120,8 @@ public sealed class LeftoverRemover(UninstallerSystem system, IAdminHelper? admi
         });
         var ordered = selected.Select(i => results[i.Id]).ToList();
         logger?.LogInformation("Removed leftovers of {App}: {Removed} of {Count}", scan.Record.Name, ordered.Count(r => r.Ok), ordered.Count);
-        return new LeftoverRun(ordered, usedBackup);
+        // The helper exports a machine key to its own fixed folder before deleting it; the results name that folder when Chippi made no backup itself.
+        return new LeftoverRun(ordered, usedBackup ?? (helperKey ? HelperBackupFolder : null));
     }
 
     private static Task<T> OnWorker<T>(Func<T> work)
