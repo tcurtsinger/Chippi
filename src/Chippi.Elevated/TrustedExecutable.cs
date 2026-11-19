@@ -42,7 +42,9 @@ public sealed class TrustedExecutable : IDisposable
     {
         string label = Path.GetFileName(path);
         if (label.Length == 0) label = "volume root";
-        var handle = CreateFile(path, 0x20080, file ? 1u : 3u, 0, 3, 0x02200000, 0);
+        // FILE_READ_DATA (FILE_LIST_DIRECTORY) is needed beside READ_CONTROL and FILE_READ_ATTRIBUTES: a handle that asks only for attribute-type rights is skipped by
+        // the sharing check, so it would not stop a rename or delete.
+        var handle = CreateFile(path, 0x20081, file ? 1u : 3u, 0, 3, 0x02200000, 0);
         if (handle.IsInvalid) { handle.Dispose(); throw new Win32Exception(); }
         _handles.Add(handle);
         if (!GetFileInformationByHandle(handle, out var info)) throw new Win32Exception();

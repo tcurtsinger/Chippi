@@ -27,7 +27,14 @@ internal static class Program
             var runner = new PackageUpdater(peer.StandardToken);
             var ports = new PortActions(new NativePortSystem(), [Environment.ProcessId, (int)peerPid], Path.GetFullPath(chippiPath));
             var categories = new CategoryActions(CategoryRoots.ForWindows());
-            await new HelperSession(runner, ports: ports, categories: categories).RunAsync(pipe).ConfigureAwait(false);
+            using var recordStore = new NativeRecordStore(peer.StandardToken);
+            var uninstalls = new UninstallActions(new NativeUninstallRegistry(peer.StandardToken), recordStore, new NativeFsProbe(peer.StandardToken), new NativeProcessLauncher(), new NativeUninstallHost());
+            uninstalls.Maintain();   // records past 30 days go each time the helper starts
+            string ownerSid = NativeLeftoverSystem.SidOf(peer.StandardToken) ?? throw new UnauthorizedAccessException("No owner.");
+            string ownerProfile = NativeLeftoverSystem.ProfileFolder(ownerSid) ?? throw new UnauthorizedAccessException("No owner profile.");
+            var leftovers = new LeftoverActions(recordStore, new NativeInstalledApps(ownerSid), new NativeFsProbe(peer.StandardToken), new NativeLeftoverRegistry(peer.StandardToken),
+                new NativeLeftoverSystem(ownerProfile), new NativeProcessLauncher());
+            await new HelperSession(runner, ports: ports, categories: categories, uninstalls: uninstalls, leftovers: leftovers).RunAsync(pipe).ConfigureAwait(false);
             return 0;
         }
         catch (Exception)

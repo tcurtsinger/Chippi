@@ -121,6 +121,7 @@ public sealed class ShellContext
     internal Chippi.Features.AppUpdates.AppUpdatesModule? AppUpdates { get; set; }
     internal Chippi.Features.PortManager.PortManagerModule? PortManager { get; set; }
     internal Chippi.Features.Cleaner.CleanerModule? Cleaner { get; set; }
+    internal Chippi.Features.Uninstaller.UninstallerModule? Uninstaller { get; set; }
 
     /// <summary>The capture layer's island side; the island host sets its close.</summary>
     internal CaptureShell CaptureShell { get; }

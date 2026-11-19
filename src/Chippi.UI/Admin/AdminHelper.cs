@@ -14,7 +14,7 @@ public interface IAdminSessionFactory { Task<IAdminConnection> OpenAsync(Cancell
 
 /// <summary>One explicitly confirmed batch per helper session. Constructing this service never launches anything.</summary>
 public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger, TimeSpan? replyCeiling = null, TimeSpan? portReplyCeiling = null,
-    TimeSpan? sessionIdle = null, TimeProvider? time = null, TimeSpan? categoryReplyCeiling = null) : IAdminHelper, IDisposable
+    TimeSpan? sessionIdle = null, TimeProvider? time = null, TimeSpan? categoryReplyCeiling = null, TimeSpan? uninstallReplyCeiling = null) : IAdminHelper, IDisposable
 {
     /// <summary>How long one package may stay silent: the helper's own ceiling, plus slack for it to answer.</summary>
     public static readonly TimeSpan DefaultReplyCeiling = Messages.PackageCeiling + TimeSpan.FromMinutes(2);
@@ -28,6 +28,9 @@ public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger, Ti
     /// <summary>One category may take a while (Windows Update caches can be many GB); the helper answers when it is done.</summary>
     public static readonly TimeSpan DefaultCategoryReplyCeiling = TimeSpan.FromMinutes(15);
     private readonly TimeSpan _categoryReplyCeiling = categoryReplyCeiling ?? DefaultCategoryReplyCeiling;
+    /// <summary>An uninstaller may wait on a wizard the owner clicks through; the helper answers when its job has ended. Past this the pipe is closed and the rows fail.</summary>
+    public static readonly TimeSpan DefaultUninstallReplyCeiling = TimeSpan.FromHours(2);
+    private readonly TimeSpan _uninstallReplyCeiling = uninstallReplyCeiling ?? DefaultUninstallReplyCeiling;
     private readonly TimeProvider _time = time ?? TimeProvider.System;
     private readonly SemaphoreSlim _gate = new(1);
     private HelperSessionState? _session;
@@ -217,6 +220,236 @@ public sealed class AdminHelper(IAdminSessionFactory factory, ILogger logger, Ti
         }
         bool reused = session is not null;
         return (session ?? await OpenSessionAsync(ct).ConfigureAwait(false), reused);
+    }
+
+    public async Task<AdminUninstallResult> UninstallAsync(AdminRegistryView view, string keyName, string? appName = null, CancellationToken ct = default) =>
+        (await UninstallAsync([new AdminUninstallItem(view, keyName, appName)], null, ct).ConfigureAwait(false))[0];
+
+    /// <summary>
+    /// Each app in turn, in one helper session (one prompt). The helper answers when the uninstaller's job has no processes left, so an item can
+    /// take as long as a wizard stays open: the wait is bounded only by the (long) uninstall ceiling, and Cancel skips the items not yet started
+    /// without cutting the wait for one that is running. The session stays open for the next job; the flow ends it with <see cref="EndSessionAsync"/>.
+    /// </summary>
+    public async Task<IReadOnlyList<AdminUninstallResult>> UninstallAsync(IReadOnlyList<AdminUninstallItem> items,
+        IProgress<AdminUninstallProgress>? progress = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        var list = items.DistinctBy(i => $"{(int)i.View}\\{i.KeyName.ToUpperInvariant()}").ToArray();   // registry key names are case-insensitive
+        if (list.Length == 0) return [];
+        if (list.Length > 256 || list.Any(i => !Enum.IsDefined(i.View) || !Messages.KeyNameAllowed(i.KeyName))) throw new ArgumentException("Invalid uninstall queue.", nameof(items));
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        var results = new List<AdminUninstallResult>();
+        HelperSessionState? session = null;
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ct.ThrowIfCancellationRequested();
+            bool reused;
+            (session, reused) = await AcquireAsync(ct).ConfigureAwait(false);
+            foreach (var item in list)
+            {
+                if (ct.IsCancellationRequested) { results.Add(new(item, AdminUninstallState.Cancelled)); continue; }
+                var request = new AdminRequest(Guid.NewGuid(), Messages.Uninstall, View: (int)item.View, KeyName: item.KeyName);
+                try { await SendAsync(session, request).ConfigureAwait(false); }
+                catch (Exception ex) when (reused && results.Count == 0 && ex is IOException or ObjectDisposedException)
+                {
+                    // The helper went away while idle and never saw the request: one fresh session, one prompt.
+                    await DiscardAsync(session).ConfigureAwait(false);
+                    session = await OpenSessionAsync(ct).ConfigureAwait(false);
+                    await SendAsync(session, request).ConfigureAwait(false);
+                }
+                reused = true;
+                progress?.Report(new(item, results.Count + 1, list.Length));
+                var reply = await ReadUninstallReplyAsync(session, request).ConfigureAwait(false);
+                var state = reply.State switch
+                {
+                    Messages.UninstallDone => AdminUninstallState.Uninstalled,
+                    Messages.UninstallRestart => AdminUninstallState.RestartNeeded,
+                    Messages.UninstallRefused => AdminUninstallState.Refused,
+                    _ => AdminUninstallState.Failed,
+                };
+                var result = new AdminUninstallResult(item, state, reply.ExitCode, reply.KeyGone ?? false, reply.RecordId, reply.Reason);
+                results.Add(result);
+                progress?.Report(new(item, results.Count, list.Length, result));
+                // The app's name only: no key name, no path.
+                logger.LogInformation("Admin uninstall {App}: {State}, exit {ExitCode}, key gone {KeyGone}, {Reason}", item.AppName ?? "app", reply.State, reply.ExitCode, reply.KeyGone, reply.Reason);
+            }
+            session.LastUsed = _time.GetTimestamp();
+            ArmIdleTimer();
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            logger.LogInformation("Admin prompt declined");
+            await DiscardAsync(session ?? _session).ConfigureAwait(false);
+            foreach (var item in list.Skip(results.Count)) results.Add(new(item, AdminUninstallState.NeedsAdmin));
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or Win32Exception or UnauthorizedAccessException or JsonException or InvalidOperationException or OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Admin helper failed; no automatic retry");
+            await DiscardAsync(session ?? _session).ConfigureAwait(false);
+            bool cancel = ct.IsCancellationRequested && ex is OperationCanceledException;
+            foreach (var item in list.Skip(results.Count))
+                results.Add(cancel ? new(item, AdminUninstallState.Cancelled) : new(item, AdminUninstallState.Failed, Reason: "Admin helper failed"));
+        }
+        finally { _gate.Release(); }
+        return results;
+    }
+
+    private async Task<AdminReply> ReadUninstallReplyAsync(HelperSessionState session, AdminRequest request)
+    {
+        AdminReply reply;
+        do
+        {
+            using var wait = new CancellationTokenSource(_uninstallReplyCeiling, _time);
+            reply = await Messages.ReadReplyAsync(session.Connection.Stream, wait.Token).ConfigureAwait(false) ?? throw new EndOfStreamException();
+            bool progress = reply.State == "Progress";
+            if (reply.Id != request.Id || reply.PackageId is not null || reply.Category is not null || reply.Bytes is not null || reply.Files is not null || reply.InUse is not null
+                || (!progress && !Messages.UninstallStateAllowed(reply.State))
+                || (progress && (reply.ExitCode is not null || reply.RecordId is not null || reply.KeyGone is not null))
+                || (reply.State == Messages.UninstallDone && reply.ExitCode != 0)
+                || (reply.State == Messages.UninstallRestart && reply.ExitCode != Messages.RestartExitCode)
+                || (reply.State == Messages.UninstallRefused && (reply.ExitCode is not null || reply.RecordId is not null || reply.KeyGone is not null)))
+                throw new InvalidDataException("Invalid helper result.");
+        } while (reply.State == "Progress");
+        return reply;
+    }
+
+    /// <summary>
+    /// The leftovers of one recorded app, in batches of at most 200 in one session (one prompt). The helper answers once per batch, when every
+    /// item has a result; the wait is bounded by the category ceiling. Cancel skips the batches not yet sent and never cuts one in flight.
+    /// </summary>
+    public async Task<IReadOnlyList<AdminLeftoverResult>> DeleteLeftoversAsync(Guid recordId, IReadOnlyList<AdminLeftoverItem> items, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        if (recordId == Guid.Empty) throw new ArgumentException("Invalid record.", nameof(recordId));
+        if (items.Count == 0) return [];
+        var wire = items.Select(ToWire).ToArray();
+        var results = new AdminLeftoverResult?[items.Count];
+        var sendable = Enumerable.Range(0, items.Count).Where(i => Messages.LeftoverItemAllowed(wire[i])).ToArray();
+        foreach (int bad in Enumerable.Range(0, items.Count).Except(sendable)) results[bad] = new(items[bad], AdminLeftoverState.Failed, "Remove failed");
+        if (sendable.Length == 0) return [.. results!];
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        HelperSessionState? session = null;
+        int done = 0;
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ct.ThrowIfCancellationRequested();
+            bool reused;
+            (session, reused) = await AcquireAsync(ct).ConfigureAwait(false);
+            foreach (var batch in sendable.Chunk(Messages.MaxLeftoverItems))
+            {
+                if (ct.IsCancellationRequested) { foreach (int i in batch) results[i] = new(items[i], AdminLeftoverState.Cancelled); done += batch.Length; continue; }
+                var request = new AdminRequest(Guid.NewGuid(), Messages.DeleteLeftovers, RecordId: recordId, Items: [.. batch.Select(i => wire[i])]);
+                try { await SendAsync(session, request).ConfigureAwait(false); }
+                catch (Exception ex) when (reused && done == 0 && ex is IOException or ObjectDisposedException)
+                {
+                    // The helper went away while idle and never saw the request: one fresh session, one prompt.
+                    await DiscardAsync(session).ConfigureAwait(false);
+                    session = await OpenSessionAsync(ct).ConfigureAwait(false);
+                    await SendAsync(session, request).ConfigureAwait(false);
+                }
+                reused = true;
+                var reply = await ReadLeftoverReplyAsync(session, request, Messages.LeftoversDone).ConfigureAwait(false);
+                for (int k = 0; k < batch.Length; k++)
+                {
+                    int i = batch[k];
+                    results[i] = reply.Results is { } list ? ToResult(items[i], list[k]) : new(items[i], AdminLeftoverState.Failed, "Remove failed");
+                }
+                done += batch.Length;
+                logger.LogInformation("Admin leftovers: {State}, {Count} items, {Removed} removed", reply.State, batch.Length, reply.Results?.Count(r => r.State == Messages.ItemRemoved) ?? 0);
+            }
+            session.LastUsed = _time.GetTimestamp();
+            ArmIdleTimer();
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            logger.LogInformation("Admin prompt declined");
+            await DiscardAsync(session ?? _session).ConfigureAwait(false);
+            foreach (int i in sendable) results[i] ??= new(items[i], AdminLeftoverState.NeedsAdmin);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or Win32Exception or UnauthorizedAccessException or JsonException or InvalidOperationException or OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Admin helper failed; no automatic retry");
+            await DiscardAsync(session ?? _session).ConfigureAwait(false);
+            bool cancel = ct.IsCancellationRequested && ex is OperationCanceledException;
+            foreach (int i in sendable)
+                results[i] ??= cancel ? new(items[i], AdminLeftoverState.Cancelled) : new(items[i], AdminLeftoverState.Failed, "Admin helper failed");
+        }
+        finally { _gate.Release(); }
+        return [.. results!];
+    }
+
+    public async Task<bool> DropRecordAsync(Guid recordId, CancellationToken ct = default)
+    {
+        if (recordId == Guid.Empty) throw new ArgumentException("Invalid record.", nameof(recordId));
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        HelperSessionState? session = null;
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ct.ThrowIfCancellationRequested();
+            bool reused;
+            (session, reused) = await AcquireAsync(ct).ConfigureAwait(false);
+            var request = new AdminRequest(Guid.NewGuid(), Messages.DropRecord, RecordId: recordId);
+            try { await SendAsync(session, request).ConfigureAwait(false); }
+            catch (Exception ex) when (reused && ex is IOException or ObjectDisposedException)
+            {
+                await DiscardAsync(session).ConfigureAwait(false);
+                session = await OpenSessionAsync(ct).ConfigureAwait(false);
+                await SendAsync(session, request).ConfigureAwait(false);
+            }
+            var reply = await ReadLeftoverReplyAsync(session, request, Messages.RecordDropped).ConfigureAwait(false);
+            session.LastUsed = _time.GetTimestamp();
+            ArmIdleTimer();
+            return reply.State == Messages.RecordDropped;
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            logger.LogInformation("Admin prompt declined");
+            await DiscardAsync(session ?? _session).ConfigureAwait(false);
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or Win32Exception or UnauthorizedAccessException or JsonException or InvalidOperationException or OperationCanceledException)
+        {
+            logger.LogWarning(ex, "Admin helper failed; no automatic retry");
+            await DiscardAsync(session ?? _session).ConfigureAwait(false);
+            return false;
+        }
+        finally { _gate.Release(); }
+    }
+
+    private static LeftoverItem ToWire(AdminLeftoverItem item) => new(item.Kind.ToString(), item.Path, item.View is { } view ? (int)view : null, item.Class.ToString(), item.Ticked);
+
+    private static AdminLeftoverResult ToResult(AdminLeftoverItem item, LeftoverResult wire)
+    {
+        // The reason is the helper's own short words; a long or odd one is not shown.
+        string? reason = wire.Reason is { Length: > 0 and <= 80 } text && text.All(c => !char.IsControl(c)) ? text : null;
+        return wire.State switch
+        {
+            Messages.ItemRemoved => new(item, AdminLeftoverState.Removed),
+            Messages.ItemKept => new(item, AdminLeftoverState.Kept, reason),
+            Messages.ItemInUse => new(item, AdminLeftoverState.InUse),
+            Messages.ItemYours => new(item, AdminLeftoverState.Yours),
+            _ => new(item, AdminLeftoverState.Failed, reason),
+        };
+    }
+
+    /// <summary>One answer, strictly checked: the id, the state, and for a leftover batch one allowed result per item.</summary>
+    private async Task<AdminReply> ReadLeftoverReplyAsync(HelperSessionState session, AdminRequest request, string goodState)
+    {
+        using var wait = new CancellationTokenSource(_categoryReplyCeiling, _time);
+        var reply = await Messages.ReadReplyAsync(session.Connection.Stream, wait.Token).ConfigureAwait(false) ?? throw new EndOfStreamException();
+        bool batch = request.Verb == Messages.DeleteLeftovers;
+        bool good = reply.State == goodState;
+        if (reply.Id != request.Id || reply.PackageId is not null || reply.Category is not null || reply.Bytes is not null || reply.Files is not null || reply.InUse is not null
+            || reply.ExitCode is not null || reply.RecordId is not null || reply.KeyGone is not null
+            || (reply.State != goodState && reply.State != Messages.LeftoversFailed)
+            || (!good && reply.Results is not null)
+            || (good && !batch && reply.Results is not null)
+            || (good && batch && (reply.Results is not { } results || results.Length != request.Items!.Length || results.Any(r => r is null || !Messages.LeftoverStateAllowed(r.State)))))
+            throw new InvalidDataException("Invalid helper result.");
+        return reply;
     }
 
     public Task<IReadOnlyList<AdminCategoryResult>> MeasureCategoriesAsync(IReadOnlyList<AdminCategory> names, CancellationToken ct = default) =>
