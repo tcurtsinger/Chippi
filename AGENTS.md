@@ -140,6 +140,10 @@ When a step here changes, or you learn one, change this file in the same pull re
 - Screen capture's Recent skips and logs an unreadable index row. A changed DPAPI key sets `recent.db` aside as `recent.unreadable-*.db` and starts empty without deleting images; later starts sweep only orphan PNGs newer than the newest set-aside stamp.
 - Screen capture's crop preview uses `ICaptureSession.SetPreview` for the frame, dimming, pill and bars while the draft keeps its source pixels. `CaptureCropTests` renders applied crop and Undo offscreen with synthetic pixels, writing `capture-crop-applied.png` and `capture-crop-undone.png` under `CHIPPI_ISLAND_SHOTS`.
 
+## Screen recording settings
+
+- `RecordingSettingsViewTests` in `Chippi.Features.Recording.Tests` renders Settings › Screen recording offscreen, beside Settings › Text and QR as the reference page (`CHIPPI_ISLAND_SHOTS`, `CHIPPI_SHOTS_THEME=light`), on fake settings and shortcuts; it never records, shows a window or opens the folder picker.
+
 ## Port manager screens
 
 - `ScreenTests` in `Chippi.Features.PortManager.Tests` renders Settings › Ports, the Free port picker, the question and every result offscreen on fakes (`CHIPPI_ISLAND_SHOTS`, `CHIPPI_SHOTS_THEME=light`, `CHIPPI_PORT_MANAGER_TIMINGS`); it never shows a window, reads a port or ends a process. Views re-draw on `Redraw()` there: raising Loaded starts the engine's loop. The Search rows (verb, shield, icon) render only in `CommandBarShots` (Island.Tests, shows windows: CI or an away session).
