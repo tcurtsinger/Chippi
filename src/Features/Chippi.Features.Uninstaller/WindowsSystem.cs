@@ -116,21 +116,18 @@ public sealed class WindowsAppProcesses : IAppProcesses
 {
     private const uint QueryLimited = 0x1000;
 
-    public IReadOnlyList<string> RunningIn(IReadOnlyList<string> folders)
+    public IReadOnlyList<string> Images()
     {
-        var roots = folders.Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f.TrimEnd('\\') + "\\").ToArray();
-        var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (roots.Length == 0) return [];
+        var images = new List<string>();
         foreach (var process in Process.GetProcesses())
         {
             using (process)
             {
                 if (process.Id == Environment.ProcessId) continue;
-                string? path = ImagePath(process.Id);
-                if (path is not null && roots.Any(r => path.StartsWith(r, StringComparison.OrdinalIgnoreCase))) names.Add(Path.GetFileName(path));
+                if (ImagePath(process.Id) is { } path) images.Add(path);
             }
         }
-        return [.. names];
+        return images;
     }
 
     private static string? ImagePath(int pid)

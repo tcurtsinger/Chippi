@@ -6,10 +6,10 @@ namespace Chippi.Elevated;
 
 /// <summary>
 /// What an HKLM Uninstall key says, read by name. IsLink: the key is a registry link. The other values are null when missing or not of the
-/// expected kind. Nothing here is trusted until UninstallActions has checked it.
+/// expected kind. Untrusted: the standard token can change the key (or a non-admin owns it), so none of its values is believed. Nothing here is trusted until UninstallActions has checked it.
 /// </summary>
 public sealed record UninstallKey(bool IsLink, int? SystemComponent, string? ParentKeyName, int? WindowsInstaller, string? DisplayName, string? Publisher,
-    string? InstallLocation, string? QuietUninstallString, string? UninstallString);
+    string? InstallLocation, string? QuietUninstallString, string? UninstallString, bool Untrusted = false);
 
 public interface IUninstallRegistry
 {
@@ -75,7 +75,7 @@ public sealed class UninstallActions(IUninstallRegistry registry, IRecordStore r
     public static readonly TimeSpan RecordLifetime = TimeSpan.FromDays(30);
     public const int MaxRecords = 50;
     public const string FailedReason = "Admin helper failed", NotFoundReason = "Not found", LinkReason = "Registry link", SystemComponentReason = "System component",
-        UpdateReason = "Update entry", NoCommandReason = "No uninstaller", CommandReason = "Unsafe command", RecordsReason = "Records unavailable",
+        UpdateReason = "Update entry", UntrustedReason = "Key not trusted", NoCommandReason = "No uninstaller", CommandReason = "Unsafe command", RecordsReason = "Records unavailable",
         RecordFailedReason = "Record failed", StartFailedReason = "Start failed";
     private readonly TimeProvider _time = time ?? TimeProvider.System;
 
@@ -112,6 +112,7 @@ public sealed class UninstallActions(IUninstallRegistry registry, IRecordStore r
         var key = registry.Read(view, keyName);
         if (key is null) return Refuse(r, NotFoundReason);
         if (key.IsLink) return Refuse(r, LinkReason);
+        if (key.Untrusted) return Refuse(r, UntrustedReason);
         if (key.SystemComponent == 1) return Refuse(r, SystemComponentReason);
         if (!string.IsNullOrEmpty(key.ParentKeyName)) return Refuse(r, UpdateReason);
 

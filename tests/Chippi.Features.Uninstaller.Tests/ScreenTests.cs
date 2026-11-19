@@ -491,6 +491,93 @@ public sealed class ScreenTests
     }
 
     [Fact]
+    public void A_tick_redraws_the_review_in_the_same_scroll_viewer_at_the_same_offset_and_the_keyboard_stays_on_the_checkbox() => WpfTestThread.Run(() =>
+    {
+        var (scans, record, engine) = Mozilla();
+        using var _ = scans;
+        using var __ = engine;
+        var page = Review(engine, record);
+        WpfTestThread.Wait(page.ScanAsync());
+        Arrange(page, Width, 150);
+        var scroll = Walk<ScrollViewer>(page).First();
+        Assert.True(scroll.ScrollableHeight > 60);
+        scroll.ScrollToVerticalOffset(60);
+        Arrange(page, Width, 150);
+        Assert.Equal(60, scroll.VerticalOffset);
+
+        var box = Walk<CheckBox>(page).First(c => c.Tag is string t && t.StartsWith("item:", StringComparison.Ordinal) && c.IsChecked != true);
+        box.IsChecked = true;
+        box.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+        Arrange(page, Width, 150);
+        Assert.Same(scroll, Walk<ScrollViewer>(page).First());
+        Assert.Equal(60, scroll.VerticalOffset);   // the list does not jump back to the top
+
+        // A redraw rebuilds every row: the one the keyboard was on is found again, though it is a CheckBox and not a Button.
+        string key = (string)box.Tag;
+        page.FocusedKeyOverride = key;
+        page.Redraw();
+        Arrange(page, Width, 150);
+        var target = Assert.IsType<CheckBox>(page.FocusTarget);
+        Assert.Equal(key, target.Tag);
+        Assert.NotSame(box, target);
+    });
+
+    [Fact]
+    public void The_apps_list_finds_a_row_tick_again_after_a_redraw() => WpfTestThread.Run(() =>
+    {
+        using var rig = Loaded();
+        var view = Open(rig);
+        var page = view.Apps;
+        var app = page.Shown.First(a => a.Name == "Audacity");
+        page.FocusedKeyOverride = "check:" + app.Id;
+        page.Redraw();
+        Arrange(page, Width, 150);
+        Assert.IsType<CheckBox>(page.FocusTarget);
+    });
+
+    [Fact]
+    public void Retrying_declined_items_keeps_the_first_runs_removals_in_the_results() => WpfTestThread.Run(() =>
+    {
+        var (scans, record, engine) = Mozilla();
+        using var _ = scans;
+        using var __ = engine;
+        bool decline = true;
+        scans.Fx.Admin.Leftover = item => new AdminLeftoverResult(item, decline ? AdminLeftoverState.NeedsAdmin : AdminLeftoverState.Removed);
+        var page = Review(engine, record);
+        WpfTestThread.Wait(page.ScanAsync());
+        Arrange(page, Width, Height);
+        int ticked = page.Ticked.Count;
+        WpfTestThread.Wait(page.RemoveAsync());
+        Arrange(page, Width, Height);
+        Assert.Equal(LeftoverStep.Results, page.Step);
+        int first = page.Run!.Removed;
+        Assert.True(first > 0 && page.Run.NotRemoved > 0);
+
+        decline = false;
+        Click(Named(page, "Remove"));   // the retry beside "Needs admin"
+        WpfTestThread.Wait(Until(() => page.Step == LeftoverStep.Results && page.Run!.NotRemoved == 0));
+        Arrange(page, Width, Height);
+        Assert.Equal(ticked, page.Run!.Results.Count);
+        Assert.Contains(ticked + " removed", Texts(page));
+    });
+
+    [Fact]
+    public void An_uninstall_finished_elsewhere_adds_its_row_to_the_open_Uninstalled_list() => WpfTestThread.Run(() =>
+    {
+        using var rig = Loaded(["Audacity"]);
+        var view = Open(rig);
+        view.RaiseEvent(new RoutedEventArgs(FrameworkElement.LoadedEvent));   // loaded: the view now follows the engine
+        view.SelectTab(1);
+        Arrange(view, Width, Height);
+        Assert.Contains("Nothing uninstalled lately", Texts(view.RecentTab));
+        var app = rig.Engine.Apps.First(a => a.Name == "Audacity");
+        WpfTestThread.Wait(rig.Engine.UninstallAsync([app]));   // the island's or Search's run finishing
+        Arrange(view, Width, Height);
+        Assert.Contains("Audacity", Texts(view.RecentTab));
+        Assert.DoesNotContain("Nothing uninstalled lately", Texts(view.RecentTab));
+    });
+
+    [Fact]
     public void The_scan_lists_Safe_Check_first_and_Shared_with_the_defaults_ticked_and_a_shared_item_dimmed_with_a_lock_and_no_checkbox() => WpfTestThread.Run(() =>
     {
         var (scans, record, engine) = Mozilla();

@@ -29,6 +29,17 @@ public sealed record LeftoverRun(IReadOnlyList<LeftoverResult> Results, string? 
 {
     public int Removed => Results.Count(r => r.Ok);
     public int NotRemoved => Results.Count(r => !r.Ok);
+
+    /// <summary>
+    /// This run with a later one (a retry of what failed) laid over it: an item the later run did again takes its new result in its place, and the
+    /// backup folder of either survives. What the first run removed stays removed.
+    /// </summary>
+    public LeftoverRun Merge(LeftoverRun later)
+    {
+        var again = later.Results.ToDictionary(r => r.Item.Id);
+        var merged = Results.Select(r => again.Remove(r.Item.Id, out var fresh) ? fresh : r).Concat(again.Values).ToList();
+        return new LeftoverRun(merged, later.BackupFolder ?? BackupFolder);
+    }
 }
 
 /// <summary>
@@ -63,7 +74,7 @@ public sealed class LeftoverRemover(UninstallerSystem system, IAdminHelper? admi
         {
             var sent = helper.Select(ToAdmin).ToArray();
             IReadOnlyList<AdminLeftoverResult> answers;
-            try { answers = await admin!.DeleteLeftoversAsync(scan.Record.HelperRecordId!.Value, sent, ct).ConfigureAwait(false); }
+            try { answers = await admin!.DeleteLeftoversAsync(scan.Record.HelperRecordId!.Value, sent, ct); }
             catch (OperationCanceledException) { answers = [.. sent.Select(s => new AdminLeftoverResult(s, AdminLeftoverState.Cancelled))]; }
             for (int i = 0; i < helper.Count; i++)
             {
@@ -81,27 +92,44 @@ public sealed class LeftoverRemover(UninstallerSystem system, IAdminHelper? admi
             }
         }
 
-        string? usedBackup = null;
-        int backups = 0;
-        foreach (var item in standard)
+        // Files, folders, the Recycle Bin and reg.exe run on one worker of their own (STA, as the Shell wants), never on the caller's thread: a large
+        // folder must not hold the window, and its progress must be able to paint. Each result reaches the caller through the progress it captured.
+        string? usedBackup = standard.Count == 0 ? null : await OnWorker(() =>
         {
-            if (ct.IsCancellationRequested) { Done(new(item, LeftoverState.Cancelled)); continue; }
-            LeftoverResult result;
-            try
+            string? used = null;
+            int backups = 0;
+            foreach (var item in standard)
             {
-                result = item.Kind == LeftoverKind.Key ? await RemoveKeyAsync(scan.Record.Name, item, () => ++backups, ct).ConfigureAwait(false) : RemovePath(item);
-                if (item.Kind == LeftoverKind.Key && result.Ok && backups > 0) usedBackup = backupFolder;
+                if (ct.IsCancellationRequested) { Done(new(item, LeftoverState.Cancelled)); continue; }
+                LeftoverResult result;
+                try
+                {
+                    result = item.Kind == LeftoverKind.Key ? RemoveKeyAsync(scan.Record.Name, item, () => ++backups, ct).GetAwaiter().GetResult() : RemovePath(item);
+                    if (item.Kind == LeftoverKind.Key && result.Ok && backups > 0) used = backupFolder;
+                }
+                catch (OperationCanceledException) { result = new(item, LeftoverState.Cancelled); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { result = new(item, LeftoverState.Failed); }
+                Done(result);
             }
-            catch (OperationCanceledException) { result = new(item, LeftoverState.Cancelled); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { result = new(item, LeftoverState.Failed); }
-            Done(result);
-        }
-
+            return used;
+        });
         var ordered = selected.Select(i => results[i.Id]).ToList();
         logger?.LogInformation("Removed leftovers of {App}: {Removed} of {Count}", scan.Record.Name, ordered.Count(r => r.Ok), ordered.Count);
         return new LeftoverRun(ordered, usedBackup);
     }
 
+    private static Task<T> OnWorker<T>(Func<T> work)
+    {
+        var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try { done.SetResult(work()); }
+            catch (Exception ex) { done.SetException(ex); }
+        }) { IsBackground = true, Name = "Leftover removal" };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return done.Task;
+    }
     private static AdminLeftoverItem ToAdmin(LeftoverItem item) => new(
         item.Kind switch { LeftoverKind.File => AdminLeftoverKind.File, LeftoverKind.Folder => AdminLeftoverKind.Folder, _ => AdminLeftoverKind.RegistryKey },
         item.Kind == LeftoverKind.Key ? item.KeyPath! : item.Path,
@@ -111,12 +139,12 @@ public sealed class LeftoverRemover(UninstallerSystem system, IAdminHelper? admi
     private LeftoverResult RemovePath(LeftoverItem item)
     {
         string path = item.Path;
-        bool isDirectory = Directory.Exists(path), isFile = File.Exists(path);
-        if (!isDirectory && !isFile && !IsLink(path)) return new(item, LeftoverState.Removed);   // already gone
-        if (IsLink(path))
+        bool isDirectory = Directory.Exists(path), isFile = File.Exists(path), link = IsLink(path);
+        if (!isDirectory && !isFile && !link) return new(item, LeftoverState.Removed);   // already gone
+        if (link)
         {
             // A link is removed as a link: its target is never touched.
-            if (new FileInfo(path).Attributes.HasFlag(FileAttributes.Directory)) Directory.Delete(path, recursive: false); else File.Delete(path);
+            if (File.GetAttributes(path).HasFlag(FileAttributes.Directory)) Directory.Delete(path, recursive: false); else File.Delete(path);
             return new(item, LeftoverState.Removed);
         }
         if (item.NoRecycleBin || (item.Bytes is { } bytes && !system.Recycler.CanRecycle(path, bytes))) return new(item, LeftoverState.Failed);
@@ -129,12 +157,12 @@ public sealed class LeftoverRemover(UninstallerSystem system, IAdminHelper? admi
         };
     }
 
-    private static bool IsLink(string path)
+    /// <summary>A link that is really there. A path that is gone is not one (its attributes read -1, every flag set).</summary>
+    internal static bool IsLink(string path)
     {
-        try { return new FileInfo(path).Attributes.HasFlag(FileAttributes.ReparsePoint); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
+        try { return File.GetAttributes(path) is var a && a != (FileAttributes)(-1) && a.HasFlag(FileAttributes.ReparsePoint); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { return false; }
     }
-
     /// <summary>The Recycle Bin must never follow a junction out of the folder: each link inside is removed as itself first.</summary>
     private static void RemoveInnerLinks(string root)
     {

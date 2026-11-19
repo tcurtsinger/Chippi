@@ -47,8 +47,8 @@ internal sealed class FakePackages : IPackageSource, IPackageRemover
 internal sealed class FakeProcesses : IAppProcesses
 {
     public HashSet<string> RunningFolders { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public IReadOnlyList<string> RunningIn(IReadOnlyList<string> folders) =>
-        [.. folders.Where(f => RunningFolders.Any(r => PathRules.Contains(f, r) || PathRules.Contains(r, f))).Select(_ => "app.exe")];
+    public int Reads;
+    public IReadOnlyList<string> Images() { Reads++; return [.. RunningFolders.Select(r => System.IO.Path.Combine(r, "app.exe"))]; }
 }
 
 internal sealed class FakeUserProcess(List<string> log) : IUserProcess
@@ -79,6 +79,7 @@ internal sealed class FakeRecycler(List<string> log) : IRecycler
     public HashSet<string> TooBig { get; } = new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> Held { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<string> Recycled { get; } = [];
+    public List<(int Thread, ApartmentState Apartment)> Threads { get; } = [];
     public bool CanRecycle(string path, long bytes) => !TooBig.Contains(path);
     public RecycleResult Recycle(string path)
     {
@@ -86,6 +87,7 @@ internal sealed class FakeRecycler(List<string> log) : IRecycler
         // Whatever the real Shell does, no link may be left inside the folder: it would be followed out.
         if (Directory.Exists(path) && new DirectoryInfo(path).EnumerateFileSystemInfos("*", SearchOption.AllDirectories).Any(e => e.Attributes.HasFlag(FileAttributes.ReparsePoint)))
             throw new InvalidOperationException("a link was left in the folder");
+        Threads.Add((Environment.CurrentManagedThreadId, Thread.CurrentThread.GetApartmentState()));
         log.Add("recycle " + path);
         Recycled.Add(path);
         if (Directory.Exists(path)) Directory.Delete(path, true); else File.Delete(path);

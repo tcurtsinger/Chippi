@@ -132,6 +132,7 @@ public sealed class UninstallerSettingsView : ContentControl, IDisposable
     {
         var card = new StackPanel();
         var records = _engine.Recent;
+        _recentSignature = RecentSignature();
         if (records.Count == 0)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 14, 16, 14), MinHeight = 20 };
@@ -285,7 +286,13 @@ public sealed class UninstallerSettingsView : ContentControl, IDisposable
         if (_disposed) return;
         if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(OnEngineChanged); return; }
         UpdateCount();
+        // The Uninstalled list follows the engine too: an uninstall finished elsewhere (the island, Search) adds its row while the tab is open.
+        if (_review is null && _tabs.SelectedIndex == 1 && RecentSignature() != _recentSignature) { BuildRecent(); _content.Child = _recent; }
     }
+
+    private string _recentSignature = "";
+
+    private string RecentSignature() => string.Join("|", _engine.Recent.Select(r => r.Id + ":" + r.Cleaned + ":" + r.Restart));
 
     internal static void OpenInExplorer(string folder)
     {

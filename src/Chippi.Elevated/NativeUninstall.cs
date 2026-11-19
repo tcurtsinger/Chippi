@@ -12,7 +12,9 @@ namespace Chippi.Elevated;
 /// <summary>The real Windows behind <see cref="IUninstallHost"/>.</summary>
 public sealed class NativeUninstallHost : IUninstallHost
 {
-    public string Expand(string text) => Environment.ExpandEnvironmentVariables(text);
+    private static readonly IReadOnlyDictionary<string, string> Variables = SystemEnvironment.FixedVariables();
+    /// <summary>Only Windows' own folders (<see cref="SystemEnvironment"/>), never the helper's inherited environment.</summary>
+    public string Expand(string text) => SystemEnvironment.Expand(text, Variables);
     public bool FileExists(string path) => File.Exists(path);
     public string SystemDirectory => Environment.SystemDirectory;
 }
@@ -62,6 +64,26 @@ internal static unsafe class NativeRegistry
     [StructLayout(LayoutKind.Sequential)] public struct SecurityAttributes { public uint Length; public IntPtr Descriptor; public int Inherit; }
     [StructLayout(LayoutKind.Sequential)] public struct GenericMapping { public uint Read, Write, Execute, All; }
 
+    private const uint KeySetValue = 0x2, KeyCreateSubKey = 0x4, KeyCreateLink = 0x20, DeleteRight = 0x10000, WriteDac = 0x40000, WriteOwner = 0x80000;
+    public const string TrustedInstaller = "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
+
+    /// <summary>
+    /// The key is owned by Administrators or SYSTEM (or TrustedInstaller when allowed), and the standard token holds no right to set a value,
+    /// create a subkey or link, delete it or change its DACL or owner. A key anyone standard can write is not believed.
+    /// </summary>
+    public static bool TrustedKey(IntPtr handle, SafeAccessTokenHandle token, bool allowTrustedInstaller)
+    {
+        if (GetSecurityInfo(handle, 4, 7, out var owner, out _, out _, out _, out var descriptor) != 0) return false;
+        try
+        {
+            string sid = new SecurityIdentifier(owner).Value;
+            if (sid is not ("S-1-5-32-544" or "S-1-5-18") && !(allowTrustedInstaller && sid == TrustedInstaller)) return false;
+            var mapping = new GenericMapping { Read = 0x20019, Write = 0x20006, Execute = 0x20019, All = 0xF003F };
+            return (Granted(descriptor, token, mapping) & (KeySetValue | KeyCreateSubKey | KeyCreateLink | DeleteRight | WriteDac | WriteOwner)) == 0;
+        }
+        finally { LocalFree(descriptor); }
+    }
+
     /// <summary>What AccessCheck grants the standard token on a security descriptor (MAXIMUM_ALLOWED).</summary>
     public static uint Granted(IntPtr descriptor, SafeAccessTokenHandle token, GenericMapping mapping)
     {
@@ -76,8 +98,8 @@ internal static unsafe class NativeRegistry
     }
 }
 
-/// <summary>Reads HKLM Uninstall keys in either registry view, never following a registry link.</summary>
-public sealed class NativeUninstallRegistry : IUninstallRegistry
+/// <summary>Reads HKLM Uninstall keys in either registry view, never following a registry link. A key the standard token could change is read as untrusted: its values are not returned.</summary>
+public sealed class NativeUninstallRegistry(SafeAccessTokenHandle standardToken) : IUninstallRegistry
 {
     private const string Base = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\";
 
@@ -91,6 +113,11 @@ public sealed class NativeUninstallRegistry : IUninstallRegistry
         {
             NativeRegistry.Close(handle);
             return new UninstallKey(true, null, null, null, null, null, null, null, null);
+        }
+        if (!NativeRegistry.TrustedKey(handle, standardToken, allowTrustedInstaller: true))
+        {
+            NativeRegistry.Close(handle);
+            return new UninstallKey(false, null, null, null, null, null, null, null, null, Untrusted: true);
         }
         using var key = RegistryKey.FromHandle(new SafeRegistryHandle(handle, true), view == 64 ? RegistryView.Registry64 : RegistryView.Registry32);
         return new UninstallKey(false, Int(key, "SystemComponent"), Str(key, "ParentKeyName"), Int(key, "WindowsInstaller"), Str(key, "DisplayName"),
@@ -116,7 +143,6 @@ public sealed unsafe class NativeRecordStore(SafeAccessTokenHandle standardToken
 {
     private static readonly string[] Keys = [@"SOFTWARE\Chippi", @"SOFTWARE\Chippi\Elevated", @"SOFTWARE\Chippi\Elevated\UninstallRecords"];
     private const string ProtectedDacl = "D:P(A;CI;KA;;;BA)(A;CI;KA;;;SY)";
-    private const uint KeySetValue = 0x2, KeyCreateSubKey = 0x4, DeleteRight = 0x10000, WriteDac = 0x40000, WriteOwner = 0x80000;
     private RegistryKey? _records;
 
     public bool Prepare()
@@ -141,19 +167,7 @@ public sealed unsafe class NativeRecordStore(SafeAccessTokenHandle standardToken
         finally { NativeRegistry.LocalFree(descriptor); }
     }
 
-    /// <summary>Owned by Administrators or SYSTEM, and the standard token holds no right to write, delete or re-ACL it.</summary>
-    private bool Trusted(IntPtr handle)
-    {
-        if (NativeRegistry.GetSecurityInfo(handle, 4, 7, out var owner, out _, out _, out _, out var descriptor) != 0) return false;
-        try
-        {
-            string sid = new SecurityIdentifier(owner).Value;
-            if (sid is not ("S-1-5-32-544" or "S-1-5-18")) return false;
-            var mapping = new NativeRegistry.GenericMapping { Read = 0x20019, Write = 0x20006, Execute = 0x20019, All = 0xF003F };
-            return (NativeRegistry.Granted(descriptor, standardToken, mapping) & (KeySetValue | KeyCreateSubKey | DeleteRight | WriteDac | WriteOwner)) == 0;
-        }
-        finally { NativeRegistry.LocalFree(descriptor); }
-    }
+    private bool Trusted(IntPtr handle) => NativeRegistry.TrustedKey(handle, standardToken, allowTrustedInstaller: false);
 
     private RegistryKey Records => _records ?? throw new InvalidOperationException("Records not prepared.");
 
@@ -264,14 +278,15 @@ public sealed class NativeProcessLauncher : IProcessLauncher
     public unsafe ILaunchedJob Start(string application, string commandLine, string workingDirectory)
     {
         var info = new StartupInfo { Size = (uint)sizeof(StartupInfo) };
+        var environment = SystemEnvironmentBlock();
         var line = (commandLine + "\0").ToCharArray();
         IntPtr job = CreateJobObjectW(IntPtr.Zero, null);
         if (job == IntPtr.Zero) throw new Win32Exception();
         try
         {
             ProcessInformation process;
-            fixed (char* app = application) fixed (char* cl = line) fixed (char* dir = workingDirectory)
-                if (!CreateProcessW(app, cl, IntPtr.Zero, IntPtr.Zero, false, CreateSuspended | CreateUnicodeEnvironment, IntPtr.Zero, dir, ref info, out process))
+            fixed (char* app = application) fixed (char* cl = line) fixed (char* dir = workingDirectory) fixed (char* env = environment)
+                if (!CreateProcessW(app, cl, IntPtr.Zero, IntPtr.Zero, false, CreateSuspended | CreateUnicodeEnvironment, (IntPtr)env, dir, ref info, out process))
                     throw new Win32Exception();
             try
             {
@@ -284,6 +299,33 @@ public sealed class NativeProcessLauncher : IProcessLauncher
         }
         catch { CloseHandle(job); throw; }
     }
+
+    /// <summary>
+    /// The uninstaller's environment: Windows' default system variables (CreateEnvironmentBlock with no token), scrubbed. It never inherits the helper's,
+    /// which carries whatever the owner's profile set. When Windows can't give one, the start fails.
+    /// </summary>
+    private static unsafe char[] SystemEnvironmentBlock()
+    {
+        if (!CreateEnvironmentBlock(out var block, IntPtr.Zero, false)) throw new Win32Exception();
+        var variables = new List<KeyValuePair<string, string>>();
+        try
+        {
+            for (char* p = (char*)block; *p != '\0';)
+            {
+                var entry = new string(p);
+                p += entry.Length + 1;
+                int equals = entry.IndexOf('=', 1);   // a name may begin with "=" (drive directories)
+                if (equals > 0 && entry[0] != '=') variables.Add(new(entry[..equals], entry[(equals + 1)..]));
+            }
+        }
+        finally { DestroyEnvironmentBlock(block); }
+        return SystemEnvironment.Block(SystemEnvironment.Scrub(variables, Environment.SystemDirectory));
+    }
+
+    [DllImport("userenv.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CreateEnvironmentBlock(out IntPtr environment, IntPtr token, [MarshalAs(UnmanagedType.Bool)] bool inherit);
+    [DllImport("userenv.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyEnvironmentBlock(IntPtr environment);
 
     private sealed class Job(IntPtr job, IntPtr process) : ILaunchedJob
     {

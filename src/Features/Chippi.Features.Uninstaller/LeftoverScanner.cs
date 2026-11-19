@@ -33,7 +33,7 @@ public sealed partial class LeftoverScanner(UninstallerSystem system, LeftoverRo
 
         InstallFolders(record, found);
         DataFolders(record, names, publisher, others, found, ct);
-        Shortcuts(record, names, found, ct);
+        Shortcuts(record, names, publisher, others, found, ct);
         Keys(record, names, publisher, others, found, ct);
 
         var items = new List<LeftoverItem>();
@@ -96,31 +96,37 @@ public sealed partial class LeftoverScanner(UninstallerSystem system, LeftoverRo
         }
     }
 
-    private void Shortcuts(AppRecord record, HashSet<string> names, List<Candidate> found, CancellationToken ct)
+    private void Shortcuts(AppRecord record, HashSet<string> names, HashSet<string> publisher, Other[] others, List<Candidate> found, CancellationToken ct)
     {
+        // A shortcut is the app's own when its target is inside a folder that is the app's alone. A sloppy InstallLocation (C:\Program Files) or an
+        // uninstaller in System32 would make a shared root "ours": a root the item rules forbid, or another installed app's, is dropped.
         var ours = new List<string>();
-        if (record.InstallLocation is not null) ours.Add(record.InstallLocation);
-        ours.AddRange(record.Folders);
+        foreach (string root in record.InstallLocation is null ? record.Folders : [record.InstallLocation, .. record.Folders])
+        {
+            var candidate = new Candidate(LeftoverKind.Folder, PathRules.Norm(root), null, null, LeftoverClass.Safe, "Install folder");
+            if (!Forbidden(candidate) && SharedWith(candidate, others, publisher, record) is null) ours.Add(candidate.Path);
+        }
         foreach (string menu in roots.StartMenuPrograms)
         {
-            foreach (string lnk in Files(menu, "*.lnk", 3)) { ct.ThrowIfCancellationRequested(); ShortcutCandidate(lnk, ours, names, found); }
+            foreach (string lnk in Files(menu, "*.lnk", 3)) { ct.ThrowIfCancellationRequested(); ShortcutCandidate(lnk, ours, names, publisher, others, record, found); }
             foreach (string dir in Children(menu))
                 if (names.Contains(UninstallerText.NameKey(Path.GetFileName(dir))) && Files(dir, "*.lnk", 1).All(l => !TargetExists(l)))
                     found.Add(new(LeftoverKind.Folder, dir, null, null, LeftoverClass.CheckFirst, "Start menu folder"));
         }
         foreach (string desktop in roots.Desktops)
-            foreach (string lnk in Files(desktop, "*.lnk", 1)) { ct.ThrowIfCancellationRequested(); ShortcutCandidate(lnk, ours, names, found); }
+            foreach (string lnk in Files(desktop, "*.lnk", 1)) { ct.ThrowIfCancellationRequested(); ShortcutCandidate(lnk, ours, names, publisher, others, record, found); }
     }
 
-    private void ShortcutCandidate(string lnk, List<string> ours, HashSet<string> names, List<Candidate> found)
+    private void ShortcutCandidate(string lnk, List<string> ours, HashSet<string> names, HashSet<string> publisher, Other[] others, AppRecord record, List<Candidate> found)
     {
         string? target = system.Shortcuts.Target(lnk);
-        if (target is not null && ours.Any(o => PathRules.Contains(o, target)))
-            found.Add(new(LeftoverKind.File, lnk, null, null, LeftoverClass.Safe, "Shortcut"));
+        // The target is checked against the other apps too: a shortcut into a folder another installed app uses is never taken as this app's.
+        bool owned = target is not null && ours.Any(o => PathRules.Contains(o, target))
+            && SharedWith(new Candidate(LeftoverKind.File, target, null, null, LeftoverClass.Safe, "Shortcut"), others, publisher, record) is null;
+        if (owned) found.Add(new(LeftoverKind.File, lnk, null, null, LeftoverClass.Safe, "Shortcut"));
         else if (names.Contains(UninstallerText.NameKey(Path.GetFileNameWithoutExtension(lnk))) && (target is null || !File.Exists(target) && !Directory.Exists(target)))
             found.Add(new(LeftoverKind.File, lnk, null, null, LeftoverClass.CheckFirst, "Shortcut"));
     }
-
     private bool TargetExists(string lnk) => system.Shortcuts.Target(lnk) is { } t && (File.Exists(t) || Directory.Exists(t));
 
     private void Keys(AppRecord record, HashSet<string> names, HashSet<string> publisher, Other[] others, List<Candidate> found, CancellationToken ct)
@@ -155,7 +161,13 @@ public sealed partial class LeftoverScanner(UninstallerSystem system, LeftoverRo
         }
     }
 
-    private static string Display(RegHive hive, string path) => (hive == RegHive.User ? "HKCU\\" : "HKLM\\") + path;
+    /// <summary>The path the review shows and the item's id is made of. The 32-bit view reads as WOW6432Node, so the two views of one key are two items.</summary>
+    private static string Display(RegHive hive, string path) => hive switch
+    {
+        RegHive.User => "HKCU\\" + path,
+        RegHive.Machine32 when path.StartsWith("Software\\", StringComparison.OrdinalIgnoreCase) => "HKLM\\Software\\WOW6432Node\\" + path["Software\\".Length..],
+        _ => "HKLM\\" + path,
+    };
 
     // ---- rules ----
 
@@ -325,11 +337,7 @@ public sealed partial class LeftoverScanner(UninstallerSystem system, LeftoverRo
         catch (UnauthorizedAccessException) { return false; }
     }
 
-    private static bool IsLink(string path)
-    {
-        try { return new FileInfo(path).Attributes.HasFlag(FileAttributes.ReparsePoint); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return false; }
-    }
+    private static bool IsLink(string path) => LeftoverRemover.IsLink(path);
 
     private static IEnumerable<string> Children(string root)
     {

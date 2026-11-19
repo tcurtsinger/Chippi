@@ -225,6 +225,23 @@ public sealed class IslandTests
     });
 
     [Fact]
+    public void Uninstall_pressed_while_another_queue_runs_does_nothing_and_never_reads_failed_for_an_app_never_tried() => WpfTestThread.Run(() =>
+    {
+        using var rig = new Rig(Apps);
+        WpfTestThread.Wait(RowFor(rig, "uninstall notepad++").Run());
+        var view = rig.View;
+        Assert.Equal(UninstallerPageMode.Question, view.Mode);
+        var slack = rig.Engine.Apps.First(a => a.Name == "Slack");
+        var inner = rig.F.User.Run;
+        UninstallerPageMode? during = null;
+        rig.F.User.Run = (application, args) => { view.Confirm(); during = view.Mode; return inner(application, args); };   // Settings' queue is running Slack
+        WpfTestThread.Wait(rig.Engine.UninstallAsync([slack]));
+        Assert.Equal(UninstallerPageMode.Question, during);
+        Assert.Equal(UninstallerPageMode.Question, view.Mode);
+        Assert.Empty(rig.F.Admin.Calls);
+    });
+
+    [Fact]
     public void The_question_of_a_user_app_has_no_shield_and_Esc_is_Cancel() => WpfTestThread.Run(() =>
     {
         using var rig = new Rig(Apps);

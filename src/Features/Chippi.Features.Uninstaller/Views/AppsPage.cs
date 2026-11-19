@@ -131,7 +131,7 @@ internal sealed class AppsPage : Grid, IDisposable
 
     internal bool IsQueued(string id) => _queue.Contains(id);
 
-    internal Button? FocusTarget => _focusKey is not null ? Find(_focusKey) : null;
+    internal System.Windows.Controls.Primitives.ButtonBase? FocusTarget => _focusKey is not null ? Find(_focusKey) : null;
 
     private void ConfigureList()
     {
@@ -259,7 +259,7 @@ internal sealed class AppsPage : Grid, IDisposable
         target.Focus();
     }
 
-    private Button? Find(string key) => Walk<Button>(this).FirstOrDefault(b => b.Tag as string == key);
+    private System.Windows.Controls.Primitives.ButtonBase? Find(string key) => Walk<System.Windows.Controls.Primitives.ButtonBase>(this).FirstOrDefault(b => b.Tag as string == key);   // the row tick is a CheckBox
 
     private static IEnumerable<T> Walk<T>(DependencyObject root) where T : DependencyObject
     {

@@ -145,9 +145,11 @@ public sealed class NativeLeftoverSystem : ILeftoverSystem
             Path.Combine(ownerProfile, "AppData", "LocalLow"), Path.Combine(ownerProfile, "Desktop"), Path.Combine(ownerProfile, "Documents"),
             Path.Combine(ownerProfile, "Downloads"), Path.Combine(ownerProfile, "Pictures"), Path.Combine(ownerProfile, "Music"), Path.Combine(ownerProfile, "Videos"),
         };
-        foreach (var variable in new[] { "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramFiles(Arm)", "CommonProgramFiles", "CommonProgramFiles(x86)",
-            "CommonProgramW6432", "ProgramData" })
-            if (Environment.GetEnvironmentVariable(variable) is { Length: > 3 } value) roots.Add(value.TrimEnd('\\'));
+        // Windows' own folder list, never the helper's environment variables: a launcher that set a decoy ProgramFiles must not lift C:\Program Files off the deny list.
+        foreach (var folder in new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.CommonProgramFiles,
+            Environment.SpecialFolder.CommonProgramFilesX86 })
+            roots.Add(Environment.GetFolderPath(folder).TrimEnd('\\'));
+        roots.Add(Path.Combine(drive, "Program Files (Arm)"));
         roots.Add(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData).TrimEnd('\\'));
         ProtectedRoots = [.. roots.Where(r => r.Length > 3).Distinct(StringComparer.OrdinalIgnoreCase)];
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);

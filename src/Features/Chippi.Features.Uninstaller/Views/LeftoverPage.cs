@@ -72,7 +72,7 @@ internal sealed class LeftoverPage : Grid, IDisposable
     internal bool AsksQuestion => _popover is not null;
     internal FrameworkElement? PopoverElement => _popover;
     internal string? FocusedKeyOverride { get; set; }
-    internal Button? FocusTarget => _focusKey is not null ? Walk<Button>(this).FirstOrDefault(b => b.Tag as string == _focusKey) : null;
+    internal System.Windows.Controls.Primitives.ButtonBase? FocusTarget => _focusKey is not null ? Walk<System.Windows.Controls.Primitives.ButtonBase>(this).FirstOrDefault(b => b.Tag as string == _focusKey) : null;   // a tick is a CheckBox, not a Button
     internal FrameworkElement Bar => _barHost;
     internal bool ChangedAnything => _changed;
 
@@ -164,13 +164,20 @@ internal sealed class LeftoverPage : Grid, IDisposable
         _title.Child = row;
     }
 
-    private static FrameworkElement Wrap(UIElement rows)
+    private readonly ScrollViewer _scroll = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
+    private LeftoverStep? _scrolledFor;
+
+    /// <summary>One scroll viewer for the page: a redraw (a tick, a fold, a result) swaps its card and keeps where the person was. A new step starts at the top.</summary>
+    private FrameworkElement Wrap(UIElement rows)
     {
         var card = new Border { CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = rows, ClipToBounds = true, VerticalAlignment = VerticalAlignment.Top };
         card.SetResourceReference(Border.BackgroundProperty, "SurfaceBrush");
         card.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
-        var scroll = new ScrollViewer { Content = card, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Focusable = false };
-        return scroll;
+        double offset = _scrolledFor == Step ? _scroll.VerticalOffset : 0;
+        _scrolledFor = Step;
+        _scroll.Content = card;
+        _scroll.ScrollToVerticalOffset(offset);
+        return _scroll;
     }
 
     private UIElement ScanningCard()
@@ -447,10 +454,12 @@ internal sealed class LeftoverPage : Grid, IDisposable
         Step = LeftoverStep.Removing;
         Render();
         var progress = new Progress<LeftoverResult>(r => { _done[r.Item.Id] = r; if (Step == LeftoverStep.Removing) Render(); });
-        try { _run = await _engine.RemoveAsync(_scan, ids, progress, CancellationToken.None); }
+        var previous = _run;   // a retry of what failed adds to the run before it, so earlier removals still count
+        try { _run = await _engine.RemoveAsync(_scan, ids, progress, CancellationToken.None, previous); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            _run = new LeftoverRun([.. _removing.Select(i => new LeftoverResult(i, LeftoverState.Failed))], null);
+            var failed = new LeftoverRun([.. _removing.Select(i => new LeftoverResult(i, LeftoverState.Failed))], null);
+            _run = previous?.Merge(failed) ?? failed;
         }
         _changed = true;
         Step = LeftoverStep.Results;

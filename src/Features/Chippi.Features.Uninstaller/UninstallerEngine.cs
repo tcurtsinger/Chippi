@@ -23,6 +23,7 @@ public sealed class UninstallerEngine : IDisposable
     private readonly AppReader _reader;
     private readonly LeftoverScanner _scanner;
     private readonly LeftoverRemover _remover;
+    private readonly LeftoverRoots _roots;
     private readonly RecordStore _records;
     private readonly string? _cachePath;
     private readonly ILogger? _log;
@@ -38,6 +39,7 @@ public sealed class UninstallerEngine : IDisposable
         ILogger? logger = null, TimeProvider? time = null, Func<TimeSpan, CancellationToken, Task>? delay = null, TimeSpan? settle = null, Func<string?, bool>? isSelfLocation = null)
     {
         _system = system;
+        _roots = roots;
         _admin = admin;
         _records = records;
         _cachePath = cachePath;
@@ -170,8 +172,15 @@ public sealed class UninstallerEngine : IDisposable
             foreach (var app in asked)
             {
                 if (!app.CanUninstall) { outcomes.Add(new(app, new AppStatus(AppRunState.Refused, app.Name))); Set(app, AppRunState.Refused); continue; }
-                if ((await Task.Run(() => _system.Processes.RunningIn(Folders(app)), CancellationToken.None).ConfigureAwait(true)).Count > 0) { outcomes.Add(new(app, new AppStatus(AppRunState.Running, app.Name))); Set(app, AppRunState.Running); continue; }
-                queue.Add((app, Snapshot(app)));
+                // The entry is read again now: the list may be older than an update that moved the uninstaller. An entry that is gone, or no longer
+                // one that can be uninstalled, fails the row; what runs is what was read here.
+                var fresh = Fresh(app);
+                if (fresh is null) { outcomes.Add(Fail(app)); continue; }
+                if (!fresh.CanUninstall) { outcomes.Add(new(app, new AppStatus(AppRunState.Refused, app.Name))); Set(app, AppRunState.Refused); continue; }
+                var folders = Folders(fresh);
+                if ((await Task.Run(() => AppProcesses.RunningIn(_system.Processes.Images(), folders), CancellationToken.None).ConfigureAwait(true)).Count > 0)
+                { outcomes.Add(new(app, new AppStatus(AppRunState.Running, app.Name))); Set(app, AppRunState.Running); continue; }
+                queue.Add((fresh, Snapshot(fresh)));
                 Set(app, AppRunState.Queued);
             }
             // The machine apps first, as one helper session; then the user's and the Store's, one after another.
@@ -305,34 +314,55 @@ public sealed class UninstallerEngine : IDisposable
         ? !_system.Packages.List().Any(p => string.Equals(p.FullName, app.Key, StringComparison.OrdinalIgnoreCase))
         : _system.Registry.ReadOne(app.Source, app.Key) is null;
 
-    private readonly Dictionary<string, (long At, bool Open)> _open = [];
+    private (long At, IReadOnlyList<string> Images)? _images;
 
     /// <summary>
-    /// The app is open now ("Running"): the answer Search rows show. Read from the running programs and kept for five seconds, since a Search
-    /// asks again on every keystroke. Never ends anything.
+    /// The app is open now ("Running"): the answer Search rows show. Read from the running programs, once for every row asked about and kept for five
+    /// seconds (a Search asks again on every keystroke). Never ends anything.
     /// </summary>
     public bool IsOpen(AppEntry app)
     {
-        if (_disposed || Folders(app).Count == 0) return false;
+        if (_disposed) return false;
+        var folders = Folders(app);
+        if (folders.Count == 0) return false;
         long now = _time.GetTimestamp();
-        if (_open.TryGetValue(app.Id, out var known) && _time.GetElapsedTime(known.At, now) < TimeSpan.FromSeconds(5)) return known.Open;
-        bool open = _system.Processes.RunningIn(Folders(app)).Count > 0;
-        _open[app.Id] = (now, open);
-        return open;
+        if (_images is not { } known || _time.GetElapsedTime(known.At, now) >= TimeSpan.FromSeconds(5))
+            _images = known = (now, _system.Processes.Images());
+        return AppProcesses.RunningIn(known.Images, folders).Count > 0;
     }
 
-    private static IReadOnlyList<string> Folders(AppEntry app) => app.InstallLocation is { Length: > 3 } location ? [location] : [];
-
-    /// <summary>What the entry says now, kept before its uninstaller deletes it. A Store app keeps its family name only: the OS removes its install folder.</summary>
-    private AppRecord Snapshot(AppEntry app)
+    /// <summary>
+    /// Where the app's programs are: its install folder, the folder its icon comes from and the folder its uninstaller runs from. A folder that is shared
+    /// (Windows, Program Files itself) is left out, so a Windows icon never makes every program in it "the app".
+    /// </summary>
+    private IReadOnlyList<string> Folders(AppEntry app)
     {
-        var fresh = app;
-        if (!app.IsStore && _system.Registry.ReadOne(app.Source, app.Key) is { } raw && _reader.Registered(app.Source, raw) is { } read) fresh = read;
-        string? uninstallerFolder = app.IsStore ? null : UserCommand.FolderOf(fresh);
-        return new AppRecord(Guid.NewGuid(), fresh.Name, fresh.Publisher, fresh.Version, fresh.Source, fresh.Key, app.IsStore ? null : fresh.InstallLocation,
+        var folders = new List<string>();
+        void Add(string? folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder) || folder.Length <= 3) return;
+            string norm = PathRules.Norm(folder);
+            if (norm.Length <= 3 || PathRules.Contains(_roots.WindowsDirectory, norm) || _roots.Containers().Any(r => PathRules.Contains(norm, r))) return;
+            if (!folders.Contains(norm, StringComparer.OrdinalIgnoreCase)) folders.Add(norm);
+        }
+        Add(app.InstallLocation);
+        if (app.IsStore) return folders;
+        Add(app.IconPath is { } icon ? Path.GetDirectoryName(icon) : null);
+        Add(UserCommand.FolderOf(app));
+        return folders;
+    }
+
+    /// <summary>The entry as it reads now, as a list row; null when it is gone. A Store app is its package.</summary>
+    private AppEntry? Fresh(AppEntry app) =>
+        app.IsStore ? app : _system.Registry.ReadOne(app.Source, app.Key) is { } raw ? _reader.Registered(app.Source, raw) : null;
+
+    /// <summary>What the entry says, kept before its uninstaller deletes it. A Store app keeps its family name only: the OS removes its install folder.</summary>
+    private AppRecord Snapshot(AppEntry fresh)
+    {
+        string? uninstallerFolder = fresh.IsStore ? null : UserCommand.FolderOf(fresh);
+        return new AppRecord(Guid.NewGuid(), fresh.Name, fresh.Publisher, fresh.Version, fresh.Source, fresh.Key, fresh.IsStore ? null : fresh.InstallLocation,
             fresh.ProductCode, uninstallerFolder is null ? [] : [uninstallerFolder], fresh.PackageFamilyName, _time.GetUtcNow().UtcDateTime);
     }
-
     // ---- leftovers ----
 
     /// <summary>Apps whose record Chippi still holds (30 days), newest first. The Scan for leftovers picker lists them.</summary>
@@ -356,13 +386,15 @@ public sealed class UninstallerEngine : IDisposable
 
     /// <summary>
     /// Removes the ticked items. When every item that could be removed is gone, the record is marked Cleaned and the helper's record is dropped.
-    /// The helper's session ends when this returns.
+    /// The helper's session ends when this returns. <paramref name="previous"/> is the run this one retries: its results are kept, and the returned run holds both.
     /// </summary>
-    public async Task<LeftoverRun> RemoveAsync(LeftoverScan scan, IReadOnlyCollection<string> ticked, IProgress<LeftoverResult>? progress = null, CancellationToken ct = default)
+    public async Task<LeftoverRun> RemoveAsync(LeftoverScan scan, IReadOnlyCollection<string> ticked, IProgress<LeftoverResult>? progress = null, CancellationToken ct = default,
+        LeftoverRun? previous = null)
     {
         try
         {
             var run = await _remover.RemoveAsync(scan, ticked, progress, ct).ConfigureAwait(true);
+            if (previous is not null) run = previous.Merge(run);   // a retry of what failed: the first run's removals still count
             var removable = scan.Removable;
             if (removable.Count > 0 && removable.All(i => run.Results.Any(r => r.Item.Id == i.Id && r.Ok)))
             {

@@ -34,10 +34,25 @@ public interface IPackageRemover
     Task<bool> RemoveAsync(string fullName, CancellationToken ct);
 }
 
-/// <summary>The running programs whose file is inside one of the folders ("Close Notepad++ first"). Never ends one.</summary>
+/// <summary>The running programs, as the files they run from ("Close Notepad++ first"). Never ends one. One read serves every app asked about.</summary>
 public interface IAppProcesses
 {
-    IReadOnlyList<string> RunningIn(IReadOnlyList<string> folders);
+    /// <summary>The full path of each running program's file: the one expensive read, which callers share.</summary>
+    IReadOnlyList<string> Images();
+}
+
+public static class AppProcesses
+{
+    /// <summary>The names of the running programs whose file is inside one of the folders.</summary>
+    public static IReadOnlyList<string> RunningIn(IReadOnlyList<string> images, IReadOnlyList<string> folders)
+    {
+        var roots = folders.Where(f => !string.IsNullOrWhiteSpace(f)).Select(f => f.TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar).ToArray();
+        if (roots.Length == 0) return [];
+        var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (string path in images)
+            if (roots.Any(r => path.StartsWith(r, StringComparison.OrdinalIgnoreCase))) names.Add(System.IO.Path.GetFileName(path));
+        return [.. names];
+    }
 }
 
 /// <summary>Starts a program as the standard user, never elevated, and waits for it. The exit code, or null when it couldn't start.</summary>

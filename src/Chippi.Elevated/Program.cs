@@ -28,7 +28,7 @@ internal static class Program
             var ports = new PortActions(new NativePortSystem(), [Environment.ProcessId, (int)peerPid], Path.GetFullPath(chippiPath));
             var categories = new CategoryActions(CategoryRoots.ForWindows());
             using var recordStore = new NativeRecordStore(peer.StandardToken);
-            var uninstalls = new UninstallActions(new NativeUninstallRegistry(), recordStore, new NativeFsProbe(peer.StandardToken), new NativeProcessLauncher(), new NativeUninstallHost());
+            var uninstalls = new UninstallActions(new NativeUninstallRegistry(peer.StandardToken), recordStore, new NativeFsProbe(peer.StandardToken), new NativeProcessLauncher(), new NativeUninstallHost());
             uninstalls.Maintain();   // records past 30 days go each time the helper starts
             string ownerSid = NativeLeftoverSystem.SidOf(peer.StandardToken) ?? throw new UnauthorizedAccessException("No owner.");
             string ownerProfile = NativeLeftoverSystem.ProfileFolder(ownerSid) ?? throw new UnauthorizedAccessException("No owner profile.");

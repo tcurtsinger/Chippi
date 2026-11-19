@@ -207,6 +207,7 @@ public sealed class UninstallerView : ContentControl, IDisposable
     internal async void Confirm()
     {
         if (_app is not { } app || _mode is not (UninstallerPageMode.Question or UninstallerPageMode.Result)) return;
+        if (_engine.IsRunning) return;   // another queue is running (Settings): the engine would run nothing, and this app must not read "failed"
         _mode = UninstallerPageMode.Working;
         _outcome = null;
         Render();
