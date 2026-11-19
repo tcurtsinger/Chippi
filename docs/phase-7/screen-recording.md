@@ -89,6 +89,8 @@ Kayla left this for wave 2 (capture-layer.md, spike results). Borderless capture
 
 ## Scrolling capture trial (task 480)
 
+**Replaced (2026-11-18):** the trial never ran. Scrolling capture is now its own brief, [scrolling-capture.md](scrolling-capture.md), built by hand-scrolling first and Auto second.
+
 A short trial at the start of this wave, in its own spike with no PR, before recording is built. It ships only if the stitching holds up on real pages; otherwise it's left out and the report says why. Per behavior spec A: select one scrollable area, show Start and Cancel, capture with a visible Stop, stop on no progress or a size/time bound (30 seconds, 100 megapixels), then show a stitched preview before Copy or Save, and label a partial result. Never send wheel events to an unconfirmed foreground window.
 
 - **Method:** WGC capture of the target window, wheel input sent to it through the input hub in steps, each step captured, and the frames stitched where they overlap.

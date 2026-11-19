@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chippi Phase 7: Scrolling capture mockups</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;margin:0}
+svg.g{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round;flex:none;display:block}
+
+/* island tokens (Chippi.UI/Themes Dark.xaml / Light.xaml, as in docs/phase-6/design) */
+.dark{--fill:rgba(40,40,44,.961);--bord:rgba(255,255,255,.09);--hair:rgba(255,255,255,.078);--face:rgba(255,255,255,.024);--faceh:rgba(255,255,255,.10);--cardb:rgba(255,255,255,.059);
+ --btn:rgba(255,255,255,.071);--ctlb:rgba(255,255,255,.09);--hov:rgba(255,255,255,.059);--track:rgba(255,255,255,.16);
+ --tx:#FFFFFF;--tx2:#C9C9C9;--tx3:#9A9A9A;--acc:#B79CFF;--accf:linear-gradient(135deg,#B78FFF,#82AEFF);--tint:rgba(183,156,255,.14);--onacc:#170F2E;--cau:#FCE100;--cautint:rgba(252,225,0,.10);--crit:#C42B1C;
+ --shadow:0 16px 40px rgba(0,0,0,.5);--rim:rgba(255,255,255,.17);--pop:#2C2C2F;
+ --win:#202020;--surf:#2B2B2B;--sbord:rgba(255,255,255,.031);--div:rgba(255,255,255,.059);--st1:#FFFFFF;--st2:#C5C5C5;--st3:#ABABAB;--st4:#9D9D9D;--scau:#FCE100;
+ --ssel:rgba(255,255,255,.059);--sbtn:rgba(255,255,255,.059);--sbtnb:rgba(255,255,255,.09);--sacc:#B79CFF;--sonacc:#000;--field:rgba(255,255,255,.059);--fieldb:rgba(255,255,255,.55);--kcap:rgba(255,255,255,.09)}
+.light{--fill:rgba(245,245,246,.961);--bord:rgba(0,0,0,.078);--hair:rgba(0,0,0,.078);--face:rgba(255,255,255,.45);--faceh:#FFFFFF;--cardb:rgba(0,0,0,.059);
+ --btn:rgba(255,255,255,.86);--ctlb:rgba(0,0,0,.09);--hov:rgba(0,0,0,.043);--track:rgba(0,0,0,.14);
+ --tx:#1A1A1A;--tx2:#5C5C5C;--tx3:#707070;--acc:#7444F0;--accf:linear-gradient(135deg,#8F5CFF,#5B86FF);--tint:rgba(116,68,240,.10);--onacc:#FFFFFF;--cau:#9D5D00;--cautint:rgba(157,93,0,.10);--crit:#C42B1C;
+ --shadow:0 16px 40px rgba(0,0,0,.2);--rim:rgba(0,0,0,.12);--pop:#F9F9F9;
+ --win:#F3F3F3;--surf:#FBFBFB;--sbord:rgba(0,0,0,.059);--div:rgba(0,0,0,.071);--st1:#1A1A1A;--st2:#404040;--st3:#5D5D5D;--st4:#616161;--scau:#9D5D00;
+ --ssel:rgba(0,0,0,.055);--sbtn:#FFFFFF;--sbtnb:rgba(0,0,0,.10);--sacc:#6B4FBB;--sonacc:#FFF;--field:#FFFFFF;--fieldb:rgba(0,0,0,.45);--kcap:rgba(0,0,0,.06)}
+
+.sheet{display:inline-flex;flex-direction:column;gap:28px;padding:32px;background:#161616;color:#E6E6E6}
+.sheet.lt{background:#D9D9D9;color:#1A1A1A}
+.srow{display:flex;gap:28px;align-items:flex-start}
+.cap{font-size:13px;line-height:18px;font-weight:600;margin:0 0 8px;max-width:584px}
+.stage{background:#1F1F1F;padding:24px 32px 32px;border-radius:2px}
+.lt .stage{background:#C8CBD2}
+
+/* island panel 520x360 */
+.panel{position:relative;width:520px;height:360px;padding:12px;background:var(--fill);border:1px solid var(--bord);border-radius:8px;box-shadow:var(--shadow);color:var(--tx);font-size:12px;line-height:16px;overflow:hidden}
+.hdr{display:flex;align-items:center;height:24px;margin-bottom:8px;gap:6px}
+.ib{width:28px;height:24px;display:inline-flex;align-items:center;justify-content:center;border:0;padding:0;border-radius:4px;background:transparent;color:var(--tx2);flex:none}
+.ib.back{margin:0 0 0 -4px}
+.ttl{flex:1;font-size:13px;font-weight:600;line-height:20px;white-space:nowrap}
+.body{position:relative;width:494px;height:302px}
+.ibtn{height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);font-size:12px;color:var(--tx);white-space:nowrap;display:inline-flex;align-items:center;gap:6px;min-width:64px;justify-content:center;flex:none}
+.ibtn.acc{background:var(--accf);border-color:transparent;color:var(--onacc);font-weight:600}
+.ibtn.crit{background:var(--crit);border-color:transparent;color:#fff}
+.ibtn.sm{height:24px;min-width:0;padding:0 8px;font-size:11px}
+.ibtn.ghost{background:transparent;border-color:transparent;color:var(--tx2)}
+.seg{display:inline-flex;height:24px;border-radius:4px;background:var(--hov);padding:2px;gap:2px;font-size:11px}
+.seg span{padding:0 8px;border-radius:3px;display:flex;align-items:center;color:var(--tx2)}
+.seg span.on{background:var(--btn);color:var(--tx);font-weight:600;box-shadow:0 0 0 1px var(--ctlb)}
+.combo{height:24px;padding:0 6px 0 8px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--tx);white-space:nowrap}
+.combo.open{border-color:var(--acc)}
+.menu{position:absolute;z-index:3;padding:4px;border-radius:8px;background:var(--pop);box-shadow:0 0 0 1px var(--bord),0 8px 24px rgba(0,0,0,.35);font-size:12px;min-width:132px}
+.menu div{height:30px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px;white-space:nowrap}
+.menu div.on{background:var(--tint)}
+.menu div .ck{width:14px;color:var(--acc)}
+.grid6{display:grid;grid-template-columns:repeat(6,76px);gap:8px}
+.cc{height:64px;border:1px solid var(--cardb);border-radius:6px;background:var(--face);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;color:var(--tx2);font-size:12px;position:relative}
+.cc span{color:var(--tx)}
+.cc.pri{background:var(--accf);border-color:transparent;color:var(--onacc)}
+.cc.pri span{color:var(--onacc);font-weight:600}
+.cc.hov{background:var(--faceh)}
+.cc.foc{outline:2px solid var(--tx);outline-offset:1px}
+.tip{position:absolute;z-index:3;padding:6px 8px;border-radius:4px;background:var(--pop);box-shadow:0 0 0 1px var(--bord),0 4px 12px rgba(0,0,0,.3);font-size:12px;white-space:nowrap;color:var(--tx)}
+.sub{display:flex;align-items:center;height:28px;margin-top:12px}
+.sub b{flex:1;font-size:12px;font-weight:600}
+.thumbs{display:grid;grid-template-columns:repeat(4,118px);gap:8px;margin-top:4px}
+.th .img{height:66px;border-radius:6px;border:1px solid var(--hair);position:relative;overflow:hidden}
+.th .n{font-size:11px;line-height:14px;color:var(--tx2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.th .m{font-size:11px;line-height:14px;color:var(--tx3)}
+.dur{position:absolute;right:4px;bottom:4px;height:16px;padding:0 4px;border-radius:3px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;line-height:16px}
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--tx3);font-size:12px}
+.card{border:1px solid var(--cardb);border-radius:6px;background:var(--face)}
+.foot{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;justify-content:flex-end;align-items:center}
+.foot .l{margin-right:auto;display:flex;gap:6px;align-items:center}
+.big{font-size:20px;font-weight:600;line-height:26px}
+.t3{color:var(--tx3);font-size:11px}
+.t2{color:var(--tx2)}
+.cau{color:var(--cau)}
+.slider{flex:1;height:18px;position:relative}
+.slider::before{content:"";position:absolute;left:0;right:0;top:7px;height:4px;border-radius:2px;background:var(--track)}
+.slider i{position:absolute;left:0;top:7px;height:4px;border-radius:2px;background:var(--accf)}
+.slider b{position:absolute;top:0;width:18px;height:18px;margin-left:-9px;border-radius:9px;background:var(--fill);box-shadow:0 0 0 1px var(--ctlb),0 1px 3px rgba(0,0,0,.3)}
+.slider b::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--acc)}
+.drow{height:44px;display:flex;align-items:center;gap:10px;padding:0 10px;margin-bottom:8px;color:var(--tx2)}
+.drow .nm{width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
+.drow .pc{width:34px;text-align:right;color:var(--tx2)}
+.lrow{height:36px;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px}
+.lrow .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* bar 256x50 */
+.desk{background:#3A3F4B;padding:16px 20px;border-radius:2px}
+.lt .desk{background:#AEB6C4}
+.bar{width:256px;height:50px;border-radius:25px;background:var(--fill);box-shadow:0 0 0 1px var(--rim),0 6px 16px rgba(0,0,0,.35);display:flex;align-items:center;color:var(--tx)}
+.bar .lead{width:34px;height:34px;border-radius:17px;background:var(--tint);color:var(--acc);display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden}
+.bar .lead.cau{background:var(--cautint);color:var(--cau)}
+.bar .lines{flex:1;min-width:0;display:flex;flex-direction:column}
+.bar .bt{font-size:13px;font-weight:600;line-height:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .bt.cau{color:var(--cau)}
+.bar .ba{font-size:12px;line-height:15px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pet{width:46px;height:50px;display:flex;align-items:center;justify-content:center;flex:none}
+.pet span{width:34px;height:30px;border-radius:15px 15px 13px 13px;background:linear-gradient(160deg,#C9B6FF,#8E7BE8)}
+
+/* the frozen screen, at real size (DIPs) */
+.scr{position:relative;width:1100px;height:640px;overflow:hidden;border-radius:2px;background:linear-gradient(160deg,#2C3E57,#1B2838);font-size:12px}
+.scr.sm{width:620px;height:380px}
+.w{position:absolute;border-radius:8px;background:#F3F3F3;box-shadow:0 8px 24px rgba(0,0,0,.4);overflow:hidden}
+.w .tb{height:32px;background:#E8E8E8;display:flex;align-items:center;padding:0 12px;font-size:12px;color:#333}
+.w .ln{height:10px;margin:12px 16px 0;border-radius:3px;background:#D5D5D5}
+.w .ln.s{width:40%}
+.w.dk{background:#1E1E1E}.w.dk .tb{background:#2B2B2B;color:#ddd}.w.dk .ln{background:#3A3A3A}
+.dim{position:absolute;background:rgba(0,0,0,.45)}
+.selx{position:absolute;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.4)}
+.hdl{position:absolute;width:8px;height:8px;background:#fff;border:1px solid #7444F0;margin:-4px 0 0 -4px}
+.whl{position:absolute;border:2px solid #B79CFF;border-radius:8px}
+.spill{position:absolute;height:22px;padding:0 8px;border-radius:4px;background:rgba(32,32,36,.92);color:#fff;font-size:11px;line-height:22px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.mag{position:absolute;width:112px;height:112px;border-radius:56px;border:2px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,.5);overflow:hidden;background:
+ repeating-linear-gradient(0deg,rgba(0,0,0,.22) 0 1px,transparent 1px 8px),repeating-linear-gradient(90deg,rgba(0,0,0,.22) 0 1px,transparent 1px 8px),linear-gradient(90deg,#F3F3F3 0 46%,#2C3E57 46%)}
+.mag::after{content:"";position:absolute;left:52px;top:52px;width:8px;height:8px;box-shadow:0 0 0 1px #000,0 0 0 2px #fff}
+.ptr{position:absolute;width:16px;height:16px;color:#fff;filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))}
+.ptr svg{fill:#fff;stroke:#000}
+.tools{position:absolute;width:40px;padding:4px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);display:flex;flex-direction:column;color:var(--tx2)}
+.tools .t{width:32px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:4px}
+.tools .t.on{background:var(--tint);color:var(--acc)}
+.tools .sep{height:1px;background:var(--hair);margin:4px 2px}
+.swd{width:14px;height:14px;border-radius:7px;box-shadow:0 0 0 2px var(--fill),0 0 0 3px var(--ctlb)}
+.acts{position:absolute;height:40px;padding:6px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);display:flex;gap:6px;align-items:center;color:var(--tx)}
+.acts .vsep{width:1px;height:20px;background:var(--hair)}
+.pop{position:absolute;z-index:4;padding:8px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);color:var(--tx)}
+.mk{position:absolute;overflow:visible}
+
+/* Settings, from the real window (r2 snapshots on main 9a978b7) */
+.sw1{width:1120px;background:var(--win);color:var(--st1);font-size:14px;line-height:20px;border:1px solid rgba(128,128,128,.35);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.tbar{height:40px;display:flex;align-items:center;flex:none;font-size:12px}
+.tbar .logo{width:16px;height:16px;border-radius:8px;background:linear-gradient(135deg,#B78FFF,#82AEFF);margin:0 9px 0 16px}
+.tbar .tt{flex:1}
+.tbar .cb{width:46px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--st2)}
+.shell{display:flex;flex:1}
+.side{width:272px;flex:none;padding:6px 12px 16px}
+.find{height:32px;margin:0 0 8px;padding:0 10px;border-radius:4px;background:var(--field);border:1px solid var(--sbtnb);display:flex;align-items:center;gap:10px;font-size:14px;color:var(--st4)}
+.gl{font-size:12px;font-weight:400;color:var(--st2);padding:10px 12px 2px;line-height:16px}
+.nav{position:relative;height:32px;margin:2px 4px;padding:0 12px;border-radius:4px;display:flex;align-items:center;gap:12px;white-space:nowrap;color:var(--st1)}
+.nav.sel{background:var(--ssel);font-weight:600}
+.nav.sel::before{content:"";position:absolute;left:-4px;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.page{flex:1;padding:4px 40px 28px 40px;min-width:0}
+.ptitle{font-family:'Segoe UI Variable Display','Segoe UI',sans-serif;font-size:20px;font-weight:600;line-height:28px;margin:0 0 8px}
+.sh{font-size:14px;font-weight:600;line-height:20px;margin:16px 0 6px}
+.scard{background:var(--surf);border:1px solid var(--sbord);border-radius:8px;margin-bottom:8px}
+.sr{min-height:48px;display:flex;align-items:center;padding:6px 16px;gap:12px;border-top:1px solid var(--div)}
+.sr:first-child{border-top:0}
+.sr.cap2{min-height:60px}
+.sr .lead{width:20px;height:20px;color:var(--st1);flex:none;display:flex;align-items:center}
+.sr .tl{flex:1;min-width:0}
+.sr .tl small{display:block;font-size:12px;line-height:16px;color:var(--st3)}
+.sr .tl small.cau{color:var(--scau)}
+.sbadge.cau{background:var(--cautint);box-shadow:none;color:var(--scau)}
+.sr.dep{padding-left:50px}
+.sr.grp{min-height:36px;padding-top:12px;padding-bottom:0;font-size:12px;color:var(--st3)}
+.sbt{height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);font-size:14px;color:var(--st1);display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.scombo{height:32px;min-width:200px;padding:0 10px 0 11px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);display:inline-flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;white-space:nowrap}
+.ssw{width:40px;height:20px;border-radius:10px;border:1px solid var(--st3);position:relative;flex:none}
+.ssw::after{content:"";position:absolute;left:4px;top:4px;width:10px;height:10px;border-radius:5px;background:var(--st2)}
+.ssw.on{background:var(--sacc);border-color:var(--sacc)}.ssw.on::after{left:auto;right:4px;width:12px;height:12px;top:3px;background:var(--sonacc)}
+.onl{font-size:14px;color:var(--st1)}
+.kc{height:26px;min-width:26px;padding:0 8px;border-radius:4px;background:var(--kcap);border:1px solid var(--sbtnb);border-bottom-width:2px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;color:var(--st1)}
+.keys{width:200px;display:flex;gap:4px;align-items:center;color:var(--st3);font-size:14px}
+.edit{color:var(--st1);font-size:14px;display:inline-flex;align-items:center;gap:6px}
+.path{color:var(--st3);font-size:14px;white-space:nowrap}
+.sthumbs{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px 16px 16px}
+.sthumbs div{height:70px;border-radius:4px;border:1px solid var(--div)}
+.palette{display:flex;gap:6px}
+.palette span{width:22px;height:22px;border-radius:11px;box-shadow:0 0 0 1px var(--div)}
+
+/* ---- Scrolling capture additions ---- */
+.acts .ic{width:32px;height:28px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:var(--tx2)}
+.acts .ic.on{background:var(--tint);color:var(--acc)}
+.acts .ic.dis{opacity:.4}
+.acts .tb2{height:28px;padding:0 10px;border-radius:4px;border:1px solid var(--ctlb);background:var(--btn);font-size:12px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.acts .tb2.acc{background:var(--accf);border-color:transparent;color:var(--onacc);font-weight:600}
+.acts .tb2.dis{opacity:.45}
+.acts .tb2.foc{outline:2px solid var(--tx);outline-offset:1px}
+.acts .st{font-size:12px;color:var(--tx2);padding:0 4px 0 6px;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.acts .st.cau{color:var(--cau)}
+.acts .num{font-size:12px;color:var(--tx);padding:0 6px;white-space:nowrap}
+.live{position:absolute;border:2px solid #B79CFF;box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.doc{position:absolute;overflow:hidden;background:#F7F7F7}
+.doc .hd{position:absolute;left:0;right:0;top:0;height:40px;background:#FFFFFF;border-bottom:1px solid #E2E2E2;display:flex;align-items:center;padding:0 14px;gap:10px;color:#222;font-size:12px;font-weight:600;z-index:1}
+.doc .hd i{width:18px;height:18px;border-radius:4px;background:#7444F0}
+.doc .sd{position:absolute;left:0;top:40px;bottom:0;width:150px;background:#EFEFF2;border-right:1px solid #E2E2E2;padding:10px 12px}
+.doc .sd b{display:block;height:8px;border-radius:3px;background:#CFCFD6;margin:10px 0}
+.doc .ct{position:absolute;left:150px;right:0;top:40px;bottom:0;padding:6px 22px}
+.doc .h{height:14px;width:46%;border-radius:3px;background:#9A9AA6;margin:16px 0 6px}
+.doc .p{height:8px;border-radius:3px;background:#D3D3D8;margin:8px 0}
+.doc .im{height:70px;border-radius:6px;margin:12px 0;background:linear-gradient(135deg,#C8B8F6,#A8C4F2)}
+.pv{position:absolute;padding:6px;border-radius:8px;background:var(--fill);box-shadow:0 0 0 1px var(--bord),var(--shadow);display:flex;flex-direction:column;gap:6px;color:var(--tx)}
+.pv .pi{position:relative;overflow:hidden;border-radius:4px;background:#F7F7F7}
+.pv .seam{position:absolute;left:0;right:0;height:0;border-top:1px dashed rgba(116,68,240,.6)}
+.pv .vp{position:absolute;left:0;right:0;border:2px solid #B79CFF;border-radius:2px}
+.pv .pc{font-size:11px;color:var(--tx2);text-align:center;white-space:nowrap}
+.mini{position:absolute;left:0;right:0}
+.mini .hd{height:5px;background:#FFFFFF;border-bottom:1px solid #E2E2E2;display:flex;align-items:center;padding:0 2px}
+.mini .row{display:flex;height:100%}
+.mini .sdm{width:19%;background:#EFEFF2}
+.mini .ctm{flex:1;padding:0 4px}
+.mini .ctm .h{height:2px;width:46%;border-radius:1px;background:#9A9AA6;margin:3px 0 1px}
+.mini .ctm .p{height:1px;border-radius:1px;background:#C6C6CC;margin:2px 0}
+.mini .ctm .im{height:9px;border-radius:2px;margin:2px 0;background:linear-gradient(135deg,#C8B8F6,#A8C4F2)}
+.res{position:absolute;overflow:hidden;background:#F7F7F7;box-shadow:0 0 0 1px rgba(255,255,255,.7),0 10px 30px rgba(0,0,0,.5)}
+.gap{position:absolute;left:0;right:0;height:3px;background:repeating-linear-gradient(90deg,#FCE100 0 6px,transparent 6px 10px)}
+.tiny{font-size:11px;color:var(--tx3)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="wave-1/lucide.js"></script>
+<script>
+// Scrolling capture mockups. Sizes are real DIPs; glyphs are Lucide (wave-1/lucide.js) plus the few added below. Every window, page and size is invented.
+Object.assign(ICONS,{
+'chevrons-down':'<path d="m7 6 5 5 5-5"/><path d="m7 13 5 5 5-5"/>',
+'mouse':'<rect x="5" y="2" width="14" height="20" rx="7"/><path d="M12 6v4"/>',
+'square-stop':'<rect width="12" height="12" x="6" y="6" rx="1.5"/>',
+'unfold-vertical':'<path d="M12 22v-6"/><path d="M12 8V2"/><path d="M4 12H2"/><path d="M10 12H8"/><path d="M16 12h-2"/><path d="M22 12h-2"/><path d="m15 19-3 3-3-3"/><path d="m15 5-3-3-3 3"/>',
+'triangle-alert':'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+'circle-check':'<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+'scan-text':'<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/>',
+'qr-code':'<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/>'
+});
+const g=(n,s=16,o='')=>`<svg class="g" width="${s}" height="${s}" viewBox="0 0 24 24" stroke-width="${(30/s).toFixed(3)}"${o}>${ICONS[n]||''}</svg>`;
+const q=new URLSearchParams(location.search);
+const board=q.get('board')||'bar-scroll', theme=q.get('theme')||'dark';
+const L=(t,html)=>`<div><p class="cap">${t}<span class="dip"></span></p>${html}</div>`;
+const stage=h=>`<div class="stage">${h}</div>`;
+
+/* ---------- the page being captured: a docs page with a sticky header and a fixed sidebar ---------- */
+const content=(n,from=0)=>{let s='';for(let i=from;i<from+n;i++){const k=i%9;s+=k===0?'<div class="h"></div>':k===4?'<div class="im"></div>':`<div class="p" style="width:${[92,86,95,74,0,90,83,97,61][k]}%"></div>`;}return s;};
+const doc=(x,y,w,h,from=0)=>`<div class="doc" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"><div class="hd"><i></i>Docs<span style="font-weight:400;color:#666;margin-left:auto">Guides · API · Blog</span></div><div class="sd">${'<b></b>'.repeat(12)}</div><div class="ct">${content(30,from)}</div></div>`;
+const browser=(x,y,w,h,from=0)=>`<div class="w" style="left:${x}px;top:${y}px;width:${w}px;height:${h}px"><div class="tb">Docs · Guides</div>${doc(0,32,w,h-32,from)}</div>`;
+const desk=(inner,o={})=>`<div class="scr" style="${o.h?`height:${o.h}px`:''}">${o.bg||''}${inner}</div>`;
+const others=`<div class="w dk" style="left:780px;top:70px;width:290px;height:380px"><div class="tb">Terminal</div>${'<div class="ln"></div>'.repeat(14)}</div>`;
+
+/* the selection: browser at (60,40) 700x560, region = its page area below the tab bar */
+const R={x:60,y:56,w:700,h:508};
+const dimAround=(r,a=.45)=>`<div class="dim" style="left:0;top:0;width:1100px;height:${r.y}px;background:rgba(0,0,0,${a})"></div><div class="dim" style="left:0;top:${r.y+r.h}px;width:1100px;height:${640-r.y-r.h}px;background:rgba(0,0,0,${a})"></div><div class="dim" style="left:0;top:${r.y}px;width:${r.x}px;height:${r.h}px;background:rgba(0,0,0,${a})"></div><div class="dim" style="left:${r.x+r.w}px;top:${r.y}px;width:${1100-r.x-r.w}px;height:${r.h}px;background:rgba(0,0,0,${a})"></div>`;
+const sel=r=>`<div class="selx" style="left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px"></div>${[[0,0],[.5,0],[1,0],[0,.5],[1,.5],[0,1],[.5,1],[1,1]].map(([a,b])=>`<div class="hdl" style="left:${r.x+a*r.w}px;top:${r.y+b*r.h}px"></div>`).join('')}`;
+const pill=(x,y,t)=>`<div class="spill" style="left:${x}px;top:${y}px">${t}</div>`;
+
+/* the finish bar as shipped (CaptureBars): Copy text, Scan QR code | Save as, Save, Copy | Cancel; Scroll joins the lead group */
+const ic=(n,o={})=>`<span class="ic${o.on?' on':''}${o.dis?' dis':''}">${g(n,16)}</span>`;
+const tb=(t,o={})=>`<span class="tb2${o.acc?' acc':''}${o.dis?' dis':''}${o.foc?' foc':''}">${o.g?g(o.g,14):''}${t}</span>`;
+const vs='<span class="vsep"></span>';
+const finish=(x,y,o={})=>`<div class="acts" style="left:${x}px;top:${y}px">${ic('scan-text')}${ic('qr-code')}${ic('unfold-vertical',{on:o.hov,dis:o.dis})}${vs}${tb('Save as')}${tb('Save')}${tb('Copy',{acc:1})}${vs}${ic('x')}</div>`;
+const tip=(x,y,t)=>`<div class="tip" style="left:${x}px;top:${y}px">${t}</div>`;
+const tools=(x,y)=>`<div class="tools" style="left:${x}px;top:${y}px">${['mouse-pointer-2','pencil','highlighter','minus','move-up-right','square','circle','type','eye-off','eraser','crop'].map((n,i)=>`<span class="t${i===0?' on':''}">${g(n,16)}</span>`).join('')}<span class="sep"></span><span class="t"><span class="swd" style="background:#E5484D"></span></span><span class="sep"></span><span class="t">${g('undo-2',16)}</span><span class="t">${g('redo-2',16)}</span></div>`;
+
+/* the scrolling bar: status · size | Auto | Done | Cancel */
+const sbar=(x,y,o)=>`<div class="acts" style="left:${x}px;top:${y}px">${o.status?`<span class="st${o.cau?' cau':''}">${o.cau?g('triangle-alert',14):o.ok?g('circle-check',14):g(o.sg||'mouse',14)}${o.status}</span>${vs}`:''}<span class="num">${o.size}</span>${vs}${o.auto==='stop'?tb('Stop',{g:'square-stop'}):tb('Auto',{g:'chevrons-down',dis:o.auto==='off'})}${tb('Done',{acc:1,foc:o.doneFoc})}${vs}${ic('x')}</div>`;
+
+/* the stitched preview, beside the region: the result so far at a fixed width, the region's place in it framed */
+const mini=(rows,from=0)=>{let s='';for(let i=from;i<from+rows;i++){const k=i%9;s+=k===0?'<div class="h"></div>':k===4?'<div class="im"></div>':`<div class="p" style="width:${[92,86,95,74,0,90,83,97,61][k]}%"></div>`;}return s;};
+const preview=(x,y,o)=>{const W=96,H=o.h;return `<div class="pv" style="left:${x}px;top:${y}px"><div class="pi" style="width:${W}px;height:${H}px"><div class="mini" style="top:0;height:${H}px"><div class="hd"></div><div class="row"><div class="sdm"></div><div class="ctm">${mini(Math.ceil(H/2.8))}</div></div></div>${(o.seams||[]).map(t=>`<div class="seam" style="top:${t}px"></div>`).join('')}${o.gap!=null?`<div class="gap" style="top:${o.gap}px"></div>`:''}<div class="vp" style="top:${o.vp}px;height:${o.vph}px"></div></div></div>`;};
+
+const screenWith=(inner,from=0)=>desk(browser(60,24,700,540,from)+others+inner);
+const liveFrame=r=>`<div class="live" style="left:${r.x-2}px;top:${r.y-2}px;width:${r.w+4}px;height:${r.h+4}px"></div>`;
+const ptr=(x,y)=>`<div class="ptr" style="left:${x}px;top:${y}px"><svg width="16" height="16" viewBox="0 0 24 24"><path d="M4 2l16 10-7 1.5L10 21z"/></svg></div>`;
+
+const B={
+ 'bar-scroll':()=>`${L('1. Released over the page: Scroll joins Copy text and Scan QR code (tooltip "Capture scrolling area · Ctrl+Shift+D" once set)',stage(screenWith(dimAround(R)+sel(R)+pill(R.x,R.y-28,'Docs · 700 × 508')+tools(R.x+R.w+8,R.y)+finish(R.x+R.w-332,R.y+R.h+8,{hov:1})+tip(R.x+R.w-262,R.y+R.h-28,'Capture scrolling area'))))}
+  ${L('2. A selection across two displays, or a freeform one: Scroll is off (tooltip "One display, rectangle")',stage(desk(browser(60,40,700,560)+others+dimAround({x:520,y:120,w:560,h:300})+sel({x:520,y:120,w:560,h:300})+`<div style="position:absolute;left:840px;top:0;width:2px;height:640px;background:rgba(255,255,255,.5)"></div>`+finish(748,428,{dis:1})+tip(818,472,'One display, rectangle'))))}`,
+ 'scrolling-start':()=>L('3. Scroll pressed: the screen goes live (the frozen picture and markup tools go), the area keeps a frame, and the page under it takes your wheel, trackpad, keys or scrollbar. Nothing outside the area is captured; the frame and bars never are.',stage(screenWith(dimAround(R,.3)+liveFrame(R)+sbar(R.x+R.w-276,R.y+R.h+10,{status:'Scroll',size:'700 × 508'})+preview(R.x+R.w+12,R.y,{h:72,rows:6,vp:0,vph:69,label:'1×'})+ptr(420,320)))),
+ 'scrolling-manual':()=>`${L('4. Scrolling by hand: the preview grows to the right (the framed part is what the area shows now; dashed lines are seams, which help spot a bad one before saving). The sticky header and sidebar are kept once.',stage(screenWith(dimAround(R,.3)+liveFrame(R)+sbar(R.x+R.w-276,R.y+R.h+10,{status:'',size:'700 × 2,180'})+preview(R.x+R.w+12,R.y,{h:300,rows:28,seams:[72,138,206],vp:228,vph:69,label:'4×'})+ptr(420,320),9)))}
+  ${L('5. Scrolled more than a screen between frames: "Too fast", the gap is never stitched over; scrolling back a little lets it catch up',stage(screenWith(dimAround(R,.3)+liveFrame(R)+sbar(R.x+R.w-322,R.y+R.h+10,{status:'Too fast',cau:1,size:'700 × 2,180'})+preview(R.x+R.w+12,R.y,{h:300,rows:28,seams:[72,138,206],gap:298,vp:228,vph:69,label:'4×'})+ptr(420,320),27)))}`,
+ 'scrolling-auto':()=>`${L('6. Auto: Chippi scrolls the page itself, without moving the pointer or taking the keyboard; Stop ends it and keeps what was stitched',stage(screenWith(dimAround(R,.3)+liveFrame(R)+sbar(R.x+R.w-322,R.y+R.h+10,{status:'Scrolling',sg:'chevrons-down',size:'700 × 3,640',auto:'stop'})+preview(R.x+R.w+12,R.y,{h:420,rows:42,seams:[72,138,206,274,342],vp:348,vph:69,label:'7×'}),18)))}
+  ${L('7. The end of the page: auto stops by itself and Done takes focus (Enter)',stage(screenWith(dimAround(R,.3)+liveFrame(R)+sbar(R.x+R.w-336,R.y+R.h+10,{status:'End reached',ok:1,size:'700 × 4,920',doneFoc:1,auto:'off'})+preview(R.x+R.w+12,R.y,{h:508,rows:52,seams:[72,138,206,274,342,410,456],vp:439,vph:69,label:'9×'}),36)))}`,
+ 'scrolling-states':()=>`${L('8. Over a browser or an admin window, Auto is off (tooltip "Auto-scroll not available"); scrolling by hand still works',stage(screenWith(dimAround(R,.3)+liveFrame(R)+sbar(R.x+R.w-276,R.y+R.h+10,{status:'Scroll',size:'700 × 508',auto:'off'})+tip(R.x+R.w-170,R.y+R.h-28,'Auto-scroll not available')+preview(R.x+R.w+12,R.y,{h:72,rows:6,vp:0,vph:69,label:'1×'}))))}
+  ${L('9. At the size limit (30,000 px tall or 80 megapixels): capture stops, Done keeps what was stitched',stage(screenWith(dimAround(R,.3)+liveFrame(R)+sbar(R.x+R.w-344,R.y+R.h+10,{status:'Limit reached',cau:1,size:'700 × 30,000',doneFoc:1,auto:'off'})+preview(R.x+R.w+12,R.y,{h:508,rows:52,seams:[],vp:439,vph:69,label:'57×'}),45)))}`,
+ 'result':()=>L('10. Done: the result fills the display\'s height, scaled to fit (the size pill gives its real size); the bar keeps Save as, Save and Copy. Esc or Cancel keeps nothing. Markup tools are left out for scrolling captures.',stage(desk(`<div class="dim" style="left:0;top:0;width:1100px;height:640px;background:rgba(0,0,0,.6)"></div><div class="res" style="left:470px;top:28px;width:96px;height:536px"><div class="mini" style="top:0;height:536px"><div class="hd"></div><div class="row"><div class="sdm"></div><div class="ctm">${mini(200)}</div></div></div></div>`+pill(470,2,'700 × 4,920')+`<div class="acts" style="left:418px;top:574px">${tb('Save as')}${tb('Save')}${tb('Copy',{acc:1,foc:1})}${vs}${ic('x')}</div>`))),
+ 'panel-recent':()=>L('11. Capture panel, Recent: a scrolling capture is a tall thumbnail ("Scrolling · 700 × 4,920"); the panel\'s tiles don\'t change',stage(`<div class="panel"><div class="hdr"><button class="ib back">${g('chevron-left',16)}</button><span class="ttl">Capture</span><span class="combo">${g('timer',14)}No delay${g('chevron-down',12)}</span></div><div class="body"><div class="grid6">${[['square-dashed','Region',1],['app-window','Window'],['monitor','Screen'],['monitor-cog','All displays'],['lasso','Freeform'],['rotate-ccw-clock','Last region']].map(([n,t,p])=>`<div class="cc${p?' pri':''}">${g(n,20)}<span>${t}</span></div>`).join('')}</div><div class="grid6" style="margin-top:8px">${[['scan-text','Text'],['qr-code','QR code'],['pipette','Color'],['video','Record'],['film','GIF'],['images','Convert']].map(([n,t])=>`<div class="cc">${g(n,20)}<span>${t}</span></div>`).join('')}</div><div class="sub"><b>Recent</b><span class="ibtn sm">Open folder</span></div><div class="thumbs"><div class="th"><div class="img" style="background:#F7F7F7"><div class="mini" style="top:0;left:41px;right:41px;height:66px"><div class="hd"></div><div class="row"><div class="sdm"></div><div class="ctm">${mini(8)}</div></div></div></div><div class="n">Scrolling · 700 × 4,920</div><div class="m">Just now</div></div><div class="th"><div class="img" style="background:#F4F4F4"></div><div class="n">Region · 1280 × 720</div><div class="m">2 min ago</div></div><div class="th"><div class="img" style="background:linear-gradient(90deg,#1B1B1B 30%,#2B2B2B 30%)"></div><div class="n">Window · Terminal</div><div class="m">9 min ago</div></div><div class="th"><div class="img" style="background:linear-gradient(160deg,#2C3E57,#1B2838)"></div><div class="n">Screen · 3440 × 1440</div><div class="m">Yesterday</div></div></div></div></div>`)),
+ 'search':()=>L('12. Search "scroll": the starter is a row like the other capture modes; Enter opens the selector, and release goes straight to scrolling',stage(`<div class="panel"><div class="hdr" style="height:32px"><span class="sfield">scroll</span></div><div class="body"><div class="isr sel"><span class="ld">${g('unfold-vertical',16)}</span><span><div class="nm">Capture scrolling area</div><div class="dt">Screen capture</div></span><span class="vb">Run</span></div><div class="isr"><span class="ld">${g('mouse',16)}</span><span><div class="nm">Smooth scrolling</div><div class="dt">Settings</div></span></div></div></div>`)),
+ 'settings':()=>L('13. Settings › Screen capture, Shortcuts: one new row, unassigned',frame(`<div class="ptitle">Screen capture</div>${sec('Shortcuts')}${card(krow('Capture region','PrtSc','square-dashed')+krow('Capture window','','app-window')+krow('Capture scrolling area','','unfold-vertical')+krow('Capture last region','','rotate-ccw-clock'))}`))
+};
+/* Settings frame, as the wave 3 pages */
+function nav(gl,n,s){return `<div class="nav${s?' sel':''}">${g(gl,16)}${n}</div>`;}
+function side(){return `<div class="side"><div class="find">${g('search',14)}Find a setting</div><div class="gl">Capture</div>${nav('scan','Screen capture',1)}${nav('video','Screen recording')}${nav('scan-text','Text and QR')}${nav('pipette','Color picker')}<div class="gl">Chippi</div>${nav('settings','General')}${nav('keyboard','Shortcuts')}</div>`;}
+function frame(c){return `<div class="sw1"><div class="tbar"><span class="logo"></span><span class="tt">Chippi Settings</span><span class="cb">${g('minus',12)}</span><span class="cb">${g('square',11)}</span><span class="cb">${g('x',12)}</span></div><div class="shell">${side()}<div class="page">${c}</div></div></div>`;}
+function kc(k){return k.split('+').map(x=>`<span class="kc">${x}</span>`).join('');}
+function krow(n,k,gl){return `<div class="sr"><span class="lead">${g(gl,20)}</span><span class="tl">${n}</span>${k?`<span style="display:flex;gap:4px;margin-right:12px">${kc(k)}</span>`:`<span class="path" style="margin-right:12px">Not set</span>`}<span class="edit">Edit ${g('square-arrow-out-up-right',14)}</span></div>`;}
+function sec(t){return `<div class="sh">${t}</div>`;}
+function card(r){return `<div class="scard">${r}</div>`;}
+document.body.className=theme;
+document.getElementById('root').innerHTML=`<div class="sheet ${theme==='light'?'lt':''}"><div class="${theme}" style="display:contents"><div class="srow" style="flex-direction:column">${B[board]()}</div></div></div>`;
+const el=document.getElementById('root').firstElementChild;
+document.body.dataset.size=Math.ceil(el.getBoundingClientRect().width)+','+Math.ceil(el.getBoundingClientRect().height);
+</script>
+</body>
+</html>
