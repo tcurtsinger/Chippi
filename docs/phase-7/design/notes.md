@@ -66,3 +66,27 @@ The later alternatives and future feature concepts from PR #287 are preserved in
 - **Port manager:** Free, Stop and the shield only on listening TCP and bound UDP rows; connections, Time wait and ended rows have no verb. A process on several ports says "3 ports" in its question. Two processes on one port get Open (Settings filtered to the port). Chippi, System and the never-ended Windows processes show with no verb and never in the picker.
 - **Cleaner:** a trailing "+" marks a size that's only a lower bound. Clean is off with nothing ticked. Settings lists the categories as switches (the list's remembered ticks), then Shortcuts. Kept rows appear only in a run and its results.
 - **Uninstaller:** a file too big for the Recycle Bin is tagged "No Recycle Bin" in the review. Shared items are dimmed with a lock, no checkbox, and the other app's name. Results group "Not removed" above "Removed", with a status on each row. The Radial menu reuses Search's verb rows.
+
+## Scrolling capture (2026-11-18)
+
+`scrolling-capture.html` draws [scrolling-capture.md](../scrolling-capture.md) for Travis's approval. Each board opens as `scrolling-capture.html?board=<name>&theme=dark|light`. The page, windows and sizes are invented. The renders live in the session's temp folder, not here.
+
+| Board | What it shows |
+|---|---|
+| `bar-scroll` | The finish bar with Scroll (lead group), and Scroll off for an area across displays |
+| `scrolling-start` | Scroll pressed: the screen live, the area framed, the bar and an empty preview |
+| `scrolling-manual` | Scrolling by hand with the preview and seams; Too fast with the gap marked |
+| `scrolling-auto` | Auto running (Stop); End reached with Done focused |
+| `scrolling-states` | Auto not available (a browser or admin window); Limit reached |
+| `result` | Done: the result scaled to the display's height, Save as, Save, Copy |
+| `panel-recent` | The Capture panel unchanged, a scrolling capture in Recent |
+| `search` | Search "scroll" |
+| `settings` | Settings › Screen capture, Shortcuts with the new row |
+
+### Calls made in the mockups
+
+- **No new panel tile:** the Capture panel's two rows are full. Scroll lives on the finish bar, where the area is already chosen, plus a shortcut and Search.
+- **The preview stays beside the area,** outside it, so it never covers what's being captured. It flips to the other side at a display edge, as the tools do.
+- **The bar's status is empty while all is well.** It only speaks for Scroll (before the first movement), Scrolling, Too fast, End reached and Limit reached.
+- **No markup on the result** in the first build; the bar keeps Save as, Save and Copy.
+
