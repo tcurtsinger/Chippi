@@ -77,7 +77,7 @@ The later alternatives and future feature concepts from PR #287 are preserved in
 | `scrolling-start` | Scroll pressed: the screen live, the area framed, the bar and an empty preview |
 | `scrolling-manual` | Scrolling by hand with the preview and seams; Too fast with the gap marked |
 | `scrolling-auto` | Auto running (Stop); End reached with Done focused |
-| `scrolling-states` | Auto not available (a browser or admin window); Limit reached |
+| `scrolling-states` | Auto not available (an admin window); Limit reached |
 | `result` | Done: the result scaled to the display's height, Save as, Save, Copy |
 | `panel-recent` | The Capture panel unchanged, a scrolling capture in Recent |
 | `search` | Search "scroll" |

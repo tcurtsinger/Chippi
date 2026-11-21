@@ -51,6 +51,9 @@ public sealed record CaptureRecentResult(string Id, int Width, int Height, strin
     /// <summary>The saved file's full path, or null when it was only copied.</summary>
     public string? SavedFile { get; init; }
 
+    /// <summary>The capture's kind ("Scrolling"), or null for a plain one: its label leads with the kind and Annotate is left out.</summary>
+    public string? Kind { get; init; }
+
     /// <summary>The saved file is no longer there. The retained copy still serves Copy, Save as and Annotate.</summary>
     public bool FileMissing { get; init; }
 }

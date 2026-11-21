@@ -45,6 +45,7 @@ public sealed class CaptureRecentModel : ICaptureRecentModel, IDisposable
         {
             Image = Result?.Id == entry.Id.ToString() ? Result.Image : null,
             SavedFile = entry.SavedFile,
+            Kind = entry.Kind,
             FileMissing = entry.SavedFile != null && (entry.SavedIdentity == null || CaptureSavedFile.Identity(entry.SavedFile) != entry.SavedIdentity),
         };
         Changed?.Invoke();

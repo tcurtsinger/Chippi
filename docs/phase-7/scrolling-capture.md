@@ -11,7 +11,7 @@ Capture an area taller than the screen (a long page, a chat, a settings list) as
 Research, 2026-11-18 (sources at the end). Scrolling capture is done two ways:
 
 - **The tool scrolls** (ShareX, Snagit's Automatic, ScrollShot): capture, scroll a step, wait, repeat until nothing moves.
-  - It fails where the app ignores the scroll input. Chromium ignores posted wheel messages and stops drawing when hidden. Elevated windows refuse input from a standard process.
+  - It fails where the app ignores the scroll input (some apps ignore posted wheel messages; Edge does not, checked in the Sandbox 2026-11-20). Elevated windows refuse input from a standard process.
   - It fails where focus can't be taken (ShareX's open bug #8837).
 - **You scroll** (Snagit's Scrolling capture, formerly Panoramic; Capso): the tool watches the area and stitches the frames as they come.
   - It works in every app, because the tool sends nothing.
@@ -67,7 +67,7 @@ One stitcher serves both.
 
 - **Offered when all of these hold:**
   - The area lies inside one top-level window.
-  - The window isn't elevated (the input hub's integrity check) and isn't a browser render host: Chromium's `Chrome_RenderWidgetHostHWND`, Firefox's `MozillaWindowClass`.
+  - The window isn't elevated (the input hub's integrity check). Browsers are not excluded: Edge honored the posted wheel in the Sandbox, and Auto turns itself off where a first step moves nothing.
   - UI Automation finds a vertically scrollable pane under the area's center (`ScrollPattern`, read only).
 - **Otherwise** Auto is off, with the tooltip "Auto-scroll not available", and scrolling by hand still works.
 - **How it scrolls** (ScrollShot's method):
@@ -75,9 +75,10 @@ One stitcher serves both.
   - The post goes through the shell's one action PC: a new `IActionPc.PostWheel(window, point, notches)`, marked as Chippi's own. No feature posts or sends input itself.
   - UI Automation is only read: `VerticalScrollPercent` gives the position, which predicts each step's shift and says when the end is reached. Its scroll methods are never called (they bring XAML apps to the front).
 - **Steps:**
-  - The first step is 3 notches. After that the step is sized so each new frame overlaps the last by about 40% of the area's height, 1 to 40 notches.
-  - After each step, Chippi waits until two frames in a row match: at most 1.5 s, polled every 60 ms.
+  - The first step is 1 notch in an area shorter than 600 px (three could overshoot it; a WinUI page scrolls about 100 px a notch), else 3. After that the step is sized from the pixels a notch moved, so each new frame overlaps the last by about 40% of the area's height, 1 to 40 notches.
+  - After each step, Chippi waits until a frame has come and none has followed for 60 ms (polled every 15 ms; frames come only when the screen changes): at most 1.5 s, and 600 ms for a step that draws nothing.
   - Smooth scrolling and a page that loads as you scroll both settle that way.
+  - **A gap never stays:** a step that no longer overlaps is undone by half (the wheel posted back up) and retried at the smaller step. A second miss posts the page back to where the last frame was, turns Auto off ("Auto-scroll not available") and leaves scrolling by hand, with no "Too fast" showing.
 - **Ends:**
   - **End reached:** at 99.999% scrolled, or when two steps in a row move nothing. Done then takes focus.
   - **Stop:** keeps what was stitched and returns to scrolling by hand.
@@ -109,6 +110,7 @@ A pure function from frames to a result, with no Windows calls, so it runs in CI
    - **Candidates:** each row of the moving band becomes a signature: gray, 32 to 64 column bins. A row counts as informative when its range is over 24 levels.
    - **Confirm:** the mean absolute difference over the whole overlap strip, at half scale.
    - **Accept** only when all hold: at least 8 informative rows; overlap of at least a fifth of the band; the best error under 0.8 of the median candidate's; and no other candidate, other than its neighbors, within 15%.
+   - **Rows one by one:** in the confirmed overlap each row counts its differing pixels (over every second column, outermost 20 px of a side left out when they differ in few rows, as a small scrollbar thumb does). More than a few in 2 rows in a row, or in 2 rows anywhere, refuses the frame, and so does a difference in over a tenth of the rows that have ink: another whole-line shift of a page whose lines differ by a digit passes every average. A shift in the best candidate's runners-up must have at least 4 times its differing pixels. The rows a frame adds (and any above them that only met the previous tail) are provisional: the next frame is judged on the rows above them, its pixels overwrite them, and a frame that fits only those rows is held until the next one settles it (an identical frame, or one that fits it better than the reference). Done waits for the stream to go quiet (100 ms, 500 ms at most) and feeds the newest frame again.
    - **Narrowed when the position is known:** when Auto knows the scroll percentage, the search is ±12 px around the predicted shift.
 3. **Never guess.**
    - An ambiguous or non-overlapping frame is rejected, and the reference frame doesn't advance.
@@ -175,7 +177,7 @@ In context only: Enter is Done, Esc is Cancel, and the bar's buttons are reachab
   - a frame identical to the last
   - a page that grows while scrolled
   - the limit
-- **Timing reports:** `CHIPPI_SCROLL_TIMINGS` names a report of the stitch time per frame at 1440p and the final encode at 20,000 px.
+- **Timing reports:** `CHIPPI_SCROLL_TIMINGS` names a report of the stitch time per frame at 1440p, the compose and the result's shrink at 20,000 px. `CHIPPI_CAPTURE_TIMINGS` also gets the scrolling spans: `scroll-start` (close, start-call, stage-show, find, wgc, first-frame), `scroll-done` (stop-auto, quiet, compose, stage-dispose, controller, reopen-call), `scroll-shown` (reopen-to-shown, done-to-shown), `auto-step` (notches, settle, read, stitch), and the freeze's `place=`.
 - **Offscreen shots (`CHIPPI_ISLAND_SHOTS`, both themes):** each board of the mockup, over a synthetic screen, including the bar's states and the preview with a gap.
 - **The overlay's exclusion from capture:** checked in the Sandbox. WGC frames must hold no frame, dim, bar or preview pixels.
 - **Sandbox, once, at the end (`run.ps1 -Checks scrolling`):**
@@ -184,7 +186,7 @@ In context only: Enter is Done, Esc is Cancel, and the bar's buttons are reachab
     - Notepad with 1,000 numbered lines
     - Windows Settings
   - **By hand:** the probe's `SendInput` wheel at several speeds, including one too fast.
-  - **Auto:** on Notepad and Settings. Edge must show Auto as unavailable.
+  - **Auto:** on Long text (to the end), Notepad and Settings, and on Edge, where it is offered, scrolls the page, and runs to the end or is stopped after 15 s.
   - Every saved result is verified row for row.
 - **Travis's live check:** a long web page and a chat, by hand and with Auto, on his displays.
 
@@ -201,7 +203,7 @@ In context only: Enter is Done, Esc is Cancel, and the bar's buttons are reachab
 ## Not verified
 
 - **Posted wheel messages:** whether every app Travis uses honors them. Each Sandbox fixture and his live check decide this per app. Auto turns itself off where nothing moves.
-- **Chromium:** that it ignores posted wheel input comes from third-party reports (ScrollShot's README, a PowerToys-Run-Snip PR). It is checked on Edge in the Sandbox before the class list is fixed.
+- **Chromium:** verified to scroll on a posted wheel: in the Sandbox (2026-11-20) Auto on Edge moved a page from row 0 to about row 37. Firefox and Electron apps are not checked; where the first step moves nothing, Auto turns itself off.
 - **`WDA_EXCLUDEFROMCAPTURE`:** whether it hides the overlay from WGC monitor capture. Documented to; checked in the Sandbox.
 
 ## Sources

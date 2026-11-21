@@ -38,11 +38,15 @@ public sealed class UninstallerModule : IFeatureModule
     private UninstallerView? _view;
 
     public UninstallerModule() : this(UninstallerSystem.ForWindows, LeftoverRoots.ForWindows) { }
-    public UninstallerModule(Func<UninstallerSystem> createSystem, Func<LeftoverRoots> roots)
+    /// <param name="time">The records' clock (30 days); tests pass a fixed one so their dated records never expire with the calendar.</param>
+    public UninstallerModule(Func<UninstallerSystem> createSystem, Func<LeftoverRoots> roots, TimeProvider? time = null)
     {
         _createSystem = createSystem;
         _roots = roots;
+        _time = time;
     }
+
+    private readonly TimeProvider? _time;
 
     public UninstallerEngine? Engine { get; private set; }
 
@@ -79,8 +83,8 @@ public sealed class UninstallerModule : IFeatureModule
         _settings = context.Settings.Get<UninstallerSettings>();
         _settings = _settings with { Shortcuts = _settings.Shortcuts ?? [] };
         string data = context.DataDirectory;
-        Engine = new UninstallerEngine(_createSystem(), context.Admin, new RecordStore(Path.Combine(data, "records.json")), _roots(), Path.Combine(data, "backups"),
-            Path.Combine(data, "apps.json"), context.Logger);
+        Engine = new UninstallerEngine(_createSystem(), context.Admin, new RecordStore(Path.Combine(data, "records.json"), _time), _roots(), Path.Combine(data, "backups"),
+            Path.Combine(data, "apps.json"), context.Logger, _time);
         Engine.Changed += UpdateBar;
         Engine.RunCompleted += PublishResult;
         _ = Engine.LoadCachedAsync();

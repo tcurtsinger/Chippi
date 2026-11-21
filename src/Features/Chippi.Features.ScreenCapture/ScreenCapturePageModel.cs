@@ -43,12 +43,13 @@ public static class ScreenCaptureShortcuts
     public const string CaptureFullScreen = "Capture full screen";
     public const string CaptureAllDisplays = "Capture all displays";
     public const string CaptureFreeform = "Capture freeform";
+    public const string CaptureScrollingArea = "Capture scrolling area";
     public const string CaptureLastRegion = "Capture last region";
     public const string CaptureAfterDelay = "Capture after delay";
     public const string OpenCapture = "Open Capture";
 
     public static IReadOnlyList<string> All { get; } =
-        [CaptureRegion, CaptureWindow, CaptureFullScreen, CaptureAllDisplays, CaptureFreeform, CaptureLastRegion, CaptureAfterDelay, OpenCapture];
+        [CaptureRegion, CaptureWindow, CaptureFullScreen, CaptureAllDisplays, CaptureFreeform, CaptureScrollingArea, CaptureLastRegion, CaptureAfterDelay, OpenCapture];
 }
 
 /// <summary>
