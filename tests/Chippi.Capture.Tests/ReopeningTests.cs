@@ -102,4 +102,52 @@ public sealed class ReopeningTests
         var shown = Reopening.Shrink(image, 1, 1);
         Assert.Equal(new byte[] { 200, 200, 200, 127 }, shown);
     }
+
+    [Fact]
+    public void An_opaque_image_shrinks_to_the_same_pixels_as_the_alpha_weighted_path()
+    {
+        var rng = new Random(7);
+        var pixels = new byte[97 * 211 * 4];
+        rng.NextBytes(pixels);
+        for (int i = 3; i < pixels.Length; i += 4) pixels[i] = 255;
+        var weighted = Reopening.Shrink(new CapturedImage(97, 211, pixels), 13, 29);
+        var opaque = Reopening.Shrink(new CapturedImage(97, 211, pixels) { Opaque = true }, 13, 29);
+        Assert.Equal(weighted, opaque);
+        Assert.All(Enumerable.Range(0, 13 * 29), i => Assert.Equal(255, opaque[i * 4 + 3]));
+    }
+
+    [Fact]
+    public void A_stitched_result_20000_rows_tall_is_composed_and_placed_within_the_budget()
+    {
+        // Done to the result shown (docs/phase-7/scrolling-capture.md): composing the stitched rows once and drawing them,
+        // shrunk, into the display's pixels is what runs here; the screen read and the first frame follow it.
+        const int w = 2560, h = 1440, step = 600;
+        var page = new SyntheticPage(w);
+        var o = new Overlay(Header: 64, Footer: 48, Left: 220, Right: 16);
+        var stitcher = new ScrollStitcher(w, h);
+        for (int offset = 0; stitcher.Height < 20_000; offset += step)
+            Assert.Equal(ScrollStatus.Accepted, stitcher.Add(Frames.Render(page, offset, h, o, 40000)).Status);
+
+        var compose = System.Diagnostics.Stopwatch.StartNew();
+        var image = stitcher.Compose();
+        compose.Stop();
+        Assert.True(image.Opaque);
+        Assert.True(image.Height >= 20_000);
+
+        var live = SelectionTests.Fake(null, new PixelRect(0, 0, 2560, 1440));
+        var place = System.Diagnostics.Stopwatch.StartNew();
+        var (freeze, rect, scale, _) = Reopening.Place(live, image, new PixelPoint(100, 100), 32);
+        place.Stop();
+        Assert.True(scale < 0.1);
+        Assert.True(new PixelRect(0, 0, 2560, 1440).Contains(rect));
+        Assert.NotNull(freeze);
+
+        var weighted = System.Diagnostics.Stopwatch.StartNew();
+        Reopening.Shrink(image with { Opaque = false }, rect.Width, rect.Height); // the alpha-weighted path, parallel
+        weighted.Stop();
+        if (Environment.GetEnvironmentVariable("CHIPPI_SCROLL_TIMINGS") is { Length: > 0 } report)
+            File.AppendAllText(report, $"scroll result {image.Width}x{image.Height}: compose {compose.Elapsed.TotalMilliseconds:F0} ms, place (shrink to {rect.Width}x{rect.Height}) {place.Elapsed.TotalMilliseconds:F0} ms, alpha-weighted shrink {weighted.Elapsed.TotalMilliseconds:F0} ms{Environment.NewLine}");
+        // Generous, for a shared CI runner: the old single-threaded shrink alone took about as long on a fast PC.
+        Assert.True(compose.Elapsed + place.Elapsed < TimeSpan.FromMilliseconds(2500), $"compose {compose.ElapsedMilliseconds} ms + place {place.ElapsedMilliseconds} ms");
+    }
 }

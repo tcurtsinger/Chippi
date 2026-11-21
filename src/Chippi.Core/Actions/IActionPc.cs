@@ -52,6 +52,12 @@ public interface IActionPc
     /// </summary>
     void MoveToDisplay(ActionWindow window, nint monitor) => throw new ActionFailure("Unavailable");
 
+    /// <summary>
+    /// Posts a mouse wheel turn to the window (WM_MOUSEWHEEL, as if the pointer were at the screen point), without moving the
+    /// pointer or taking the keyboard. Positive notches scroll down, negative up. Throws for an elevated window, which refuses it.
+    /// </summary>
+    void PostWheel(nint window, int screenX, int screenY, int notches) => throw new ActionFailure("Unavailable");
+
     void Media(MediaAction action);
 
     /// <summary>Presses the keys in the app in front, once the keys still held are let go.</summary>

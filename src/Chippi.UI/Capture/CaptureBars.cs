@@ -303,21 +303,22 @@ public sealed class MarkupTools : Border
 }
 
 /// <summary>What the finish bar's buttons do.</summary>
-public enum FinishAction { CopyText, ScanQrCode, SaveAs, Save, Copy, Cancel, Retry }
+public enum FinishAction { CopyText, ScanQrCode, SaveAs, Save, Copy, Cancel, Retry, Scroll }
 
 /// <summary>
 /// The finish bar under the selection (Frozen screen v1, released-action-bar): Copy text and Scan QR code (each only when
-/// its feature is on), Save as, Save, Copy (the main verb), and Cancel. 40 high. After a failed output the feature sets
+/// its feature is on), Scroll (scrolling capture, only when <see cref="ShowScroll"/>), Save as, Save, Copy (the main verb), and Cancel. 40 high. After a failed output the feature sets
 /// <see cref="Failure"/>: the line ("Copy failed", "Copied. Save failed") and Retry take the place of Copy text and Scan
 /// QR code, and Retry becomes the main verb.
 /// </summary>
 public sealed class FinishBar : Border
 {
-    private readonly Button _copyText, _scan, _copy, _retry;
+    private readonly Button _copyText, _scan, _scroll, _copy, _retry;
     private readonly Border _lead;
     private readonly StackPanel _failure;
     private readonly TextBlock _failureText = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
-    private bool _showCopyText = true, _showScan = true;
+    private bool _showCopyText = true, _showScan = true, _showScroll, _scrollEnabled = true;
+    private string? _scrollKeys;
 
     public FinishBar()
     {
@@ -341,6 +342,10 @@ public sealed class FinishBar : Border
         _copyText = CaptureBars.IconButton(LucideIcons.ScanText, "Copy text", 32, 28);
         _scan = CaptureBars.IconButton(LucideIcons.QrCode, "Scan QR code", 32, 28);
         _scan.Margin = new Thickness(6, 0, 0, 0);
+        _scroll = CaptureBars.IconButton(LucideIcons.UnfoldVertical, "Scroll", 32, 28);
+        _scroll.Margin = new Thickness(6, 0, 0, 0);
+        _scroll.Visibility = Visibility.Collapsed;
+        ToolTipService.SetShowOnDisabled(_scroll, true);
         _lead = CaptureBars.Rule(vertical: true);
         _lead.Margin = new Thickness(6, 0, 0, 0);
         var saveAs = CaptureBars.TextButton("Save as");
@@ -354,11 +359,11 @@ public sealed class FinishBar : Border
         trail.Margin = new Thickness(6, 0, 0, 0);
         var cancel = CaptureBars.IconButton(LucideIcons.Close, "Cancel", 28, 28, "Cancel · Esc");
         cancel.Margin = new Thickness(6, 0, 0, 0);
-        foreach (var (button, action) in new[] { (_copyText, FinishAction.CopyText), (_scan, FinishAction.ScanQrCode), (saveAs, FinishAction.SaveAs), (save, FinishAction.Save), (copy, FinishAction.Copy), (cancel, FinishAction.Cancel) })
+        foreach (var (button, action) in new[] { (_copyText, FinishAction.CopyText), (_scan, FinishAction.ScanQrCode), (_scroll, FinishAction.Scroll), (saveAs, FinishAction.SaveAs), (save, FinishAction.Save), (copy, FinishAction.Copy), (cancel, FinishAction.Cancel) })
         {
             button.Click += (_, _) => Picked?.Invoke(action);
             row.Children.Add(button);
-            if (action == FinishAction.ScanQrCode)
+            if (action == FinishAction.Scroll)
                 row.Children.Add(_lead);
             if (action == FinishAction.Copy)
                 row.Children.Add(trail);
@@ -366,6 +371,7 @@ public sealed class FinishBar : Border
         Child = CaptureBars.Surface(row, new Thickness(5));
         AutomationProperties.SetName(this, "Finish");
         _copy = copy;
+        ScrollHint();
     }
 
     /// <summary>Copy text shows while Text and QR is on (and no failure is shown).</summary>
@@ -373,6 +379,20 @@ public sealed class FinishBar : Border
 
     /// <summary>Scan QR code shows while Text and QR is on (and no failure is shown).</summary>
     public bool ShowScanQrCode { get => _showScan; set { _showScan = value; Lead(); } }
+
+    /// <summary>Scroll joins the lead group (Capture scrolling area); the feature turns it on for a capture that can scroll.</summary>
+    public bool ShowScroll { get => _showScroll; set { _showScroll = value; Lead(); } }
+
+    /// <summary>
+    /// Scroll works: a rectangle on one display. Off, it's dimmed and its tooltip says "One display, rectangle".
+    /// </summary>
+    public bool ScrollEnabled { get => _scrollEnabled; set { _scrollEnabled = value; ScrollHint(); } }
+
+    /// <summary>The Capture scrolling area shortcut's keys for the tooltip ("Capture scrolling area · Ctrl+Shift+D"), or null while it's unset.</summary>
+    public string? ScrollKeys { get => _scrollKeys; set { _scrollKeys = value; ScrollHint(); } }
+
+    /// <summary>The Scroll button, for tests and shots.</summary>
+    public Button Scroll => _scroll;
 
     /// <summary>Copy, the main verb while nothing has failed.</summary>
     public Button Copy => _copy;
@@ -412,13 +432,28 @@ public sealed class FinishBar : Border
 
     private static Visibility Show(bool on) => on ? Visibility.Visible : Visibility.Collapsed;
 
+    private void ScrollHint()
+    {
+        _scroll.IsEnabled = _scrollEnabled;
+        _scroll.ToolTip = _scrollEnabled ? _scrollKeys is { Length: > 0 } keys ? $"Capture scrolling area · {keys}" : "Capture scrolling area" : "One display, rectangle";
+    }
+
     private void Lead()
     {
         bool failed = _failure.Visibility == Visibility.Visible;
         _copyText.Visibility = Show(_showCopyText && !failed);
         _scan.Visibility = Show(_showScan && !failed);
-        _scan.Margin = new Thickness(_copyText.Visibility == Visibility.Visible ? 6 : 0, 0, 0, 0);
-        _lead.Visibility = Show(failed || _copyText.Visibility == Visibility.Visible || _scan.Visibility == Visibility.Visible);
+        _scroll.Visibility = Show(_showScroll && !failed);
+        // The first lead button sits flush; the rest are 6 apart.
+        bool first = true;
+        foreach (var button in new[] { _copyText, _scan, _scroll })
+        {
+            if (button.Visibility != Visibility.Visible)
+                continue;
+            button.Margin = new Thickness(first ? 0 : 6, 0, 0, 0);
+            first = false;
+        }
+        _lead.Visibility = Show(failed || !first);
         ((FrameworkElement)Child).InvalidateMeasure();
     }
 }

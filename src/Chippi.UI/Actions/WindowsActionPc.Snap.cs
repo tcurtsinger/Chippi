@@ -375,22 +375,25 @@ public sealed partial class WindowsActionPc : IDisposable
             throw new ActionFailure("Snap failed");
     }
 
-    private static bool IsElevated(nint process)
+    private static bool IsElevated(nint process) => IntegrityOf(process) >= 0x3000; // high
+
+    /// <summary>The process's integrity RID (0x2000 medium, 0x3000 high, 0x4000 system); int.MaxValue when it can't be read.</summary>
+    internal static int IntegrityOf(nint process)
     {
-        if (!OpenProcessToken(process, 8, out nint token)) return true;
+        if (!OpenProcessToken(process, 8, out nint token)) return int.MaxValue;
         nint buffer = 0;
         try
         {
             // UIPI follows integrity, as the input/clipboard guards do. TokenElevation can remain true on
             // a restricted medium token in a UAC-disabled session (Windows Sandbox).
             GetTokenInformation(token, 25, 0, 0, out int needed); // TokenIntegrityLevel
-            if (needed <= 0) return true;
+            if (needed <= 0) return int.MaxValue;
             buffer = Marshal.AllocHGlobal(needed);
-            if (!GetTokenInformation(token, 25, buffer, needed, out _)) return true;
+            if (!GetTokenInformation(token, 25, buffer, needed, out _)) return int.MaxValue;
             nint sid = Marshal.ReadIntPtr(buffer);
-            if (!IsValidSid(sid)) return true;
+            if (!IsValidSid(sid)) return int.MaxValue;
             int count = Marshal.ReadByte(GetSidSubAuthorityCount(sid));
-            return count == 0 || Marshal.ReadInt32(GetSidSubAuthority(sid, (uint)(count - 1))) >= 0x3000; // high
+            return count == 0 ? int.MaxValue : Marshal.ReadInt32(GetSidSubAuthority(sid, (uint)(count - 1)));
         }
         finally
         {

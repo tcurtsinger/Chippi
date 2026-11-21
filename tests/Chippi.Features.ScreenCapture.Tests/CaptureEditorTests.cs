@@ -10,6 +10,7 @@ using System.Windows.Media;
 using Chippi.Capture;
 using Chippi.Core.Modules;
 using Chippi.Core.Clipboard;
+using Chippi.Features.ScreenCapture.Scrolling;
 using Chippi.Island.Tests;
 using Chippi.UI.Capture;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -157,6 +158,118 @@ public sealed class CaptureEditorTests
             Click(Find(session.Output!, button));
             Assert.Equal([(qr, 0, 400)], reads); // the page is asked for while the frozen screen still holds the foreground
             Assert.Equal([(CaptureEnd.Finished, false)], session.Closes); // then it closes, never handing the keyboard back
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
+    private static ModuleContext Context() => new("screen-capture", new SettingsStore(), NullLogger.Instance, null!, null!);
+
+    [Fact]
+    public void Scroll_closes_the_frozen_screen_keeping_nothing_and_hands_the_area_over() => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-scroll-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var context = Context();
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session();
+            var started = new List<ScrollingStart>();
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { })
+            { StartScroll = started.Add, ScrollKeys = () => "Ctrl+Shift+D" };
+            session.Release(new(50, 40, 200, 150));
+            var finish = Assert.IsType<FinishBar>(session.Output);
+            Assert.True(finish.ShowScroll);
+            Assert.True(finish.Scroll.IsEnabled);
+            Assert.Equal("Capture scrolling area · Ctrl+Shift+D", finish.Scroll.ToolTip);
+            Click(Find(session.Output!, "Scroll"));
+            // The frozen screen closes with nothing kept and the keyboard back on the page; then the session starts.
+            Assert.Equal([(CaptureEnd.Finished, true)], session.Closes);
+            var start = Assert.Single(started);
+            Assert.Equal(new PixelRect(50, 40, 200, 150), start.Request.Area);
+            Assert.Equal(new PixelRect(0, 0, 400, 300), start.Request.Display);
+            Assert.Equal(96, start.Dpi);
+            Click(Find(session.Output!, "Scroll"));
+            Assert.Single(started); // a second press does nothing
+            Assert.Empty(model.Recent);
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
+    [Fact]
+    public void Scroll_is_off_without_a_session_to_start_and_for_a_shape_or_an_area_across_displays() => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-scroll-off-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var context = Context();
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session();
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { });
+            session.Release(new(50, 40, 200, 150));
+            Assert.False(Assert.IsType<FinishBar>(session.Output).ShowScroll);
+
+            var screen = new CapturedScreen("a", 1, new(0, 0, 400, 300), 96, new byte[400 * 300 * 4]);
+            var freeze = new Freeze([screen], [], DateTimeOffset.Now);
+            Selection Pick(PixelRect rect, SelectionMask? mask = null) => new(rect, freeze, Chippi.Capture.CaptureMode.Region, mask, null, false, screen);
+            Assert.True(CaptureEditor.CanScroll(Pick(new(10, 10, 100, 100))));
+            Assert.True(CaptureEditor.CanScroll(Pick(new(0, 0, 400, 300))));
+            Assert.False(CaptureEditor.CanScroll(Pick(new(300, 200, 200, 200)))); // across the display's edge
+            Assert.False(CaptureEditor.CanScroll(Pick(new(10, 10, 100, 100), new SelectionMask(new(10, 10, 100, 100), new byte[100 * 100])))); // freeform
+            Assert.False(CaptureEditor.CanScroll(Pick(new(10, 10, 100, 100)) with { Source = new CapturedImage(1, 1, new byte[4]) })); // a reopened capture
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
+    [Fact]
+    public void The_scrolling_shortcut_goes_straight_to_scrolling_on_release_with_no_finish_bar() => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-scroll-direct-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var context = Context();
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session();
+            var started = new List<ScrollingStart>();
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { }) { StartScroll = started.Add, ScrollOnRelease = true };
+            session.Release(new(50, 40, 200, 150));
+            Assert.Null(session.Output);
+            Assert.Null(session.Tools);
+            Assert.Equal([(CaptureEnd.Finished, true)], session.Closes);
+            Assert.Equal(new PixelRect(50, 40, 200, 150), Assert.Single(started).Request.Area);
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
+    [Fact]
+    public void A_scrolling_result_has_no_markup_no_reading_buttons_and_no_Scroll() => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-scroll-result-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var context = Context();
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session();
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { }, () => true)
+            { ScrollingResult = true, StartScroll = _ => throw new InvalidOperationException("a result never scrolls") };
+            session.Release();
+            Assert.Null(session.Tools);
+            var finish = Assert.IsType<FinishBar>(session.Output);
+            Assert.False(finish.ShowScroll);
+            Assert.Equal(Visibility.Collapsed, finish.Scroll.Visibility);
+            Assert.Equal(Visibility.Collapsed, Find(finish, "Copy text").Visibility);
+            Assert.Equal(Visibility.Collapsed, Find(finish, "Scan QR code").Visibility);
+            Assert.Equal(["Save as", "Save", "Copy", "Cancel"], new[] { "Save as", "Save", "Copy", "Cancel" }.Where(n => Find(finish, n).Visibility == Visibility.Visible));
+            // No tool is reachable and the pixels are the capture's own, never drawn again.
+            Assert.NotNull(editor.Draft);
+            Assert.Empty(session.Canvas.Children.OfType<TextBox>());
         }
         finally { Directory.Delete(folder, true); }
     });

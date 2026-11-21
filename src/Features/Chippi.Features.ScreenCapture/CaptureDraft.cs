@@ -99,6 +99,8 @@ public sealed class CaptureDraft
     private readonly Stack<State> _undo = new(), _redo = new();
     private State _state;
     public Int32Rect Crop => _state.Crop;
+    /// <summary>The pixels as captured, for a result that is never marked up or cropped (a scrolling capture).</summary>
+    internal BitmapSource Source => _source;
     internal bool IsCropped => Crop != new Int32Rect(0, 0, _source.PixelWidth, _source.PixelHeight);
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
@@ -106,7 +108,7 @@ public sealed class CaptureDraft
 
     public CaptureDraft(BitmapSource source)
     {
-        _source = source.Clone(); _source.Freeze();
+        _source = source.IsFrozen ? source : source.Clone(); _source.Freeze();
         _state = new(new Int32Rect(0, 0, source.PixelWidth, source.PixelHeight), []);
     }
 
