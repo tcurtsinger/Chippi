@@ -450,8 +450,10 @@ public sealed class ScrollingController : IDisposable
                 lock (_gate)
                 {
                     step = _stitcher.Add(settled.Bgra, predicted);
-                    // A reading that is off (a pane whose percent is approximate) must not refuse a frame the stitcher can verify.
-                    if (step.Status is ScrollStatus.Gap or ScrollStatus.Ambiguous && predicted is not null && !_stitcher.HasHeld)
+                    // A reading that is off (a pane whose percent is approximate) must not refuse a frame the stitcher can verify. And a
+                    // frame the stitcher holds for a second look gets it here: settling already saw it twice unchanged, which is the
+                    // identical frame the hold waits for (the Sandbox's whole Edge page stopped Auto without this, 2026-11-20).
+                    if (step.Status is ScrollStatus.Gap or ScrollStatus.Ambiguous && (predicted is not null || _stitcher.HasHeld))
                         step = _stitcher.Add(settled.Bgra);
                     Apply(step, settled);
                 }
