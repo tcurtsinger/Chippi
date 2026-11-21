@@ -74,7 +74,7 @@ public sealed class IslandTests
         {
             UninstallerUi.LoadIcons = false;
             seed?.Invoke(F);
-            Module = new UninstallerModule(() => F.Sys, () => F.Roots);
+            Module = new UninstallerModule(() => F.Sys, () => F.Roots, new FixedTime(F));   // the fixture's day, not the calendar's
             Context = new ModuleContext(UninstallerModule.Id, new Settings(), NullLogger.Instance, Island, Ui)
             {
                 OpenSettings = Opened.Add, Admin = F.Admin, DataDirectory = Path.Combine(F.Base, "data"),

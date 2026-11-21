@@ -50,7 +50,7 @@ public sealed class ModuleTests : IDisposable
 
         public Rig(Fixture f)
         {
-            Module = new UninstallerModule(() => f.Sys, () => f.Roots);
+            Module = new UninstallerModule(() => f.Sys, () => f.Roots, new FixedTime(f));
             Context = new ModuleContext(UninstallerModule.Id, Settings, NullLogger.Instance, Island, Ui)
             {
                 OpenSettings = Opened.Add, Admin = f.Admin, DataDirectory = Path.Combine(f.Base, "data"),
