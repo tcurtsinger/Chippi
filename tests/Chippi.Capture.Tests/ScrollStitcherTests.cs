@@ -367,6 +367,30 @@ public sealed class ScrollStitcherTests
     }
 
     [Fact]
+    public void A_held_torn_frame_is_flagged_and_a_clean_frame_with_a_prediction_still_stitches()
+    {
+        var page = new SyntheticPage(W);
+        var o = new Overlay(Header: 30, Footer: 20);
+        var s = new ScrollStitcher(W, FH);
+        Feed(s, page, o, 0, 20000);
+        Feed(s, page, o, 120, 20000);
+        Assert.False(s.HasHeld);
+
+        var a = Frames.Render(page, 240, FH, o, 20000);
+        var b = Frames.Render(page, 300, FH, o, 20000);
+        var torn = (byte[])a.Clone();
+        Buffer.BlockCopy(b, 200 * W * 4, torn, 200 * W * 4, (FH - 200) * W * 4);
+        var step = s.Add(torn, 120);
+        Assert.Equal(ScrollStatus.Ambiguous, step.Status);
+        Assert.True(s.HasHeld); // held, waiting for the next frame: a caller must not feed the same frame again
+
+        // The clean frame, with a prediction measured from the reference before the torn one: it still lands on the page.
+        var clean = s.Add(b, 180);
+        Assert.NotEqual(ScrollStatus.Gap, clean.Status);
+        Assert.Null(Check(s, page, o, 0, Frames.Render(page, 0, FH, o, 20000)));
+    }
+
+    [Fact]
     public void Scrolling_up_adds_nothing_and_scrolling_down_again_catches_up()
     {
         var page = new SyntheticPage(W);

@@ -16,6 +16,13 @@ public sealed record AreaFramesRequest(nint Monitor, PixelRect Display, PixelRec
 /// <summary>One live frame of the area: tight BGRA rows (width × 4 bytes each). The array belongs to the receiver.</summary>
 public sealed record AreaFrame(int Width, int Height, byte[] Bgra, TimeSpan Time);
 
+/// <summary>The reasons an <see cref="IAreaFrames"/> source gives that a caller treats specially.</summary>
+public static class AreaFrameReasons
+{
+    /// <summary>The display's size or layout changed under the capture.</summary>
+    public const string DisplayChanged = "Display changed";
+}
+
 /// <summary>
 /// Live frames of an area of a display (screen scrolling capture, docs/phase-7/scrolling-capture.md). Frames arrive only
 /// when the screen changes, newest only (a slow receiver skips frames, never queues them), on a worker thread.

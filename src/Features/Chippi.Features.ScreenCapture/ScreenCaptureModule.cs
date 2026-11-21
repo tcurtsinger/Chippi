@@ -35,7 +35,7 @@ public sealed class ScreenCaptureModule(ICaptureLayer capture) : IFeatureModule
     internal Func<ScrollingStart, ScrollingParts?>? ScrollingFactory { get; set; }
 
     /// <summary>A scrolling capture is on screen (its stage, not a frozen screen): a starter waits for it to end.</summary>
-    internal bool IsScrolling => _scrolling is { IsEnded: false };
+    internal bool IsScrolling => _scrolling != null; // until Scrolled runs: a Done still composing holds it too
     public Func<bool> TextAvailable { get; init; } = () => false;
     public Func<CapturedImage, bool, Task> ReadText { get; init; } = (_, _) => Task.CompletedTask;
     public CaptureRecentModel? RecentModel { get; private set; }

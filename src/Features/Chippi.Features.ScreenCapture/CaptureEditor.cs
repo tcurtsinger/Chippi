@@ -168,7 +168,7 @@ internal sealed class CaptureEditor : IDisposable
                     (p.Y * old.Scale + old.Rect.Y - selection.Rect.Y) / selection.Scale)), item.Color, item.Width, item.Fill, item.Text, item.Bold));
         InvalidateOutput(); _selected = -1;
         _finish.ShowCopyText = _finish.ShowScanQrCode = !ScrollingResult && _hasText();
-        _finish.ShowScroll = !ScrollingResult && StartScroll != null;
+        _finish.ShowScroll = !ScrollingResult && StartScroll != null && selection.Source is null; // a reopened capture has no screen to scroll
         _finish.ScrollEnabled = CanScroll(selection);
         _finish.ScrollKeys = ScrollKeys?.Invoke();
         foreach (var surface in _session.Surfaces)

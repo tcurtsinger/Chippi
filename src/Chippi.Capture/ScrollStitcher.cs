@@ -105,6 +105,9 @@ public sealed class ScrollStitcher
     /// <summary>Rows at the end of the result (above the footer) that no later frame has vouched for yet; the next frame may replace them.</summary>
     public int ProvisionalRows => _committed && _verifiedTo < _fh - _layout.Header - _layout.Footer ? _fh - _layout.Header - _layout.Footer - _verifiedTo : 0;
 
+    /// <summary>True while a frame is held as a candidate, waiting for the next one to settle it.</summary>
+    public bool HasHeld => _cands.Count > 0;
+
     public int Width => _w;
 
     /// <summary>
@@ -228,7 +231,7 @@ public sealed class ScrollStitcher
             if (bestI >= 0)
             {
                 CommitCandidate(bestI);
-                return Process(cur, p);
+                return Process(cur, null); // p was measured from the old reference; the candidate sits D pixels from it
             }
         }
         if (m.Status != ScrollStatus.Accepted && _committed)

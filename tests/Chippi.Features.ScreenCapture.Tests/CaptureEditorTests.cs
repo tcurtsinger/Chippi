@@ -225,6 +225,24 @@ public sealed class CaptureEditorTests
     });
 
     [Fact]
+    public void A_reopened_capture_has_no_Scroll_button() => WpfTestThread.Run(() =>
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "chippi-scroll-reopen-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            using var store = new RecentCaptureStore(folder);
+            var context = Context();
+            using var model = new ScreenCaptureModel(context, store, _ => { }, _ => false);
+            var session = new Session { Source = new CapturedImage(1, 1, new byte[4]) };
+            using var editor = new CaptureEditor(session, context, model, store, (_, _) => { }) { StartScroll = _ => { } };
+            session.Release(new(50, 40, 200, 150));
+            Assert.False(Assert.IsType<FinishBar>(session.Output).ShowScroll);
+        }
+        finally { Directory.Delete(folder, true); }
+    });
+
+    [Fact]
     public void The_scrolling_shortcut_goes_straight_to_scrolling_on_release_with_no_finish_bar() => WpfTestThread.Run(() =>
     {
         string folder = Path.Combine(Path.GetTempPath(), "chippi-scroll-direct-" + Guid.NewGuid().ToString("N"));
@@ -314,6 +332,7 @@ public sealed class CaptureEditorTests
         public CaptureRequest Request { get; } = new(Chippi.Capture.CaptureMode.Region);
         public Canvas Canvas { get; } = new() { Width = 400, Height = 300 };
         public FrameworkElement? Tools, Output;
+        public CapturedImage? Source;
         public CapturePreview? Preview;
         public void SetPreview(CapturePreview? preview) => Preview = preview;
         public Freeze? Freeze { get; private set; }
@@ -342,6 +361,7 @@ public sealed class CaptureEditorTests
             _selector.Down(new(bounds.X, bounds.Y), false);
             _selector.Up(new(bounds.Right - 1, bounds.Bottom - 1));
             Selection = _selector.Selection;
+            if (Source != null && Selection != null) Selection = Selection with { Source = Source };
             Selected?.Invoke(Selection!);
         }
         public void Adjust(PixelPoint from, PixelPoint to)

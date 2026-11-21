@@ -111,7 +111,8 @@ public sealed class WgcAreaFrames : IAreaFrames
                 Usage = D3D11_USAGE.D3D11_USAGE_STAGING, CPUAccessFlags = D3D11_CPU_ACCESS_FLAG.D3D11_CPU_ACCESS_READ,
             };
             ID3D11Texture2D* texture = null;
-            device->CreateTexture2D(in desc, null, &texture);
+            device->CreateTexture2D(in desc, null, &texture); // a failure throws (the binding is not PreserveSig)
+            if (texture == null) throw new InvalidOperationException("Capture failed");
             staging = texture;
 
             var dxgiId = new Guid("54ec77fa-1377-44e6-8c32-88fd5f44c84c");
@@ -160,15 +161,16 @@ public sealed class WgcAreaFrames : IAreaFrames
             if (frame == null) continue;
             var content = frame.ContentSize;
             if (content.Width != _size.Width || content.Height != _size.Height)
-            { Fail("Display changed"); break; }
+            { Fail(AreaFrameReasons.DisplayChanged); break; }
             nint source = 0;
             try
             {
                 source = CaptureInterop.Texture(frame.Surface);
                 var box = new D3D11_BOX { left = (uint)area.X, top = (uint)area.Y, right = (uint)area.Right, bottom = (uint)area.Bottom, front = 0, back = 1 };
                 context->CopySubresourceRegion((ID3D11Resource*)staging, 0, 0, 0, 0, (ID3D11Resource*)source, 0, &box);
-                D3D11_MAPPED_SUBRESOURCE mapped;
-                context->Map((ID3D11Resource*)staging, 0, D3D11_MAP.D3D11_MAP_READ, 0, &mapped);
+                D3D11_MAPPED_SUBRESOURCE mapped = default;
+                context->Map((ID3D11Resource*)staging, 0, D3D11_MAP.D3D11_MAP_READ, 0, &mapped); // a failure throws a COMException, caught below
+                if (mapped.pData == null) { Fail("Capture failed"); break; }
                 var bytes = new byte[row * area.Height];
                 try { AreaReadback.CopyRows((byte*)mapped.pData, (int)mapped.RowPitch, area.Width, area.Height, bytes); }
                 finally { context->Unmap((ID3D11Resource*)staging, 0); }

@@ -4,7 +4,9 @@
 using System.Diagnostics;
 using System.Windows.Threading;
 using Chippi.Capture;
+using System.Runtime.InteropServices;
 using Chippi.UI.Capture;
+using Chippi.UI.Displays;
 
 namespace Chippi.Features.ScreenCapture.Scrolling;
 
@@ -41,7 +43,8 @@ internal sealed class ScrollingSession : IDisposable
     private readonly PixelSize _area;
     private readonly CancellationTokenSource _cancel = new();
     private int _dirty;
-    private bool _ended0, _keyboardTaken, _autoStarting;
+    private bool _ended0, _keyboardTaken, _autoStarting, _watching;
+    private DispatcherTimer? _desktopWatch;
     private int _composedHeight = -1;
     private CapturedImage? _strip;
 
@@ -54,6 +57,8 @@ internal sealed class ScrollingSession : IDisposable
         _ended = ended;
         _controller.Changed += Changed;
         _controller.Failed += OnFailed;
+        DisplayChanges.Changed += DisplaysChanged;
+        _watching = true;
         _stage.AutoAsked += () => _ = AutoAsync();
         _stage.StopAsked += () => _ = StopAsync();
         _stage.DoneAsked += () => _ = DoneAsync();
@@ -66,6 +71,46 @@ internal sealed class ScrollingSession : IDisposable
     /// <summary>The capture has ended (Done, Cancel or a failure).</summary>
     public bool IsEnded => _ended0;
 
+    /// <summary>True when the input desktop is not ours (a lock, Ctrl+Alt+Del or UAC). Tests replace it.</summary>
+    internal Func<bool> InputDesktopLost { get; init; } = () => !InputDesktopIsOurs();
+
+    /// <summary>How often the input desktop is checked.</summary>
+    internal TimeSpan DesktopPoll { get; init; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>The displays changed or the PC resumed: the area is no longer what was frozen, so the capture ends, keeping nothing.</summary>
+    internal void DisplaysChanged() => _dispatcher.BeginInvoke(() => End(ScrollingOutcome.Cancelled, null));
+
+    private void WatchDesktop()
+    {
+        _desktopWatch = new DispatcherTimer(DispatcherPriority.Background, _dispatcher) { Interval = DesktopPoll };
+        _desktopWatch.Tick += (_, _) =>
+        {
+            if (!_ended0 && InputDesktopLost())
+                End(ScrollingOutcome.Cancelled, null);
+        };
+        _desktopWatch.Start();
+    }
+
+    private void StopWatching()
+    {
+        _desktopWatch?.Stop();
+        _desktopWatch = null;
+        if (!_watching) return;
+        _watching = false;
+        DisplayChanges.Changed -= DisplaysChanged;
+    }
+
+    private static bool InputDesktopIsOurs()
+    {
+        nint desktop = OpenInputDesktop(0, false, 0x0001);
+        if (desktop == 0) return false;
+        CloseDesktop(desktop);
+        return true;
+    }
+
+    [DllImport("user32.dll")] private static extern nint OpenInputDesktop(uint flags, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint access);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CloseDesktop(nint desktop);
+
     /// <summary>Shows the stage and starts the frames. The first live frame follows; a refusal ends the capture as Failed.</summary>
     public void Start()
     {
@@ -73,6 +118,7 @@ internal sealed class ScrollingSession : IDisposable
         long begun = Stopwatch.GetTimestamp();
         _ = RunAsync();
         _stage.Show();
+        WatchDesktop();
         Refresh();
         _timings?.Invoke("scroll-start stage-show=" + ScrollTimings.Ms(begun));
     }
@@ -108,7 +154,9 @@ internal sealed class ScrollingSession : IDisposable
     private void OnFailed(string reason)
     {
         Chippi.Core.Diagnostics.Log.Warn("Scrolling capture: " + reason);
-        _dispatcher.BeginInvoke(() => End(ScrollingOutcome.Failed, null));
+        // A display change ends the capture without a notice, as a lock does: the frozen screen is gone with it.
+        var outcome = reason == AreaFrameReasons.DisplayChanged ? ScrollingOutcome.Cancelled : ScrollingOutcome.Failed;
+        _dispatcher.BeginInvoke(() => End(outcome, null));
     }
 
     private void Changed()
@@ -225,6 +273,7 @@ internal sealed class ScrollingSession : IDisposable
 
     private void Finish(ScrollingOutcome outcome, CapturedImage? image)
     {
+        StopWatching();
         _controller.Changed -= Changed;
         _controller.Failed -= OnFailed;
         if (outcome != ScrollingOutcome.Done)
@@ -240,6 +289,7 @@ internal sealed class ScrollingSession : IDisposable
         if (_ended0)
             return;
         _ended0 = true;
+        StopWatching();
         _controller.Changed -= Changed;
         _controller.Failed -= OnFailed;
         _stage.Dispose();

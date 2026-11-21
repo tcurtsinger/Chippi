@@ -103,12 +103,14 @@ public sealed class ScrollingSessionTests
         public readonly ScrollingSession Session;
         public readonly TaskCompletionSource<(ScrollingOutcome Outcome, CapturedImage? Image)> Ended = new();
 
+        public bool DesktopLost;
+
         public Rig()
         {
             var request = new AreaFramesRequest(1, new PixelRect(0, 0, 200, 300), new PixelRect(10, 10, W, H));
             var controller = new ScrollingController(request, Frames, new NoTarget(), new Pc(), new SystemScrollClock());
             Session = new ScrollingSession(controller, Stage, request.Area.Size, Dispatcher.CurrentDispatcher, (outcome, image) => Ended.TrySetResult((outcome, image)))
-            { Throttle = TimeSpan.Zero };
+            { Throttle = TimeSpan.Zero, InputDesktopLost = () => DesktopLost, DesktopPoll = TimeSpan.FromMilliseconds(20) };
         }
 
         public void Dispose() => Session.Dispose();
@@ -224,10 +226,55 @@ public sealed class ScrollingSessionTests
         rig.Session.Start();
         WpfTestThread.Wait(rig.Frames.Started.Task);
         rig.Frames.Emit(0);
-        rig.Frames.Lose("Display changed");
+        rig.Frames.Lose("Capture failed");
         WpfTestThread.Wait(rig.Ended.Task.WaitAsync(TimeSpan.FromSeconds(10)));
         var (outcome, image) = rig.Ended.Task.Result;
         Assert.Equal(ScrollingOutcome.Failed, outcome);
+        Assert.Null(image);
+        Assert.True(rig.Stage.Disposed);
+    });
+
+    [Fact]
+    public void A_display_change_ends_the_capture_silently_keeping_nothing() => WpfTestThread.Run(() =>
+    {
+        using var rig = new Rig();
+        rig.Session.Start();
+        WpfTestThread.Wait(rig.Frames.Started.Task);
+        rig.Frames.Emit(0);
+        rig.Frames.Emit(60);
+        rig.Session.DisplaysChanged(); // the displays settled after a change or a resume
+        WpfTestThread.Wait(rig.Ended.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        var (outcome, image) = rig.Ended.Task.Result;
+        Assert.Equal(ScrollingOutcome.Cancelled, outcome);
+        Assert.Null(image);
+        Assert.True(rig.Stage.Disposed);
+        Assert.True(rig.Frames.Disposed);
+    });
+
+    [Fact]
+    public void The_sources_own_display_change_is_no_failure() => WpfTestThread.Run(() =>
+    {
+        using var rig = new Rig();
+        rig.Session.Start();
+        WpfTestThread.Wait(rig.Frames.Started.Task);
+        rig.Frames.Emit(0);
+        rig.Frames.Lose(AreaFrameReasons.DisplayChanged);
+        WpfTestThread.Wait(rig.Ended.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        Assert.Equal(ScrollingOutcome.Cancelled, rig.Ended.Task.Result.Outcome);
+    });
+
+    [Fact]
+    public void A_lock_or_secure_desktop_ends_the_capture_keeping_nothing() => WpfTestThread.Run(() =>
+    {
+        using var rig = new Rig();
+        rig.Session.Start();
+        WpfTestThread.Wait(rig.Frames.Started.Task);
+        rig.Frames.Emit(0);
+        rig.Frames.Emit(60);
+        rig.DesktopLost = true; // Win+L: the input desktop is no longer ours
+        WpfTestThread.Wait(rig.Ended.Task.WaitAsync(TimeSpan.FromSeconds(10)));
+        var (outcome, image) = rig.Ended.Task.Result;
+        Assert.Equal(ScrollingOutcome.Cancelled, outcome);
         Assert.Null(image);
         Assert.True(rig.Stage.Disposed);
     });

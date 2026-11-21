@@ -451,7 +451,7 @@ public sealed class ScrollingController : IDisposable
                 {
                     step = _stitcher.Add(settled.Bgra, predicted);
                     // A reading that is off (a pane whose percent is approximate) must not refuse a frame the stitcher can verify.
-                    if (step.Status is ScrollStatus.Gap or ScrollStatus.Ambiguous && predicted is not null)
+                    if (step.Status is ScrollStatus.Gap or ScrollStatus.Ambiguous && predicted is not null && !_stitcher.HasHeld)
                         step = _stitcher.Add(settled.Bgra);
                     Apply(step, settled);
                 }
