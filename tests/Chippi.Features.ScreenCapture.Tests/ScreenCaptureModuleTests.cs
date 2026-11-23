@@ -29,7 +29,8 @@ public sealed class ScreenCaptureModuleTests
         {
             module.StartAsync(context, default).GetAwaiter().GetResult();
             Assert.NotNull(ui.Page);
-            Assert.Equal(8, context.Shortcuts.List.Count);
+            Assert.Equal(9, context.Shortcuts.List.Count);
+            Assert.Contains(context.Shortcuts.List, s => s.Name == ScreenCaptureShortcuts.CaptureScrollingArea && s.Shortcut == null); // unassigned
             layer.Fail = true;
             module.Start(Chippi.Capture.CaptureMode.Region, CaptureDoor.Shortcut);
             layer.Fail = false;

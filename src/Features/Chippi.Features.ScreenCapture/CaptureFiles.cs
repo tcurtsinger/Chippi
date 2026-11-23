@@ -29,7 +29,7 @@ public static class CaptureFiles
 
     internal static byte[] Thumbnail(BitmapSource pixels)
     {
-        double scale = Math.Min(1, 240d / pixels.PixelWidth);
+        double scale = Math.Min(1, Math.Min(240d / pixels.PixelWidth, 480d / pixels.PixelHeight));
         var image = new TransformedBitmap(pixels, new ScaleTransform(scale, scale));
         var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image));
         using var stream = new MemoryStream(); encoder.Save(stream);

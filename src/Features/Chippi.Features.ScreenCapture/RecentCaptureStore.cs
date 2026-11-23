@@ -10,7 +10,30 @@ using Chippi.Core.Diagnostics;
 
 namespace Chippi.Features.ScreenCapture;
 
-public sealed record RecentCapture(Guid Id, string Image, DateTimeOffset Time, int Width, int Height, string? SavedFile, CaptureFileIdentity? SavedIdentity = null);
+/// <param name="Kind">What kind of capture it is: <see cref="RecentKinds.Scrolling"/>, or null for any other (and every entry from before kinds).</param>
+public sealed record RecentCapture(Guid Id, string Image, DateTimeOffset Time, int Width, int Height, string? SavedFile, CaptureFileIdentity? SavedIdentity = null, string? Kind = null)
+{
+    /// <summary>A scrolling capture: its label reads "Scrolling · W × H" and Annotate is left out.</summary>
+    public bool IsScrolling => Kind == RecentKinds.Scrolling;
+
+    /// <summary>The label a Recent entry shows for its size: "700 × 4,920" for a scrolling capture, "Scrolling · 700 × 4,920" with <paramref name="withKind"/>.</summary>
+    public string Label(bool withKind) => RecentKinds.Label(Kind, Width, Height, withKind);
+}
+
+/// <summary>The kinds a Recent capture can have, beyond a plain one.</summary>
+public static class RecentKinds
+{
+    public const string Scrolling = "Scrolling";
+
+    /// <summary>"Scrolling · 700 × 4,920" for a scrolling capture, otherwise "700 × 800" as before. <paramref name="withKind"/> off leaves the kind out.</summary>
+    public static string Label(string? kind, int width, int height, bool withKind = true)
+    {
+        string size = kind == Scrolling
+            ? string.Create(System.Globalization.CultureInfo.CurrentCulture, $"{width:N0} × {height:N0}")
+            : string.Create(System.Globalization.CultureInfo.CurrentCulture, $"{width} × {height}");
+        return kind == Scrolling && withKind ? Scrolling + " · " + size : size;
+    }
+}
 
 /// <summary>Single-worker store. Index and thumbnails are sealed; retained PNGs are ordinary local files.</summary>
 public sealed class RecentCaptureStore : IDisposable
@@ -150,16 +173,17 @@ public sealed class RecentCaptureStore : IDisposable
         _skipped = 0; _keyLost = false; // Clearing also drops entries that couldn't be read, so the notice goes.
         foreach (var entry in entries) File.Delete(Path.Combine(_folder, entry.Image));
     }
-    public void Put(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile)
-    { lock (_gate) PutCore(draftId, flattened, time, savedFile); }
-    private void PutCore(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile)
+    public void Put(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile, string? kind = null)
+    { lock (_gate) PutCore(draftId, flattened, time, savedFile, kind); }
+    private void PutCore(Guid draftId, BitmapSource flattened, DateTimeOffset time, string? savedFile, string? kind)
     {
         var previous = Read();
         string name = Guid.NewGuid().ToString("N") + ".png";
         // SaveAs publishes a fully encoded file before its index row can become visible.
         CaptureFiles.SaveAs(flattened, Path.Combine(_folder, name), CaptureFileType.Png, true);
         var entry = new RecentCapture(draftId, name, time, flattened.PixelWidth, flattened.PixelHeight, savedFile ?? previous.FirstOrDefault(x => x.Id == draftId)?.SavedFile,
-            savedFile != null ? CaptureSavedFile.Identity(savedFile) : previous.FirstOrDefault(x => x.Id == draftId)?.SavedIdentity);
+            savedFile != null ? CaptureSavedFile.Identity(savedFile) : previous.FirstOrDefault(x => x.Id == draftId)?.SavedIdentity,
+            kind ?? previous.FirstOrDefault(x => x.Id == draftId)?.Kind);
         var thumbnail = CaptureFiles.Thumbnail(flattened);
         using var transaction = _database.Connection.BeginTransaction();
         foreach (var old in previous.Where(x => x.Id == draftId)) DeleteRow(old.Id, transaction);

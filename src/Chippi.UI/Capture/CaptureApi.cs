@@ -152,6 +152,9 @@ public interface ICaptureLayer
 
     /// <summary>The previous released rectangle, for Last region; the feature saves it in its settings and sets it at start.</summary>
     PixelRect? LastRegion { get; set; }
+
+    /// <summary>The island's styles the features' own windows (the scrolling capture's bar and preview) merge, as the overlays do; null when none.</summary>
+    Uri? BarStyles => null;
 }
 
 /// <summary>What the layer needs from the shell. The App implements it; tests pass a fake.</summary>

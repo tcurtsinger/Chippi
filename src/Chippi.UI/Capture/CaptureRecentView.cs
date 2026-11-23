@@ -166,7 +166,11 @@ public sealed class CaptureRecentView : UserControl
         var dpi = VisualTreeHelper.GetDpi(this);
         _image.Width = Math.Max(1, result.Width / dpi.DpiScaleX);
         _image.Height = Math.Max(1, result.Height / dpi.DpiScaleY);
-        string size = string.Create(CultureInfo.CurrentCulture, $"{result.Width} × {result.Height}");
+        bool scrolling = result.Kind == "Scrolling";
+        string size = scrolling
+            ? string.Create(CultureInfo.CurrentCulture, $"Scrolling · {result.Width:N0} × {result.Height:N0}")
+            : string.Create(CultureInfo.CurrentCulture, $"{result.Width} × {result.Height}");
+        _annotate.Visibility = scrolling ? Visibility.Collapsed : Visibility.Visible;
         AutomationProperties.SetName(_picture, $"Capture, {size}");
         _size.Text = $"{size} · {result.When}";
 

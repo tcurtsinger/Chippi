@@ -236,6 +236,11 @@ public static class Probe
         return
     }
 
+    if ($checks -contains 'scrolling') {
+        $found.scrolling = & (Join-Path $PSScriptRoot 'scrolling.ps1')
+        return
+    }
+
     if ($checks -contains 'capture') {
         $found.capture = & (Join-Path $PSScriptRoot 'capture.ps1')
         return

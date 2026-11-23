@@ -443,7 +443,7 @@ public sealed class ScreenCaptureSettingsPage : UserControl
         {
             _capture = capture;
             _fileMissing = fileMissing;
-            string size = $"{capture.Width.ToString(CultureInfo.CurrentCulture)} × {capture.Height.ToString(CultureInfo.CurrentCulture)}";
+            string size = capture.Label(withKind: true);
             string when = When(capture.Time, now);
             _missing.Visibility = fileMissing ? Visibility.Visible : Visibility.Collapsed;
             Button.ToolTip = fileMissing ? $"{size} · {when} · File missing" : $"{size} · {when}";
@@ -453,7 +453,8 @@ public sealed class ScreenCaptureSettingsPage : UserControl
         public ContextMenu Menu()
         {
             var menu = new ContextMenu();
-            menu.Items.Add(Item("Annotate", () => Say(_page._recentError, _page._model.Annotate(_id) ? null : "Annotate failed")));
+            if (_capture?.IsScrolling != true) // Drawing on a picture many screens tall needs its own design.
+                menu.Items.Add(Item("Annotate", () => Say(_page._recentError, _page._model.Annotate(_id) ? null : "Annotate failed")));
             menu.Items.Add(Item("Remove from recent", () => _page._model.Remove(_id)));
             if (_capture is { SavedFile: { Length: > 0 } } capture && !_fileMissing)
                 menu.Items.Add(Item("Delete file", () => _page.Delete(_id, capture, Button)));

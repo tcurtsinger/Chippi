@@ -168,7 +168,7 @@ internal sealed class CapturePanelHost : ICapturePanelModel, IDisposable
             return tools.Select(t => t with { Enabled = !IsRecording || t.Id is "recording/start" or "media-tools/convert" }).ToArray();
         }
     }
-    public IReadOnlyList<CapturePanelRecent> Recent => (_capture.Model?.Recent.Select(x => (x.Time, Item: new CapturePanelRecent(x.Id.ToString(), $"{x.Width} × {x.Height}", x.Time.ToLocalTime().ToString("g"), _capture.Model.Thumbnail(x.Id)))) ?? [])
+    public IReadOnlyList<CapturePanelRecent> Recent => (_capture.Model?.Recent.Select(x => (x.Time, Item: new CapturePanelRecent(x.Id.ToString(), x.Label(withKind: true), x.Time.ToLocalTime().ToString("g"), _capture.Model.Thumbnail(x.Id)))) ?? [])
         .Concat(_recording?.Model?.Recent.Select(x => (Time: x.Created, Item: new CapturePanelRecent("recording/" + x.Id, $"Video · {RecordingModule.FormatTime(x.Duration)}", x.Created.ToLocalTime().ToString("g"), _recording.Model.Poster(x)))) ?? [])
         .OrderByDescending(x => x.Time).Select(x => x.Item).ToArray();
     public void Start(CaptureMode mode) { if (CanCapture) _capture.Start(mode, CaptureDoor.Island, Delay); }

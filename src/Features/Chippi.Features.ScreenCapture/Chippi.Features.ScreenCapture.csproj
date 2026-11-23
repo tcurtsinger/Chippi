@@ -9,6 +9,8 @@
     <!-- The Settings page: its rows, ShortcutSetting and the shortcut types. -->
     <ProjectReference Include="../../Chippi.Core/Chippi.Core.csproj" />
     <ProjectReference Include="../../Chippi.UI/Chippi.UI.csproj" />
+    <!-- WgcAreaFrames, the scrolling capture's live frames. -->
+    <ProjectReference Include="../../Chippi.Media/Chippi.Media.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Chippi.Features.ScreenCapture.Tests" />

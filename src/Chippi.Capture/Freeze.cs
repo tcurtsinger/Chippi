@@ -39,6 +39,9 @@ public sealed record FrozenWindow(nint Handle, string Title, string ProcessPath,
 public sealed record CapturedImage(int Width, int Height, byte[] Pixels)
 {
     public int Stride => Width * 4;
+
+    /// <summary>Every pixel is fully opaque (a stitched scrolling result): shrinking it skips the alpha weighting.</summary>
+    public bool Opaque { get; init; }
 }
 
 /// <summary>

@@ -302,7 +302,8 @@ public sealed class OverlayView : Grid
         }
         // A reopened capture shown smaller still reads its own size.
         var of = preview?.Size ?? (selector.Selection?.Source is { } source ? new PixelSize(source.Width, source.Height) : rect.Size);
-        string pixels = string.Create(CultureInfo.InvariantCulture, $"{of.Width} × {of.Height}");
+        // A reopened capture (a scrolling result is often thousands tall) groups its digits as the bar and Recent do.
+        string pixels = selector.Selection?.Source is not null ? ScrollingBar.Size(of.Width, of.Height) : string.Create(CultureInfo.InvariantCulture, $"{of.Width} × {of.Height}");
         _pillText.Text = window is { Title.Length: > 0 } ? $"{window.Title} · {pixels}" : pixels;
         _pillCopy.Visibility = selector.CopyDrag ? Visibility.Visible : Visibility.Collapsed;
         _pill.Visibility = Visibility.Visible;

@@ -16,7 +16,7 @@ when the build has the hub, hook-timings.csv there.
 Any of: radial (the Radial menu's hold, flick, click, drag and Esc), cost (Chippi's CPU over 60 s of the mouse moving, three
 times), watchdog (Debug builds of the hub only: both hooks are dropped behind the hub's back 45 s after start, and the
 Radial menu must work again after the mouse and keys have moved), pause (Debug builds only: a borderless window over
-the screen stands in for a game; the pause, Always on, Pause in these apps and the Radial menu's Open over fullscreen apps), debounce (Debounce on SendInput: pairs 2 ms and 60 ms apart), timestamps (the hook's own timestamp against Stopwatch), shortcuts (Shortcuts: Back, Forward and Middle, the side wheel's tilts, a key, Win combinations, an app left alone), scroll (Smooth scrolling: notch totals, glide, Ctrl+wheel, leaving the window, a game in front, Linear, per-app speeds), switcher (the App switcher by shortcut and Radial slice: Enter, Esc, search, arrows, where focus lands), capture (Debug builds only: the capture layer's freeze, modes, keys, delay and Print Screen, with Windows' Print Screen setting; capture.ps1).
+the screen stands in for a game; the pause, Always on, Pause in these apps and the Radial menu's Open over fullscreen apps), debounce (Debounce on SendInput: pairs 2 ms and 60 ms apart), timestamps (the hook's own timestamp against Stopwatch), shortcuts (Shortcuts: Back, Forward and Middle, the side wheel's tilts, a key, Win combinations, an app left alone), scroll (Smooth scrolling: notch totals, glide, Ctrl+wheel, leaving the window, a game in front, Linear, per-app speeds), switcher (the App switcher by shortcut and Radial slice: Enter, Esc, search, arrows, where focus lands), scrolling (a Release build: scrolling capture by hand and with Auto over an Edge page, a long text window, Notepad and Settings, every saved PNG checked row for row; scrolling.ps1; waits up to 25 minutes), capture (Debug builds only: the capture layer's freeze, modes, keys, delay and Print Screen, with Windows' Print Screen setting; capture.ps1).
 #>
 param(
     [Parameter(Mandatory)][string]$App,
@@ -37,6 +37,7 @@ if (Get-Process -Name WindowsSandbox, WindowsSandboxClient, WindowsSandboxRemote
     throw 'Windows Sandbox is already running, and only one can. Wait for it to close.'
 }
 
+if (($Checks | ForEach-Object { $_ -split ',' }) -contains 'scrolling' -and $TimeoutMinutes -lt 25) { $TimeoutMinutes = 25 }
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 $Out = (Resolve-Path -LiteralPath $Out).Path
 Get-ChildItem -LiteralPath $Out -Force | Remove-Item -Recurse -Force
@@ -88,4 +89,8 @@ if (($Checks | ForEach-Object { $_ -split ',' }) -contains 'arrangements') {
 if (($Checks | ForEach-Object { $_ -split ',' }) -contains 'screen-capture') {
     $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
     if ($report.error -or $report.screenCapture.passed -ne $true) { throw 'Screen capture Sandbox check failed; see results.json' }
+}
+if (($Checks | ForEach-Object { $_ -split ',' }) -contains 'scrolling') {
+    $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
+    if ($report.error -or $report.scrolling.passed -ne $true) { throw 'Scrolling capture Sandbox check failed; see results.json' }
 }

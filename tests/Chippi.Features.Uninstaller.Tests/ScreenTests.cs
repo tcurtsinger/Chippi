@@ -468,7 +468,7 @@ public sealed class ScreenTests
         Assert.Equal("note", view.Apps.SearchBox.Text);
         Assert.Equal(0, view.SelectedTab);
         Assert.Equal(1, rig.View(UninstallerModule.RecentSection).SelectedTab);
-        var module = new UninstallerModule(() => rig.F.Sys, () => rig.F.Roots);
+        var module = new UninstallerModule(() => rig.F.Sys, () => rig.F.Roots, new FixedTime(rig.F));
         Assert.True(module.StartAsync(rig.Context.WithUi(rig.Ui), default).IsCompletedSuccessfully);
         Assert.IsType<UninstallerSettingsView>(rig.Ui.Page!("search"));
         WpfTestThread.Wait(module.StopAsync(default));

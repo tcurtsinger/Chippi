@@ -60,6 +60,8 @@ internal sealed class WindowsRadialPc(IActionPc actions) : IRadialPc
 
     public void Media(MediaAction action) => actions.Media(action);
 
+    public void PostWheel(nint window, int screenX, int screenY, int notches) => actions.PostWheel(window, screenX, screenY, notches);
+
     public Task PressAsync(KeyCombo keys) => actions.PressAsync(keys);
 
     public Task TypeAsync(string text) => actions.TypeAsync(text);

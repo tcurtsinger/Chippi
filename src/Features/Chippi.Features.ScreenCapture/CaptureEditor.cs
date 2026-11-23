@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Chippi.Capture;
 using Chippi.Core.Modules;
+using Chippi.Features.ScreenCapture.Scrolling;
 using Chippi.UI.Capture;
 using Microsoft.Win32;
 
@@ -49,6 +50,28 @@ internal sealed class CaptureEditor : IDisposable
     private int _textIndex = -1;
     private Int32Rect? _crop;
     private CaptureOutput? _output;
+    private bool _scrollStarted;
+
+    /// <summary>Begins a scrolling capture of the selected area (the finish bar's Scroll, or the shortcut's release). Null leaves Scroll off the bar.</summary>
+    internal Action<ScrollingStart>? StartScroll { get; init; }
+
+    /// <summary>The release goes straight to scrolling, with no finish bar (Capture scrolling area), when the selection can scroll.</summary>
+    internal bool ScrollOnRelease { get; init; }
+
+    /// <summary>
+    /// The editor shows a finished scrolling capture: no markup tools, and the bar keeps Save as, Save, Copy and Cancel.
+    /// The pixels are saved and copied as they are, never redrawn: a result many screens tall can't be rendered again.
+    /// </summary>
+    internal bool ScrollingResult { get; init; }
+
+    /// <summary>
+    /// A scrolling result's pixels already made into a bitmap (off the UI thread, while the overlay freezes), so showing it
+    /// copies nothing; null builds it when the result is selected.
+    /// </summary>
+    internal Task<BitmapSource>? ScrollingBitmap { get; init; }
+
+    /// <summary>The keys of the Capture scrolling area shortcut for the Scroll button's tooltip, or null while it's unset.</summary>
+    internal Func<string?>? ScrollKeys { get; init; }
 
     internal CaptureDraft? Draft => _draft;
     /// <summary>The mark with the dashed frame, or -1.</summary>
@@ -84,6 +107,7 @@ internal sealed class CaptureEditor : IDisposable
         {
             if (action == FinishAction.Retry && _retry != null) await _retry();
             else if (action is FinishAction.CopyText or FinishAction.ScanQrCode) await ReadText(action == FinishAction.ScanQrCode);
+            else if (action == FinishAction.Scroll) BeginScroll();
             else if (action == FinishAction.Cancel) Cancel();
             else if (action == FinishAction.SaveAs) await SaveAs();
             else if (action == FinishAction.Copy) await Finish(EnterAction.Copy);
@@ -91,29 +115,65 @@ internal sealed class CaptureEditor : IDisposable
         });
     }
 
-    private static BitmapSource Bitmap(CapturedImage image)
+    // The prebuilt bitmap of a scrolling result, waiting for it if the worker is still copying; null when there is none or it failed.
+    private BitmapSource? PendingBitmap()
+    {
+        if (ScrollingBitmap is not { } pending) return null;
+        try { return pending.GetAwaiter().GetResult(); }
+        catch (Exception ex) when (ex is OutOfMemoryException or InvalidOperationException) { return null; }
+    }
+
+    internal static BitmapSource Bitmap(CapturedImage image)
     {
         var bitmap = BitmapSource.Create(image.Width, image.Height, 96, 96, PixelFormats.Bgra32, null, image.Pixels, image.Stride);
         bitmap.Freeze(); return bitmap;
     }
+    /// <summary>A rectangle inside one display: what a scrolling capture can watch (a freeform shape or two displays can't).</summary>
+    internal static bool CanScroll(Selection selection) =>
+        selection.Mask is null && selection.Source is null && selection.Display.Bounds.Contains(selection.Rect);
+
+    private void BeginScroll()
+    {
+        if (_scrollStarted || _disposed || _selection is not { } selection || StartScroll is not { } start || !CanScroll(selection)) return;
+        _scrollStarted = true;
+        var area = new ScrollingStart(new AreaFramesRequest(selection.Display.Monitor, selection.Display.Bounds, selection.Rect), selection.Display.Dpi);
+        // The frozen screen goes with nothing kept and the keyboard goes back to the page, which then takes the wheel.
+        long begun = System.Diagnostics.Stopwatch.GetTimestamp();
+        _session.Close(CaptureEnd.Finished, handBack: true);
+        long closed = System.Diagnostics.Stopwatch.GetTimestamp();
+        start(area);
+        ScrollTimings.Sink?.Invoke("scroll-start close=" + System.Diagnostics.Stopwatch.GetElapsedTime(begun, closed).TotalMilliseconds.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " start-call=" + ScrollTimings.Ms(closed));
+    }
+
+    private BitmapSource Pixels() => ScrollingResult ? _draft!.Source : _draft!.Flatten();
+
     private void Selected(Selection selection)
     {
         if (_busy) return;
+        if (ScrollOnRelease && !ScrollingResult && CanScroll(selection) && StartScroll != null)
+        {
+            _selection = selection;
+            BeginScroll();
+            return;
+        }
         CommitText();
         var old = _selection;
         var objects = _draft?.Objects.ToArray() ?? [];
         _selection = selection;
-        _draft = new CaptureDraft(Bitmap(selection.Image()));
+        _draft = new CaptureDraft(ScrollingResult && PendingBitmap() is { } ready ? ready : Bitmap(selection.Image()));
         if (old != null)
             foreach (var item in objects)
                 _draft.Add(new MarkupObject(item.Tool, item.Points.Select(p => new Point(
                     (p.X * old.Scale + old.Rect.X - selection.Rect.X) / selection.Scale,
                     (p.Y * old.Scale + old.Rect.Y - selection.Rect.Y) / selection.Scale)), item.Color, item.Width, item.Fill, item.Text, item.Bold));
         InvalidateOutput(); _selected = -1;
-        _finish.ShowCopyText = _finish.ShowScanQrCode = _hasText();
+        _finish.ShowCopyText = _finish.ShowScanQrCode = !ScrollingResult && _hasText();
+        _finish.ShowScroll = !ScrollingResult && StartScroll != null && selection.Source is null; // a reopened capture has no screen to scroll
+        _finish.ScrollEnabled = CanScroll(selection);
+        _finish.ScrollKeys = ScrollKeys?.Invoke();
         foreach (var surface in _session.Surfaces)
         {
-            if (!_canvases.Contains(surface.Layer))
+            if (!_canvases.Contains(surface.Layer) && !ScrollingResult)
             {
                 _canvases.Add(surface.Layer);
                 surface.Layer.Background = Brushes.Transparent;
@@ -126,7 +186,8 @@ internal sealed class CaptureEditor : IDisposable
                 if (Window.GetWindow(surface.Layer) is { } window && _windows.Add(window)) window.PreviewKeyDown += PreviewKey;
             }
         }
-        _session.SetBars(selection.FastPath && _model.Settings.CtrlDragCopies ? null : _tools, selection.FastPath && _model.Settings.CtrlDragCopies ? null : _finish);
+        _session.SetBars(selection.FastPath && _model.Settings.CtrlDragCopies || ScrollingResult ? null : _tools, selection.FastPath && _model.Settings.CtrlDragCopies ? null : _finish);
+        if (ScrollingResult) System.Windows.Application.Current?.Dispatcher.BeginInvoke(() => { if (!_disposed) _finish.Copy.Focus(); }, System.Windows.Threading.DispatcherPriority.Input);
         Redraw();
         if (selection.FastPath && _model.Settings.CtrlDragCopies) _ = Finish(EnterAction.Copy);
     }
@@ -362,7 +423,7 @@ internal sealed class CaptureEditor : IDisposable
         else if (ctrl && e.Key == System.Windows.Input.Key.S) { e.Handled = true; if (shift) await SaveAs(); else await Finish(EnterAction.Save); }
         else if (ctrl && e.Key == System.Windows.Input.Key.Z) { e.Handled = true; History(redo: shift); }
         else if (ctrl && e.Key == System.Windows.Input.Key.Y) { e.Handled = true; History(redo: true); }
-        else if (!ctrl && Keyboard.Modifiers == ModifierKeys.None)
+        else if (!ctrl && !ScrollingResult && Keyboard.Modifiers == ModifierKeys.None)
         {
             var key = e.Key.ToString();
             var tool = Enum.GetValues<CaptureTool>().FirstOrDefault(t => CaptureBars.Letter(t)?.ToString() == key);
@@ -373,7 +434,7 @@ internal sealed class CaptureEditor : IDisposable
     {
         _output = null; _retry = null; _finish.Failure = null;
     }
-    internal void RefreshProviders() => _finish.ShowCopyText = _finish.ShowScanQrCode = _hasText();
+    internal void RefreshProviders() => _finish.ShowCopyText = _finish.ShowScanQrCode = !ScrollingResult && _hasText();
     private async Task ReadText(bool qr)
     {
         if (_busy || _draft == null || !_hasText()) return;
@@ -398,7 +459,7 @@ internal sealed class CaptureEditor : IDisposable
         _busy = true;
         try
         {
-            var pixels = _draft.Flatten();
+            var pixels = Pixels();
             if (!retry) InvalidateOutput();
             _output ??= new CaptureOutput(pixels,
                 image => _context.Clipboard == null ? Task.FromResult(false) : CaptureClipboard.CopyAsync(_context.Clipboard, image, _cancel.Token),
@@ -408,7 +469,7 @@ internal sealed class CaptureEditor : IDisposable
                     _cancel.Token.ThrowIfCancellationRequested();
                     if (_model.Settings.History)
                     {
-                        await CaptureFiles.OnWorkerAsync(() => { _cancel.Token.ThrowIfCancellationRequested(); _store.Put(_id, image, DateTimeOffset.Now, file); return true; });
+                        await CaptureFiles.OnWorkerAsync(() => { _cancel.Token.ThrowIfCancellationRequested(); _store.Put(_id, image, DateTimeOffset.Now, file, ScrollingResult ? RecentKinds.Scrolling : null); return true; });
                         _cancel.Token.ThrowIfCancellationRequested();
                         _model.RefreshRecent();
                     }
@@ -416,6 +477,7 @@ internal sealed class CaptureEditor : IDisposable
             var result = retry ? await _output.RetryAsync() : await _output.FinishAsync(action);
             if (_disposed) return;
             FeedbackSource = result.SavedFile != null ? Path.GetFileName(result.SavedFile)
+                : ScrollingResult ? RecentKinds.Label(RecentKinds.Scrolling, pixels.PixelWidth, pixels.PixelHeight)
                 : $"{CaptureBarLine.ModeName(_session.Request.Mode)} · {pixels.PixelWidth} × {pixels.PixelHeight}";
             if (result.Copied || result.Saved)
                 FeedbackPicture = await CaptureFiles.OnWorkerAsync(() => CaptureFiles.Thumbnail(pixels));
@@ -452,7 +514,7 @@ internal sealed class CaptureEditor : IDisposable
         CommitText(); InvalidateOutput(); _busy = true;
         try
         {
-            var pixels = _draft.Flatten();
+            var pixels = Pixels();
             await CaptureFiles.OnWorkerAsync(() => { CaptureFiles.SaveAs(pixels, path, type, true); return true; });
             if (_disposed) return;
             FeedbackSource = Path.GetFileName(path);
@@ -462,7 +524,7 @@ internal sealed class CaptureEditor : IDisposable
             {
                 if (_model.Settings.History)
                 {
-                    await CaptureFiles.OnWorkerAsync(() => { _cancel.Token.ThrowIfCancellationRequested(); _store.Put(_id, pixels, DateTimeOffset.Now, path); return true; });
+                    await CaptureFiles.OnWorkerAsync(() => { _cancel.Token.ThrowIfCancellationRequested(); _store.Put(_id, pixels, DateTimeOffset.Now, path, ScrollingResult ? RecentKinds.Scrolling : null); return true; });
                     if (!_disposed) _model.RefreshRecent();
                 }
                 if (!_disposed) _feedback("Saved", false);
