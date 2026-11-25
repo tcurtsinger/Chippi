@@ -104,6 +104,22 @@ public static class IslandGeometry
     }
 
     /// <summary>
+    /// The panel grown down out of the Mac-style desktop's notch (docs/mac-style/brief.md): its top edge is the notch's,
+    /// centered on it, and kept 8 inside the work area across; fitted to the room below the notch.
+    /// </summary>
+    public static Rect NotchPanelRect(Rect notch, Rect work, double scale, double height = IslandPage.Height)
+    {
+        double inset = Gap * scale;
+        double fit = Math.Min(scale, Math.Min(
+            Math.Max(1, work.Width - 2 * inset) / IslandPage.Width,
+            Math.Max(1, work.Bottom - inset - notch.Top) / IslandPage.Height));
+        var size = new Size(IslandPage.Width * fit, height * fit);
+        double x = notch.Left + notch.Width / 2 - size.Width / 2;
+        x = Math.Clamp(x, work.Left + inset, Math.Max(work.Left + inset, work.Right - inset - size.Width));
+        return new Rect(new Point(x, notch.Top), size);
+    }
+
+    /// <summary>
     /// The open panel's top-left: the widget becomes the panel, so the panel's corner is the puck's
     /// outer corner (a bottom-right puck shares its right and bottom edges with the panel, and the bar,
     /// which grows from the puck, shares them too), then kept 8px inside the work area.

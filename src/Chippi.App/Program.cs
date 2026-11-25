@@ -50,10 +50,18 @@ public static class Program
                 // VB-CABLE itself is never removed.
                 try { Chippi.Features.Sound.Processing.MicProcessingModule.RestoreOnUninstall(System.IO.Path.Combine(Chippi.Core.Modules.ModuleServices.DefaultDataRoot, Chippi.Features.Sound.Processing.MicProcessingModule.Id)); }
                 catch (Exception ex) { Log.Warn("Uninstall: restoring the default mic failed", ex); }
+                // The Mac-style desktop's hidden taskbar comes back, with the user's own auto-hide setting.
+                Chippi.Features.MacDesktop.Shell.TaskbarTakeover.Restore();
             })
             .Run();
 
         App.LeaveInstallFolder();
+
+        // Chippi.exe --restore gives the taskbar back at once, even with Chippi stuck or gone; a running Chippi then hears the
+        // verb and turns the Mac-style desktop off. Dev profiles never touch the real taskbar.
+        if (Environment.GetCommandLineArgs().Contains("--" + Chippi.Features.MacDesktop.MacDesktopModule.RestoreVerb, StringComparer.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(ExplorerRegistration.EnvironmentProfile()))
+            Chippi.Features.MacDesktop.Shell.TaskbarTakeover.Restore();
 
         var startup = Notifications.ToastStartup.Prepare(Environment.GetCommandLineArgs()[1..]);
         if (startup.Exit) return startup.ExitCode;

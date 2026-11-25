@@ -245,6 +245,45 @@ public partial class IslandPanelWindow : Window
 
     public void Initialize() => _hwnd = IslandNative.MakeNoActivate(this);
 
+    // ----- The notch (docs/mac-style/brief.md) -----
+
+    private ResourceDictionary? _notchLook;
+
+    /// <summary>Opens out of the Mac-style desktop's notch: pure black, the dark island ink, grown down from the notch's top edge.</summary>
+    internal bool FromNotch { get; private set; }
+
+    internal void SetNotch(bool notch)
+    {
+        if (notch == FromNotch)
+            return;
+        if (IsVisible)
+            CloseIsland(immediate: true);
+        FromNotch = notch;
+        if (notch)
+            Resources.MergedDictionaries.Add(_notchLook ??= NotchLook());
+        else if (_notchLook is not null)
+            Resources.MergedDictionaries.Remove(_notchLook);
+        PointSharedKeys();
+    }
+
+    /// <summary>The dark theme with a black body and no edge or shadow, whatever the app theme.</summary>
+    internal static ResourceDictionary NotchLook()
+    {
+        var look = new ResourceDictionary();
+        look.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi.UI;component/Themes/Dark.xaml", UriKind.Absolute) });
+        look["IslandBrush"] = Brushes.Black;
+        look["IslandBorderBrush"] = Brushes.Transparent;
+        var none = new System.Windows.Media.Effects.DropShadowEffect { Opacity = 0, BlurRadius = 0, ShadowDepth = 0 };
+        none.Freeze();
+        look["IslandExpandedShadow"] = none;
+        return look;
+    }
+
+    /// <summary>The page's place: out of the notch, or on the puck's corner.</summary>
+    private Rect PanelFor(double height) => FromNotch
+        ? IslandGeometry.NotchPanelRect(_puck, _area.Work, _area.Scale, height)
+        : IslandGeometry.PanelRect(_puck, _area.Work, _area.Scale, height);
+
     /// <summary>
     /// Lays the home out once while the panel is closed, so the first open costs what later ones do: its
     /// templates, text and code paths are ready (the first open after start used to skip about 5 frames).
@@ -287,7 +326,7 @@ public partial class IslandPanelWindow : Window
     private void PointSharedKeys()
     {
         foreach (var (key, island) in SharedKeys)
-            Resources[key] = Application.Current?.TryFindResource(island);
+            Resources[key] = FromNotch ? TryFindResource(island) : Application.Current?.TryFindResource(island);
         if (TryFindResource("IslandBorderBrush") is SolidColorBrush panel)
         {
             _widgetEdge = Colors.Transparent;
@@ -1009,7 +1048,7 @@ public partial class IslandPanelWindow : Window
     {
         double s = _area.Scale;
         // The host reserves the full page so the HWND stays still when a shorter gallery opens a tool.
-        var cover = IslandGeometry.PanelRect(_puck, _area.Work, s);
+        var cover = PanelFor(IslandPage.Height);
         cover.Union(_widget);
         cover.Inflate(ShadowRoom * s, ShadowRoom * s);
         cover.Intersect(_area.Monitor);
@@ -1031,7 +1070,7 @@ public partial class IslandPanelWindow : Window
     private void Reshape(bool snap)
     {
         Card.Height = _page is null ? _grid.HomeHeight : IslandPage.Height;
-        _target = Local(IslandGeometry.PanelRect(_puck, _area.Work, _area.Scale, Card.Height));
+        _target = Local(PanelFor(Card.Height));
         double fit = _target.Width / IslandPage.Width;
         if (fit != _pageScale)
         {
@@ -1218,7 +1257,7 @@ public partial class IslandPanelWindow : Window
         Canvas.SetTop(Shape, _drawn.Y);
         Shape.Width = Math.Max(0, _drawn.Width);
         Shape.Height = Math.Max(0, _drawn.Height);
-        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = new CornerRadius(_radius);
+        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = FromNotch ? new CornerRadius(0, 0, _radius, _radius) : new CornerRadius(_radius);
         // Mid-morph the content already sits at its final place; only what's inside the shape shows.
         // The clip belongs to the card, before its transform into the shape's coordinate system.
         var inside = new Rect((_drawn.X - _target.X) / _pageScale, (_drawn.Y - _target.Y) / _pageScale,

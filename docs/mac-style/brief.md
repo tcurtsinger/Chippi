@@ -1,6 +1,6 @@
 # Mac-style desktop
 
-Requested by Travis, 2026-11-25. Answers approved the same day: every recommended default, except that the notch follows the theme and can be dragged along the top bar. Mockup: [design/mockup.html](design/mockup.html) (dark and light, clickable). Nothing is built until the mockup is approved.
+Requested by Travis, 2026-11-25. Answers approved the same day: every recommended default, except that the notch can be dragged along the top bar (its color settled later as pure black in both themes). Mockup: [design/mockup.html](design/mockup.html) (dark and light, clickable). Mockup approved by Travis the same day ("Ok great. Let's do it"); the menu bar is final as no fill and no blur, its ink following the wallpaper.
 
 An optional mode that gives Windows a top menu bar, a bottom dock and turns the widget into a notch at the top of the screen. References: [Muelle](https://github.com/crafter-station/Muelle) (MIT) for the Windows shell parts, [vorssaint-utils](https://github.com/vorssaint/vorssaint-utils) for the notch's behavior. Neither's code or assets are copied; Muelle's approach is followed and credited in `THIRD-PARTY-NOTICES.md` if any code is ported.
 

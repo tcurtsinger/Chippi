@@ -174,6 +174,11 @@ public partial class App : Application
     private async Task RouteLaunchAsync(string[] arguments)
     {
         await _modulesStarted;
+        // A start without the Mac-style desktop gives back a taskbar a crash or a sign-out left hidden.
+        if (Shell.MacDesktop is not { IsRunning: true, Settings.HidesTaskbar: true }
+            && string.Equals(Shell.Services.DataRoot, Chippi.Core.Modules.ModuleServices.DefaultDataRoot, StringComparison.OrdinalIgnoreCase)
+            && File.Exists(Chippi.Features.MacDesktop.Shell.TaskbarJournal.DefaultPath))
+            Chippi.Features.MacDesktop.Shell.TaskbarTakeover.Restore();
         Shell.ModulesStarted(arguments);
         // A hold on Print Screen no shortcut uses any more puts Windows' setting back.
         Shell.Shortcuts.Started();
@@ -270,6 +275,11 @@ public partial class App : Application
 
         // [Phase 7] Displays and brightness: replaces its catalog placeholder.
         shell.Registry.Register(new Chippi.Features.Displays.DisplaysModule());
+
+        // Mac-style desktop (docs/mac-style/brief.md). Only the real profile hides the real taskbar.
+        shell.MacDesktop = new Chippi.Features.MacDesktop.MacDesktopModule(shell.Island, () =>
+            string.Equals(shell.Services.DataRoot, Chippi.Core.Modules.ModuleServices.DefaultDataRoot, StringComparison.OrdinalIgnoreCase));
+        shell.Registry.Register(shell.MacDesktop);
 
 
         var windowLayouts = new Chippi.Features.WindowLayouts.WindowLayoutsModule(SnapDisplaySource.Connected);
