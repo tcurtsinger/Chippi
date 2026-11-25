@@ -3,6 +3,7 @@
 A Windows 11 tray app for the owner's own PC (C#, .NET 10, WPF): a widget on the desktop (a puck with the pet) that opens a panel with a page per feature (Audio, Clipboard, Scratchpad, Shelf, System, Keep awake, File organizer and more), and a Settings window. GitHub: `tcurtsinger/Chippi`.
 
 - **Design:** `DESIGN.md` wins over taste. Mockups are under `docs/**/design/`.
+- **Impeccable** (v4.11.0) is in `.claude/skills/impeccable`. `DESIGN.md` wins over its defaults. Its screenshot, live and detector tools are web-only and don't run on WPF.
 - **Plans:** `PLAN.md` has the phases. Each phase's brief is `docs/phase-N-handoff.md`, with its `behavior-spec.md`, `architecture.md` and report beside it.
 - **Hopper** (`X:\code\hopper`) is reference only. Never change it.
 
