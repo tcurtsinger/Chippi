@@ -228,7 +228,7 @@ internal sealed class MenuBarController : IDisposable
         var items = new List<BarMenuItem>
         {
             new("Minimize") { Hint = "Win+↓", Enabled = has, Run = () => Shell.Window(window, WindowAction.Minimize) },
-            new(maximized ? "Restore" : "Maximize") { Hint = "Win+↑", Enabled = has, Run = () => Shell.Window(window, maximized ? WindowAction.Restore : WindowAction.Maximize) },
+            new(maximized ? "Restore" : "Maximize") { Hint = "Win+↑", Enabled = has, Run = () => Shell.Window(window, WindowAction.Maximize) },
             BarMenuItem.Separator,
             new("Snap left") { Hint = "Win+←", Enabled = has, Run = () => Shell.Window(window, WindowAction.SnapLeft) },
             new("Snap right") { Hint = "Win+→", Enabled = has, Run = () => Shell.Window(window, WindowAction.SnapRight) },
@@ -278,8 +278,7 @@ internal sealed class MenuBarController : IDisposable
         var windows = new Chippi.UI.Actions.WindowsWindowList().Read().Where(w => w.ProcessId == pid || w.AppProcessId == pid).Reverse().ToArray();
         foreach (var window in windows)
         {
-            if (window.Minimized)
-                Shell.Window(window.Handle, WindowAction.Restore);
+            Chippi.UI.Actions.ForegroundRight.Unminimize(window.Handle);
             Native.SetWindowPos(window.Handle, 0, 0, 0, 0, 0, Native.SwpNoMove | Native.SwpNoSize | Native.SwpNoActivate | Native.SwpNoOwnerZOrder);
         }
     }

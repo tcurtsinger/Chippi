@@ -13,9 +13,7 @@ namespace Chippi.UI.Controls;
 /// <summary>Native icon ownership and transparent bitmap conversion. All reads run on an STA worker.</summary>
 internal static class WindowsAppIcons
 {
-    /// <param name="exact">The frame at exactly <paramref name="pixels"/>, scaled by Windows from the icon's nearest size,
-    /// rather than a bigger one for WPF to resample.</param>
-    internal static BitmapSource? Read(string? parsing, int pixels, bool exact = false)
+    internal static BitmapSource? Read(string? parsing, int pixels)
     {
         if (string.IsNullOrWhiteSpace(parsing)) return null;
         try
@@ -24,8 +22,8 @@ internal static class WindowsAppIcons
             var item = Item(parsing);
             try
             {
-                // BIGGERSIZEOK | ICONONLY: retain original artwork and let WPF resample it smoothly. Exact: ICONONLY alone.
-                if (((IShellItemImageFactory)item).GetImage(new Size32(pixels, pixels), exact ? 0x4 : 0x1 | 0x4, out nint bitmap) != 0 || bitmap == 0)
+                // BIGGERSIZEOK | ICONONLY: retain original artwork and let WPF resample it smoothly.
+                if (((IShellItemImageFactory)item).GetImage(new Size32(pixels, pixels), 0x1 | 0x4, out nint bitmap) != 0 || bitmap == 0)
                     return null;
                 try { return Pixels(bitmap); }
                 finally { DeleteObject(bitmap); }
@@ -121,6 +119,8 @@ internal static class WindowsAppIcons
         bool alpha = false;
         for (int i = 3; i < pixels.Length && !alpha; i += 4) alpha = pixels[i] != 0;
         if (!alpha) for (int i = 3; i < pixels.Length; i += 4) pixels[i] = 255;
+        // Windows hands icons over with straight alpha; WPF draws premultiplied.
+        else if (IconPixels.IsStraight(pixels)) IconPixels.Premultiply(pixels);
         var image = BitmapSource.Create(width, height, 96, 96, PixelFormats.Pbgra32, null, pixels, width * 4);
         image.Freeze();
         return image;

@@ -54,7 +54,32 @@ public static class DockLayout
     /// <summary>The shelf's length for icons of these sizes, with <paramref name="dividers"/> dividers of 9 (1 and 4 each side).</summary>
     public static double Length(IReadOnlyList<double> sizes, int dividers) =>
         2 * Padding + sizes.Sum() + Gap * Math.Max(0, sizes.Count - 1) + dividers * (9 + Gap);
+
+    /// <summary>How far a magnified icon reaches past the shelf's outer edge line.</summary>
+    public static double Overhang(double size) => Math.Max(0, size - (Slot - (Padding - Edge)));
+
+    /// <summary>
+    /// The room the icons take beyond their resting length while the pointer is among them: the icon under it and three
+    /// each side, along the cosine.
+    /// </summary>
+    public static double Growth(double max)
+    {
+        double growth = 0;
+        for (int i = -(int)Reach; i <= (int)Reach; i++)
+            growth += Magnified(i, max) - Icon;
+        return growth;
+    }
+
+    /// <summary>
+    /// The scale that fits a shelf <paramref name="length"/> long into <paramref name="available"/>: 1 while it fits, then
+    /// smaller, so a dock with more apps than the display is wide shrinks instead of running off both ends.
+    /// </summary>
+    public static double Fit(double length, double available) =>
+        !(length > 0) || !(available > 0) || length <= available ? 1 : Math.Max(0.4, available / length);
 }
+
+/// <summary>What a click on an app's icon does.</summary>
+public enum DockClick { Launch, Minimize, Show }
 
 /// <summary>One app in the dock: pinned, running, or both. Its windows are in z-order, the front one first.</summary>
 public sealed record DockApp(string Key, string Launch, string Path, string Name, bool Pinned, IReadOnlyList<ListedWindow> Windows)
@@ -124,6 +149,20 @@ public static class DockApps
             apps.Add(new DockApp(key, launch, front.Executable, front.App, false, own));
         }
         return apps;
+    }
+
+    /// <summary>
+    /// What a click does, with <paramref name="front"/> the window in front: an app that isn't running opens; its window in
+    /// front minimizes, as on the taskbar; otherwise its front window is shown, minimized or not.
+    /// </summary>
+    public static (DockClick Action, nint Window) OnClick(DockApp app, nint front)
+    {
+        if (!app.Running)
+            return (DockClick.Launch, 0);
+        foreach (var window in app.Windows)
+            if (window.Handle == front)
+                return (window.Minimized ? DockClick.Show : DockClick.Minimize, front); // minimized, it can still hold the keyboard
+        return (DockClick.Show, app.Windows[0].Handle);
     }
 
     /// <summary>

@@ -118,7 +118,7 @@ internal sealed class DockBackdrop : IDisposable
     public void Dispose() => _source.Dispose();
 
     /// <summary>Settings › Personalization › Colors › Transparency effects.</summary>
-    private static bool TransparencyOn()
+    internal static bool TransparencyOn()
     {
         try
         {

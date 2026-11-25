@@ -45,7 +45,7 @@ internal static class BarMenu
             PlacementTarget = anchor,
             Placement = placement,
             HorizontalOffset = horizontalOffset,
-            VerticalOffset = placement == PlacementMode.Top ? 14 : verticalOffset,
+            VerticalOffset = verticalOffset,
         };
         menu.Resources.MergedDictionaries.Add(Styles);
         menu.Style = (Style)Styles["BarContextMenuStyle"];

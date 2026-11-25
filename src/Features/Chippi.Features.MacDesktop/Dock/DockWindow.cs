@@ -27,11 +27,22 @@ namespace Chippi.Features.MacDesktop.Dock;
 /// </summary>
 internal sealed class DockWindow : Window
 {
-    /// <summary>The window's depth from its edge: the shelf, its gap, the magnified icons' growth and the name above them.</summary>
-    private const double Depth = DockLayout.Reserved + 34 + 40;
+    /// <summary>
+    /// The window's depth from its edge: the shelf, its gap, the largest magnified icon's reach past the shelf, and the name
+    /// above it with its shadow.
+    /// </summary>
+    private static readonly double Depth = DockLayout.Reserved + DockLayout.Overhang(MacDesktopSettings.MaxMagnified) + 10 + 28 + 16;
+
+    /// <summary>A clear color that still takes the pointer: a layered window passes clicks through only where it's fully clear.</summary>
+    private static readonly Brush Touchable = Frozen(Color.FromArgb(1, 0, 0, 0));
 
     private readonly DockController _dock;
     private readonly Grid _root = new();
+    private readonly Border _band = new() { Background = Touchable, Visibility = Visibility.Collapsed };
+    private DockFocus? _focus;
+    private double _fit = 1;
+    private bool _holdMagnify;
+    private bool _transparency = true;
     private readonly Border _shelf = new();
     private readonly Border _shadow = new() { IsHitTestVisible = false };
     private readonly StackPanel _row = new() { Orientation = Orientation.Horizontal };
@@ -96,7 +107,11 @@ internal sealed class DockWindow : Window
         _shadow.RenderTransform = _slide;
         _shadow.SetBinding(WidthProperty, new System.Windows.Data.Binding(nameof(ActualWidth)) { Source = _shelf });
         _shadow.SetBinding(HeightProperty, new System.Windows.Data.Binding(nameof(ActualHeight)) { Source = _shelf });
-        _shelf.SizeChanged += (_, _) => SyncBackdrop();
+        _shelf.SizeChanged += (_, _) => { SizeBand(); SyncBackdrop(); };
+        // Under everything: while the icons are magnified, the strip they grow into takes the pointer, so a click on a round
+        // icon's clear corner lands on the icon and the pointer crossing between two grown icons stays in the dock.
+        _band.RenderTransform = _slide;
+        _root.Children.Add(_band);
         _root.Children.Add(_shadow);
         _shelf.AllowDrop = true;
         _shelf.Drop += OnShelfDrop;
@@ -117,7 +132,8 @@ internal sealed class DockWindow : Window
         ThemeManager.ThemeChanged += OnThemeChanged;
 
         _root.MouseMove += (_, e) => Magnify(e.GetPosition(_row));
-        _root.MouseLeave += (_, _) => { if (!_dragging) Magnify(null); _leftAt = DateTime.UtcNow; HideLabel(); };
+        // An open menu holds the mouse, which reads as the pointer leaving: the icons stay as they are under it.
+        _root.MouseLeave += (_, _) => { if (!_dragging && !_holdMagnify) Magnify(null); _leftAt = DateTime.UtcNow; HideLabel(); };
         _root.MouseEnter += (_, _) => _leftAt = DateTime.MaxValue;
         // Files dragged over the dock grow the icons under them too, as the pointer does.
         _root.AllowDrop = true;
@@ -137,6 +153,7 @@ internal sealed class DockWindow : Window
         SourceInitialized += (_, _) =>
         {
             _hwnd = Native.MakeNoActivate(this, Hook);
+            _transparency = DockBackdrop.TransparencyOn();
             _backdrop = DockBackdrop.Create(ThemeManager.IsLight);
             ApplyTheme();
             Place();
@@ -153,6 +170,10 @@ internal sealed class DockWindow : Window
             ClosePreview();
             if (_confirm is not null)
                 _confirm.IsOpen = false;
+            if (_menu is { IsOpen: true })
+                _menu.IsOpen = false;
+            _focus?.Close();
+            _focus = null;
             _backdrop?.Dispose();
             _backdrop = null;
         };
@@ -217,6 +238,33 @@ internal sealed class DockWindow : Window
         ApplyTheme();
     }
 
+    /// <summary>
+    /// Shrinks the shelf to fit its edge when there are more apps than the display has room for, leaving room for the icons
+    /// to grow under the pointer. 1 while it fits.
+    /// </summary>
+    private void UpdateFit()
+    {
+        double extent = Horizontal ? _root.Width : _root.Height;
+        if (double.IsNaN(extent) || extent <= 0)
+            return;
+        int dividers = _tiles.Count(t => t.IsDivider);
+        var rest = Enumerable.Repeat(DockLayout.Icon, _tiles.Count - dividers).ToArray();
+        double growth = _dock.Settings.Magnify ? DockLayout.Growth(_dock.Settings.MagnifiedSize) : 0;
+        double fit = DockLayout.Fit(DockLayout.Length(rest, dividers) + 2 * DockLayout.Edge + growth, extent - 24);
+        if (fit == _fit)
+            return;
+        _fit = fit;
+        _shelf.LayoutTransform = _shadow.LayoutTransform = fit < 1 ? new ScaleTransform(fit, fit) : Transform.Identity;
+    }
+
+    /// <summary>The strip that takes the pointer while the icons are magnified: the shelf, its gap and the icons' reach.</summary>
+    private void SizeBand()
+    {
+        double reach = (DockLayout.Reserved + DockLayout.Overhang(_dock.Settings.MagnifiedSize) + 4) * _fit;
+        _band.Width = Horizontal ? _shelf.ActualWidth * _fit : reach;
+        _band.Height = Horizontal ? reach : _shelf.ActualHeight * _fit;
+    }
+
     /// <summary>Puts the window along the dock's edge of the main display and reserves its strip while it's always shown.</summary>
     public void Place()
     {
@@ -249,6 +297,8 @@ internal sealed class DockWindow : Window
         _row.Orientation = Horizontal ? Orientation.Horizontal : Orientation.Vertical;
         _shelf.HorizontalAlignment = _shadow.HorizontalAlignment = Edge switch { DockEdge.Left => HorizontalAlignment.Left, DockEdge.Right => HorizontalAlignment.Right, _ => HorizontalAlignment.Center };
         _shelf.VerticalAlignment = _shadow.VerticalAlignment = Horizontal ? VerticalAlignment.Bottom : VerticalAlignment.Center;
+        _band.HorizontalAlignment = _shelf.HorizontalAlignment;
+        _band.VerticalAlignment = _shelf.VerticalAlignment;
         _shelf.Margin = _shadow.Margin = Edge switch
         {
             DockEdge.Left => new Thickness(DockLayout.EdgeGap, 0, 0, 0),
@@ -267,7 +317,12 @@ internal sealed class DockWindow : Window
         if (Horizontal) { _shelf.Height = DockLayout.Shelf; _shelf.Width = double.NaN; }
         else { _shelf.Width = DockLayout.Shelf; _shelf.Height = double.NaN; }
         foreach (var tile in _tiles)
+        {
             tile.Orient(Edge);
+            tile.Refresh(); // the display's scale or the magnified size may have changed
+        }
+        UpdateFit();
+        SizeBand();
         if (!reserve && _shown && !PointerNear())
             SetShown(false, animate: false);
         else if (reserve && !_shown)
@@ -289,25 +344,35 @@ internal sealed class DockWindow : Window
         wanted.Add(("downloads", () => DockTile.Folder(this, "downloads", "Downloads", DockController.Downloads), _ => { }));
         wanted.Add(("bin", () => DockTile.Folder(this, "bin", "Recycle Bin", DockController.RecycleBin), _ => { }));
 
+        if (_dragging)
+            return; // the drag ends with its own refresh
         var existing = _tiles.ToDictionary(t => t.Key);
         var next = new List<DockTile>();
-        foreach (var (key, make, update) in wanted)
+        bool changed = wanted.Count != _tiles.Count;
+        for (int i = 0; i < wanted.Count; i++)
         {
+            var (key, make, update) = wanted[i];
             if (existing.TryGetValue(key, out var tile))
                 update(tile);
             else
+            {
                 tile = make();
-            tile.Orient(Edge);
+                tile.Orient(Edge);
+            }
+            changed |= i >= _tiles.Count || _tiles[i] != tile;
             next.Add(tile);
         }
-        if (_dragging)
-            return; // the drag ends with its own refresh
+        // Most reads change nothing but a dot: the row is put together again only when an app comes, goes or moves, so the
+        // icon under the pointer keeps its name, its press and its preview.
+        if (!changed)
+            return;
         _tiles.Clear();
         _tiles.AddRange(next);
         _row.Children.Clear();
         foreach (var tile in _tiles)
             _row.Children.Add(tile);
         ApplyTheme();
+        UpdateFit();
     }
 
     // ----- Magnification -----
@@ -318,6 +383,7 @@ internal sealed class DockWindow : Window
         if (_dragging)
             return;
         bool on = _dock.Settings.Magnify && pointer is { } p && OverShelf(p);
+        _band.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
         double along = pointer is { } q ? (Horizontal ? q.X : q.Y) : 0;
         double offset = 0;
         foreach (var tile in _tiles)
@@ -420,7 +486,7 @@ internal sealed class DockWindow : Window
         }
         var topLeft = _shelf.PointToScreen(new Point(1, 1));
         var bottomRight = _shelf.PointToScreen(new Point(_shelf.ActualWidth - 1, _shelf.ActualHeight - 1));
-        _backdrop.Place(_hwnd, new Rect(topLeft, bottomRight), (DockLayout.Corner - 1) * _scale);
+        _backdrop.Place(_hwnd, new Rect(topLeft, bottomRight), (DockLayout.Corner - 1) * _scale * _fit);
     }
 
     // Icons are measured against where they sit at rest, so the row doesn't chase the pointer: rest centers are offsets from
@@ -531,7 +597,30 @@ internal sealed class DockWindow : Window
         bool first = _binFull is null;
         _binFull = full;
         if (!first && _tiles.FirstOrDefault(t => t.IsBin) is { } bin)
-            bin.ReloadIcon(DockController.RecycleBin);
+            bin.ReloadIcon();
+    }
+
+    /// <summary>
+    /// Follows Windows' Transparency effects switch while the dock runs (read every 5 seconds): the blur comes and goes
+    /// with it, and the shelf's tint with the blur.
+    /// </summary>
+    private void FollowTransparency()
+    {
+        bool wanted = DockBackdrop.TransparencyOn();
+        if (wanted == _transparency)
+            return; // acts on the switch changing, so a blur Windows refused isn't asked for again every time
+        _transparency = wanted;
+        if (wanted == (_backdrop is not null))
+            return;
+        if (wanted)
+            _backdrop = DockBackdrop.Create(ThemeManager.IsLight);
+        else
+        {
+            _backdrop?.Dispose();
+            _backdrop = null;
+        }
+        ApplyTheme();
+        SyncBackdrop();
     }
 
     // ----- Empty Recycle Bin: the question, Cancel and Empty -----
@@ -540,8 +629,11 @@ internal sealed class DockWindow : Window
     {
         if (_tiles.FirstOrDefault(t => t.IsBin) is not { } bin)
             return;
-        if (_confirm is not null)
-            _confirm.IsOpen = false;
+        if (_confirm is { } open)
+        {
+            _confirm = null; // replaced, not answered: the keyboard stays held for the new one
+            open.IsOpen = false;
+        }
         var cancel = new Button { Content = "Cancel" };
         cancel.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
         var empty = new Button { Content = "Empty", Margin = new Thickness(8, 0, 0, 0) };
@@ -576,9 +668,26 @@ internal sealed class DockWindow : Window
             popup.IsOpen = false;
             _dock.EmptyRecycleBin();
         };
-        popup.Closed += (_, _) => { if (_confirm == popup) _confirm = null; };
+        card.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Escape)
+                return;
+            e.Handled = true;
+            popup.IsOpen = false;
+        };
+        popup.Closed += (_, _) =>
+        {
+            if (_confirm != popup)
+                return;
+            _confirm = null;
+            _focus?.Release();
+        };
         _confirm = popup;
+        // The question holds the keyboard while it's open, as a menu does, so Esc and a click elsewhere answer Cancel.
+        _focus ??= new DockFocus();
+        _focus.Hold(Native.Cursor(), () => popup.IsOpen = false);
         popup.IsOpen = true;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (popup.IsOpen) cancel.Focus(); });
     }
 
     // ----- Clicks, menus and drags -----
@@ -611,7 +720,7 @@ internal sealed class DockWindow : Window
             HideLabel();
             ClosePreview();
         }
-        var delta = at - _pressAt;
+        var delta = (at - _pressAt) / _fit; // the icon moves in the shelf's own units, which a crowded shelf scales down
         bool away = Away(at);
         tile.Lift(Horizontal ? new Vector(delta.X, Math.Min(0, delta.Y)) : new Vector(Edge == DockEdge.Left ? Math.Max(0, delta.X) : Math.Min(0, delta.X), delta.Y), away);
         OpenGap(tile, away ? null : Landing(tile, at));
@@ -705,6 +814,25 @@ internal sealed class DockWindow : Window
         _dock.SettingsChanged();
     }
 
+    /// <summary>
+    /// The pressed icon lost the mouse without a release (another app came forward mid-drag): the drag is dropped where it
+    /// started, so the dock isn't left waiting for a release that never comes.
+    /// </summary>
+    internal void CaptureLost(DockTile tile)
+    {
+        if (_pressed != tile)
+            return;
+        _pressed = null;
+        if (!_dragging)
+            return;
+        _dragging = false;
+        tile.Lift(default, false);
+        foreach (var other in _tiles)
+            other.Unshift();
+        HideLabel();
+        _dock.SettingsChanged();
+    }
+
     /// <summary>Where among the pins a program dropped from Explorer at <paramref name="at"/> goes.</summary>
     private int PinIndexAt(Point at)
     {
@@ -716,37 +844,62 @@ internal sealed class DockWindow : Window
     {
         ClosePreview();
         HideLabel();
-        if (_menu is { IsOpen: true })
-            _menu.IsOpen = false;
+        _previewDelay?.Stop();
+        if (_menu is { IsOpen: true } replaced)
+        {
+            _menu = null; // replaced, not closed: the keyboard stays held for the new one
+            replaced.IsOpen = false;
+        }
         var placement = Edge switch { DockEdge.Left => PlacementMode.Right, DockEdge.Right => PlacementMode.Left, _ => PlacementMode.Top };
-        // The dock never takes the foreground, and a menu in a window that hasn't it can't hold the mouse: a click elsewhere
-        // never reached it and Esc went to the app in front. The menu takes the foreground while it's open, and hands it
-        // back when it closes without a click elsewhere.
-        nint before = Native.GetForegroundWindow();
-        _menu = BarMenu.Open(tile, items, placement, horizontalOffset: Horizontal ? -12 : 0, verticalOffset: Horizontal ? 0 : -16, closed: () =>
+        // The dock never takes the foreground, and a menu in a process that hasn't it can't close on a click elsewhere or
+        // on Esc. DockFocus takes the keyboard before the menu opens, as an app's window holds it for the app's own menus,
+        // and the menu then closes as any menu does. Windows refusing (rare, right after a click) leaves a menu that works
+        // with the mouse; only then is a press elsewhere watched for.
+        _focus ??= new DockFocus();
+        ContextMenu? opened = null;
+        bool held = _focus.Hold(Native.Cursor(), () => { if (opened is { IsOpen: true }) opened.IsOpen = false; });
+        // Above the icon as it is now, grown or not, 8 clear of it; the icons stay as they are while it's open, so it isn't
+        // left hanging over a gap. (The menu's own card sits 16 inside its bottom edge, for its shadow.)
+        double above = (DockLayout.Slot - (DockLayout.Padding - DockLayout.Edge) - tile.Size - 8) * _fit + 16;
+        _holdMagnify = true;
+        void Closed()
         {
-            nint now = Native.GetForegroundWindow();
-            Native.GetWindowThreadProcessId(now, out uint owner);
-            if (before != 0 && Native.IsWindow(before) && (now == 0 || owner == (uint)Environment.ProcessId))
-                Chippi.UI.Actions.ForegroundRight.Take(before);
-        });
-        var opened = _menu;
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+            if (opened is not null && _menu != opened)
+                return;
+            _menu = null;
+            _holdMagnify = false;
+            _focus?.Release();
+            // The pointer may be anywhere by now: the icons rest unless it's still on the dock.
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { if (!_root.IsMouseOver && !_dragging && !_holdMagnify) Magnify(null); });
+        }
+        try
         {
-            if (opened.IsOpen && PresentationSource.FromVisual(opened) is System.Windows.Interop.HwndSource source)
-                Chippi.UI.Actions.ForegroundRight.Take(source.Handle);
-        });
+            opened = BarMenu.Open(tile, items, placement, horizontalOffset: Horizontal ? -12 : 0, verticalOffset: Horizontal ? above : -16, closed: Closed);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            Chippi.Core.Diagnostics.Log.Warn("Mac-style desktop: a dock menu didn't open", ex);
+            Closed();
+            return;
+        }
+        if (!opened.IsOpen)
+            return; // it couldn't open: its closing has already let go
+        _menu = opened;
+        _menuWatched = !held;
         _menuPressed = Pressing();
     }
 
-    private bool _menuPressed;
+    private bool _menuPressed, _menuWatched;
 
     private static bool Pressing() => (Native.GetAsyncKeyState(0x01) & 0x8000) != 0 || (Native.GetAsyncKeyState(0x02) & 0x8000) != 0;
 
-    /// <summary>A press outside the open menu closes it, wherever the foreground is.</summary>
+    /// <summary>
+    /// Only for a menu that opened without the keyboard (Windows refused it): a press outside it closes it, which its own
+    /// hold on the mouse can't see from a process that isn't in front.
+    /// </summary>
     private void WatchMenu()
     {
-        if (_menu is not { IsOpen: true } menu)
+        if (!_menuWatched || _menu is not { IsOpen: true } menu)
             return;
         bool pressing = Pressing();
         if (pressing && !_menuPressed && PresentationSource.FromVisual(menu) is not null)
@@ -792,16 +945,27 @@ internal sealed class DockWindow : Window
         var anchor = tile.PointToScreen(new Point(tile.ActualWidth / 2, -grown));
         if (Edge != DockEdge.Bottom)
             anchor = tile.PointToScreen(new Point(Edge == DockEdge.Left ? tile.ActualWidth + grown : -grown, tile.ActualHeight / 2));
-        _preview = new DockPreview(app, anchor, Edge, _scale, window => { ClosePreview(); _dock.Activate(window); });
+        var preview = new DockPreview(app, anchor, Edge, _scale, window => { ClosePreview(); _dock.Activate(window); });
+        // It closes itself when the pointer leaves it: forgotten here too, or the icon keeps its name hidden and an
+        // auto-hiding dock stays up.
+        preview.Closed += (_, _) =>
+        {
+            if (_preview != preview)
+                return;
+            _preview = null;
+            _previewTile = null;
+        };
+        _preview = preview;
         _previewTile = tile;
-        _preview.Show();
+        preview.Show();
     }
 
     private void ClosePreview()
     {
-        _preview?.Close();
+        var preview = _preview;
         _preview = null;
         _previewTile = null;
+        preview?.Close();
     }
 
     // ----- Drops from Explorer -----
@@ -835,7 +999,10 @@ internal sealed class DockWindow : Window
             return;
         WatchMenu();
         if (_tick % 50 == 0)
+        {
             CheckBin();
+            FollowTransparency();
+        }
         if (_tick % 10 == 0 && _backdrop is not null)
             _backdrop.Restack(_hwnd); // another topmost window may have come between them
         if (++_tick % 5 == 0)

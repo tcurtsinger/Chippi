@@ -46,6 +46,9 @@ internal sealed class DockTile : Grid
         _menu = menu;
         Background = Brushes.Transparent; // the whole slot takes the pointer, not only the icon's opaque pixels
         AppIcon.Configure(_image);
+        // Its frames are already scaled to the sizes it rests at; in between it's drawn a little smaller than one, which
+        // plain filtering does well and at no cost per frame.
+        RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.Linear);
         _art.Children.Add(_image);
         _art.RenderTransform = _lift;
         Children.Add(_art);
@@ -59,7 +62,7 @@ internal sealed class DockTile : Grid
         MouseLeftButtonDown += (_, e) => { e.Handled = true; dock.Pressed(this, e); };
         MouseMove += (_, e) => dock.Moved(this, e);
         MouseLeftButtonUp += (_, e) => { e.Handled = true; dock.Released(this, e); };
-        LostMouseCapture += (_, _) => SetPressed(false);
+        LostMouseCapture += (_, _) => { SetPressed(false); dock.CaptureLost(this); };
         MouseRightButtonUp += (_, e) =>
         {
             e.Handled = true;
@@ -154,23 +157,52 @@ internal sealed class DockTile : Grid
     protected override Geometry GetLayoutClip(Size layoutSlotSize) => null!;
 
     private BitmapSource? _rest, _large;
+    private string? _icon;
+    private int _restPixels, _largePixels, _loads;
+    private bool _monogram;
 
-    /// <summary>
-    /// Two frames: the icon's own at the resting size in device pixels, sharp, and a 256-pixel one for while it's magnified,
-    /// which a resting 48 would only blur.
-    /// </summary>
     private void Load(string path)
     {
-        int rest = (int)Math.Round(DockLayout.Icon * (_dock?.Scale ?? 1));
-        var small = AppIcon.LoadExactAsync(path, rest);
-        var large = AppIcon.LoadAsync(path, 192);
+        _icon = path;
+        Reload(changed: false);
+    }
+
+    /// <summary>The frames read again where the display's scale or the magnified size has changed.</summary>
+    public void Refresh() => Reload(changed: false);
+
+    /// <summary>
+    /// Two frames of the one drawing (the icon's largest artwork, AppIcon.LoadFittedAsync): one at the resting size in
+    /// device pixels and one at the magnified size, each scaled once. Between the two it's only ever drawn a little
+    /// smaller than a frame, so it stays sharp at rest and at full size and the drawing never changes as it grows.
+    /// </summary>
+    private void Reload(bool changed)
+    {
+        if (_icon is not { } path)
+            return;
+        double scale = _dock?.Scale ?? 1;
+        double grown = _dock is { Controller.Settings: { Magnify: true } settings } ? Math.Max(DockLayout.Icon, settings.MagnifiedSize) : DockLayout.Icon;
+        int rest = (int)Math.Round(DockLayout.Icon * scale), large = (int)Math.Round(grown * scale);
+        if (!changed && rest == _restPixels && large == _largePixels)
+            return;
+        (_restPixels, _largePixels) = (rest, large);
+        if (changed)
+            AppIcon.Forget(path);
+        var small = AppIcon.LoadFittedAsync(path, rest);
+        var big = large == rest ? small : AppIcon.LoadFittedAsync(path, large);
+        int load = ++_loads;
         _ = Paint();
 
         async Task Paint()
         {
-            _rest = await small;
+            var first = await small;
+            if (load != _loads)
+                return;
+            _rest = first ?? _rest;
             ShowFrame();
-            _large = await large;
+            var second = await big;
+            if (load != _loads)
+                return;
+            _large = second ?? _large;
             ShowFrame();
             if (_rest is null && _large is null && _image.Source is null)
                 ShowMonogram();
@@ -186,6 +218,9 @@ internal sealed class DockTile : Grid
 
     private void ShowMonogram()
     {
+        if (_monogram)
+            return;
+        _monogram = true;
         string letter = _name.Length > 0 ? _name[..1].ToUpperInvariant() : "?";
         _art.Children.Insert(0, Scaled(new Border
         {
@@ -219,25 +254,8 @@ internal sealed class DockTile : Grid
         Dot.Visibility = Visibility.Visible;
     }
 
-    /// <summary>The icon read again (the Recycle Bin's, as it fills and empties).</summary>
-    public async void ReloadIcon(string path)
-    {
-        int rest = (int)Math.Round(DockLayout.Icon * (_dock?.Scale ?? 1));
-        var (small, large) = await Task.Run(() =>
-        {
-            BitmapSource? a = null, b = null;
-            var thread = new Thread(() => { a = AppIcon.ReadExact(path, rest); b = AppIcon.Read(path, 192); });
-            thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
-            return (a, b);
-        });
-        if (small is null && large is null)
-            return;
-        (_rest, _large) = (small, large);
-        _image.Source = null;
-        ShowFrame();
-    }
+    /// <summary>The icon read again (the Recycle Bin's, as it fills and empties). The old one stays until the new one is in.</summary>
+    public void ReloadIcon() => Reload(changed: true);
 
     public void Update(DockApp app)
     {
@@ -308,7 +326,6 @@ internal sealed class DockTile : Grid
         };
     }
 
-    /// <summary>Follows a drag by <paramref name="offset"/>; faded while it's far enough off the shelf to come off it.</summary>
     /// <summary>Moves the tile <paramref name="offset"/> along the shelf, out of the way of a dragged icon's landing place.</summary>
     public void Shift(Vector offset)
     {
@@ -332,6 +349,7 @@ internal sealed class DockTile : Grid
         _shift.X = _shift.Y = 0;
     }
 
+    /// <summary>Follows a drag by <paramref name="offset"/>; faded while it's far enough off the shelf to come off it.</summary>
     public void Lift(Vector offset, bool away)
     {
         _lift.X = offset.X;

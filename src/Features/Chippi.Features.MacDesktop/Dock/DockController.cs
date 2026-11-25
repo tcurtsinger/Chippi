@@ -30,6 +30,8 @@ internal sealed class DockController : IDisposable
     private readonly Native.WinEventProc _proc;
     private readonly List<nint> _hooks = [];
     private readonly Dictionary<nint, string> _appIds = [];
+    private readonly Dictionary<nint, int> _appIdMisses = [];
+    private readonly HashSet<nint> _known = [];
     private readonly List<string> _seen = [];
     private DockWindow? _window;
     private IInputRegistration? _keys;
@@ -53,11 +55,28 @@ internal sealed class DockController : IDisposable
         _dispatcher = Dispatcher.CurrentDispatcher;
         _settle = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, (_, _) => { _settle!.Stop(); ReadWindows(); }, _dispatcher);
         _settle.Stop();
-        _proc = (_, _, window, objectId, _, _, _) =>
+        _proc = (_, type, window, objectId, _, _, _) =>
         {
-            if (objectId == 0 && window != 0 && !_settle.IsEnabled)
+            if (objectId == 0 && window != 0 && !_settle.IsEnabled && Matters(type, window))
                 _settle.Start();
         };
+    }
+
+    /// <summary>
+    /// Whether an event can change the dock. The hooks hear every window of every app: tooltips, menus, child windows and
+    /// each change of a title. Only an app's own window appearing, leaving or coming forward moves anything here.
+    /// </summary>
+    private bool Matters(uint type, nint window)
+    {
+        if (type is Native.EventSystemForeground or Native.EventSystemMinimizeStart or Native.EventSystemMinimizeEnd)
+            return true;
+        if (_known.Contains(window))
+            return type != Native.EventObjectNameChange; // a title is read when a menu or preview opens, not kept
+        if (type is Native.EventObjectDestroy or Native.EventObjectHide)
+            return false; // not one the dock shows
+        // Shown or named: a window the dock doesn't have yet (one with no title isn't listed until it gets one).
+        return Native.GetAncestor(window, 2 /* GA_ROOT */) == window
+            && (Native.GetWindowLongPtr(window, Native.GwlExStyle) & (nint)Native.WsExToolWindow) == 0;
     }
 
     public void Start()
@@ -113,20 +132,33 @@ internal sealed class DockController : IDisposable
             return;
         var windows = _list.Read();
         var pins = (Settings.Pins ?? []).Select(DockPins.Read).ToArray();
-        foreach (var gone in _appIds.Keys.Where(h => windows.All(w => w.Handle != h)).ToArray())
+        _known.Clear();
+        foreach (var window in windows)
+            _known.Add(window.Handle);
+        foreach (var gone in _appIds.Keys.Where(h => !_known.Contains(h)).ToArray())
             _appIds.Remove(gone);
+        foreach (var gone in _appIdMisses.Keys.Where(h => !_known.Contains(h)).ToArray())
+            _appIdMisses.Remove(gone);
         Apps = DockApps.KeepOrder(DockApps.Compose(pins, windows, AppId), _seen);
         _window?.SetApps(Apps);
     }
 
-    /// <summary>A window's AppUserModelID, kept once read; one that has none yet is read again next time (apps set it late).</summary>
+    /// <summary>
+    /// A window's AppUserModelID, kept once read. One that has none yet is read again the next few times (apps set it
+    /// late), then taken to have none, so a desktop app's windows aren't asked on every read.
+    /// </summary>
     private string? AppId(ListedWindow window)
     {
         if (_appIds.TryGetValue(window.Handle, out var known))
             return known;
+        int misses = _appIdMisses.GetValueOrDefault(window.Handle);
+        if (misses >= 20)
+            return null;
         var id = ShellProperties.AppId(window);
         if (id is not null)
             _appIds[window.Handle] = id;
+        else
+            _appIdMisses[window.Handle] = misses + 1;
         return id;
     }
 
@@ -144,27 +176,40 @@ internal sealed class DockController : IDisposable
     /// <summary>Not running, it opens; running, it comes to the front; its window in front minimizes, as on the taskbar.</summary>
     public void Click(DockApp app)
     {
-        if (!app.Running)
+        var (action, window) = DockApps.OnClick(app, Native.GetForegroundWindow());
+        switch (action)
         {
-            Launch(app.Launch);
-            return;
+            case DockClick.Minimize:
+                _shell.Window(window, WindowAction.Minimize);
+                break;
+            case DockClick.Show:
+                Activate(window);
+                break;
+            // Its windows may all be on another desktop: Windows goes there rather than opening a second copy.
+            case DockClick.Launch when Everywhere(app) is { Running: true } away:
+                Activate(away.Windows[0].Handle);
+                break;
+            default:
+                Launch(app.Launch);
+                break;
         }
-        nint front = Native.GetForegroundWindow();
-        if (app.Windows.FirstOrDefault(w => w.Handle == front) is { } inFront)
-        {
-            _shell.Window(inFront.Handle, WindowAction.Minimize);
-            return;
-        }
-        Activate(app.Windows[0].Handle);
     }
 
-    /// <summary>Brings the window to the front, restored if it was minimized. The click on the dock earns the foreground.</summary>
+    /// <summary>
+    /// Brings the window to the front, un-minimized if it was. The dock never takes the foreground, so Windows may refuse it
+    /// the right to give it away; ForegroundRight earns it.
+    /// </summary>
     public void Activate(nint window)
     {
-        if (Native.IsIconic(window))
-            _shell.Window(window, WindowAction.Restore);
-        // The dock never takes the foreground, so Windows may refuse it the right to give it away; this earns it.
-        Chippi.UI.Actions.ForegroundRight.Take(window);
+        if (!ForegroundRight.Show(window))
+            Log.Warn("Mac-style desktop: a window didn't come to the front");
+    }
+
+    /// <summary>The app with its windows on every desktop, matched as the dock matches them; null when it has none.</summary>
+    private DockApp? Everywhere(DockApp app)
+    {
+        var pins = (Settings.Pins ?? []).Select(DockPins.Read).ToArray();
+        return DockApps.Compose(pins, _list.Read(includeOtherDesktops: true), AppId).FirstOrDefault(a => a.Key == app.Key);
     }
 
     public void Launch(string target, string arguments = "")
@@ -297,10 +342,13 @@ internal sealed class DockController : IDisposable
             _shell.Window(window.Handle, WindowAction.Close);
     }
 
-    /// <summary>Closes every window the program has, on every desktop.</summary>
+    /// <summary>
+    /// Closes every window the app has, on every desktop: the windows the dock shows under its icon, matched by its ID or
+    /// its program as they are there, not by one program's path (a pin's launcher isn't the program its windows run).
+    /// </summary>
     private void Quit(DockApp app)
     {
-        foreach (var window in _list.Read(includeOtherDesktops: true).Where(w => string.Equals(w.Executable, app.Path, StringComparison.OrdinalIgnoreCase)))
+        foreach (var window in (Everywhere(app) ?? app).Windows)
             _shell.Window(window.Handle, WindowAction.Close);
     }
 
@@ -376,24 +424,51 @@ internal sealed class DockController : IDisposable
             _window?.ShowStatus("Move failed");
     }
 
-    /// <summary>Files dropped on the Recycle Bin go to it, as Explorer's Delete does.</summary>
-    public void Recycle(IReadOnlyList<string> paths)
+    /// <summary>
+    /// Files dropped on the Recycle Bin go to it, as Explorer's Delete does. One that can't be recycled (too big for the
+    /// bin, or on a drive without one) is never deleted for good without Windows asking first. Off the UI thread: a large
+    /// folder takes a while.
+    /// </summary>
+    public async void Recycle(IReadOnlyList<string> paths)
     {
         if (paths.Count == 0)
             return;
-        var operation = new FileOperation
+        string from = string.Join('\0', paths) + "\0\0";
+        var (result, aborted) = await OnSta(() =>
         {
-            Function = 0x3, // FO_DELETE
-            From = string.Join('\0', paths) + "\0\0",
-            Flags = 0x40 | 0x400 | 0x10, // FOF_ALLOWUNDO | FOF_NOERRORUI | FOF_NOCONFIRMATION
-        };
-        int result = SHFileOperation(ref operation);
-        if (result != 0 || operation.Aborted)
+            var operation = new FileOperation
+            {
+                Function = 0x3, // FO_DELETE
+                From = from,
+                Flags = 0x40 | 0x400 | 0x10 | 0x4000, // FOF_ALLOWUNDO | FOF_NOERRORUI | FOF_NOCONFIRMATION | FOF_WANTNUKEWARNING
+            };
+            int code = SHFileOperation(ref operation);
+            return (code, operation.Aborted);
+        });
+        if (_disposed)
+            return;
+        // Declining Windows' question (1223, or the operation's own 0x75) is an answer, not a failure.
+        if (result != 0 && !aborted && result is not (1223 or 0x75))
         {
             Log.Warn($"Mac-style desktop: recycling failed ({result})");
             _window?.ShowStatus("Delete failed");
         }
         _window?.CheckBin();
+    }
+
+    /// <summary>Runs shell work on its own STA thread, which Windows' file operations need for their questions.</summary>
+    private static Task<T> OnSta<T>(Func<T> work)
+    {
+        var done = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try { done.SetResult(work()); }
+            catch (Exception ex) { done.SetException(ex); }
+        })
+        { IsBackground = true, Name = "Chippi dock file operation" };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        return done.Task;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

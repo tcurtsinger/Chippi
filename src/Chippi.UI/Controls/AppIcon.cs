@@ -30,32 +30,46 @@ public static class AppIcon
     /// <summary>Read on an STA worker, never on the UI thread. Callers may own their request cache.</summary>
     public static BitmapSource? Read(string? parsing, int pixels = 64) => WindowsAppIcons.Read(parsing, SourcePixels(pixels));
 
-    /// <summary>The <see cref="LoadExactAsync"/> frame, read here: on an STA worker, never on the UI thread.</summary>
-    public static BitmapSource? ReadExact(string? parsing, int pixels) => WindowsAppIcons.Read(parsing, Math.Clamp(pixels, 16, 256), exact: true);
-
     /// <summary>A bounded window-icon fallback. Physical display size determines the DPI hint.</summary>
     public static BitmapSource? ReadWindow(nint window, int pixels) => WindowsAppIcons.ReadWindow(window, pixels);
 
     public static Task<BitmapSource?> LoadAsync(string? parsing, int pixels = 64) => Load(parsing, SourcePixels(pixels));
 
     /// <summary>
-    /// The frame Windows draws at exactly <paramref name="pixels"/> device pixels: an icon's own hinted small size where it
-    /// has one, which stays sharp where a 256-pixel frame scaled down to it goes soft (the dock's icons at rest).
+    /// The icon's largest artwork, trimmed of its clear margins and scaled once to exactly <paramref name="pixels"/> device
+    /// pixels (<see cref="IconPixels.Fit"/>): every size of one icon is the same drawing, and icons drawn small inside
+    /// their frame come out the size of the ones that fill it (the dock).
     /// </summary>
-    public static Task<BitmapSource?> LoadExactAsync(string? parsing, int pixels) => Load(parsing, -Math.Clamp(pixels, 16, 256));
+    public static Task<BitmapSource?> LoadFittedAsync(string? parsing, int pixels)
+    {
+        pixels = Math.Clamp(pixels, 16, 256);
+        return Load(parsing, -pixels, () => IconPixels.Fit(WindowsAppIcons.Read(parsing, 256), pixels));
+    }
 
-    /// <summary>A negative <paramref name="source"/> asks for exactly that many pixels (cached apart from the larger frames).</summary>
-    private static Task<BitmapSource?> Load(string? parsing, int source)
+    /// <summary>Drops what's kept of an icon that has changed (the Recycle Bin's, as it fills and empties).</summary>
+    public static void Forget(string? parsing)
+    {
+        if (string.IsNullOrWhiteSpace(parsing)) return;
+        string name = parsing.ToUpperInvariant();
+        lock (Gate)
+            foreach (var key in Cache.Keys.Where(key => key.Item1 == name).ToArray())
+                Cache.Remove(key);
+    }
+
+    private static Task<BitmapSource?> Load(string? parsing, int source) => Load(parsing, source, () => WindowsAppIcons.Read(parsing, source));
+
+    /// <summary>A negative <paramref name="size"/> is a fitted size (cached apart from the source frames).</summary>
+    private static Task<BitmapSource?> Load(string? parsing, int size, Func<BitmapSource?> read)
     {
         if (string.IsNullOrWhiteSpace(parsing)) return Task.FromResult<BitmapSource?>(null);
-        var key = (parsing.ToUpperInvariant(), source);
+        var key = (parsing.ToUpperInvariant(), size);
         lock (Gate)
         {
             if (Cache.TryGetValue(key, out var known)) return known;
             if (Cache.Count >= 256)
                 foreach (var old in Cache.Where(pair => pair.Value.IsCompleted).Select(pair => pair.Key).Take(64).ToArray())
                     Cache.Remove(old);
-            return Cache[key] = Run(() => WindowsAppIcons.Read(parsing, Math.Abs(source), exact: source < 0));
+            return Cache[key] = Run(read);
         }
     }
 

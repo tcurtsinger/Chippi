@@ -27,6 +27,25 @@ public static partial class ForegroundRight
         return SetForegroundWindow(hwnd) && GetForegroundWindow() == hwnd;
     }
 
+    /// <summary>
+    /// Brings another app's window to the front: un-minimized first, then given the foreground. Not Snap's Restore
+    /// (<c>WindowAction.Restore</c>), which puts a snapped window back where it was and refuses any other.
+    /// </summary>
+    public static bool Show(nint hwnd)
+    {
+        if (hwnd == 0 || !IsWindow(hwnd))
+            return false;
+        Unminimize(hwnd);
+        return Take(hwnd);
+    }
+
+    /// <summary>Un-minimizes the window where it is in the z-order. Posted, so a busy app never holds the caller.</summary>
+    public static void Unminimize(nint hwnd)
+    {
+        if (hwnd != 0 && IsIconic(hwnd))
+            ShowWindowAsync(hwnd, 9); // SW_RESTORE
+    }
+
     private static void Tap(ushort vk)
     {
         Input[] inputs =
@@ -46,5 +65,8 @@ public static partial class ForegroundRight
 
     [LibraryImport("user32.dll")] private static partial nint GetForegroundWindow();
     [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static partial bool SetForegroundWindow(nint hwnd);
+    [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static partial bool IsWindow(nint hwnd);
+    [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static partial bool IsIconic(nint hwnd);
+    [LibraryImport("user32.dll")][return: MarshalAs(UnmanagedType.Bool)] private static partial bool ShowWindowAsync(nint hwnd, int command);
     [LibraryImport("user32.dll")] private static partial uint SendInput(uint count, [In] Input[] inputs, int size);
 }
