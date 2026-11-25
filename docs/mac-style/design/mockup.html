@@ -10,7 +10,7 @@ body{margin:0;font-size:14px}
   --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(190,160,255,.75),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(150,200,255,.7),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(245,170,230,.55),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(150,215,245,.6),transparent 70%),linear-gradient(160deg,#F1EDFB,#E9F0FB);
   --bar:rgba(246,246,248,.66);--bartx:#1A1A1A;--bartx2:#3A3A3A;--barhov:rgba(0,0,0,.07);
   --menu:rgba(246,246,248,.94);--menub:rgba(0,0,0,.09);--menutx:#1A1A1A;--menutx3:#707070;--menusel:linear-gradient(135deg,#8F5CFF,#5B86FF);--menuselTx:#FFFFFF;--menushadow:0 12px 32px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.08);
-  --notch:rgba(245,245,246,.97);--notchb:rgba(0,0,0,.08);--notchshadow:0 6px 18px rgba(0,0,0,.13),0 1px 3px rgba(0,0,0,.08);
+  --notch:rgba(255,255,255,.5);--notchopen:rgba(252,252,254,.8);--notchb:rgba(255,255,255,.75);--notchshadow:0 6px 18px rgba(60,40,120,.10),0 1px 3px rgba(0,0,0,.06);--guide:linear-gradient(90deg,#8F5CFF,#5B86FF);
   --ntx:#1A1A1A;--ntx2:#4A4A4A;--ntx3:#707070;--tile:rgba(0,0,0,.035);--tileh:rgba(0,0,0,.075);--hair:rgba(0,0,0,.08);
   --ac:#7444F0;--acfill:linear-gradient(135deg,#8F5CFF,#5B86FF);--onac:#FFFFFF;--actint:rgba(116,68,240,.11);--agent:#C8613A;--track:rgba(0,0,0,.25);--knob:#FFFFFF;
   --dock:rgba(255,255,255,.42);--dockb:rgba(255,255,255,.7);--dockshadow:0 10px 30px rgba(60,40,120,.18);--dot:#3A3A3A;--tip:rgba(246,246,248,.94);
@@ -22,7 +22,7 @@ body{margin:0;font-size:14px}
   --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);
   --bar:rgba(30,30,34,.55);--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.10);
   --menu:rgba(40,40,44,.94);--menub:rgba(255,255,255,.09);--menutx:#FFFFFF;--menutx3:#9A9A9A;--menusel:linear-gradient(135deg,#B78FFF,#82AEFF);--menuselTx:#170F2E;--menushadow:0 12px 32px rgba(0,0,0,.5),0 1px 4px rgba(0,0,0,.3);
-  --notch:#000000;--notchb:transparent;--notchshadow:none;
+  --notch:#000000;--notchopen:#000000;--notchb:transparent;--notchshadow:none;--guide:linear-gradient(90deg,#B78FFF,#82AEFF);
   --ntx:#FFFFFF;--ntx2:#C9C9C9;--ntx3:#9A9A9A;--tile:rgba(255,255,255,.07);--tileh:rgba(255,255,255,.12);--hair:rgba(255,255,255,.09);
   --ac:#B79CFF;--acfill:linear-gradient(135deg,#B78FFF,#82AEFF);--onac:#170F2E;--actint:rgba(183,156,255,.16);--agent:#E8875B;--track:rgba(255,255,255,.3);--knob:#454545;
   --dock:rgba(40,40,46,.45);--dockb:rgba(255,255,255,.13);--dockshadow:0 10px 30px rgba(0,0,0,.45);--dot:#E6E6E6;--tip:rgba(40,40,44,.94);
@@ -33,7 +33,7 @@ body{margin:0;font-size:14px}
   --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);
   --bar:rgba(30,30,34,.55);--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.10);
   --menu:rgba(40,40,44,.94);--menub:rgba(255,255,255,.09);--menutx:#FFFFFF;--menutx3:#9A9A9A;--menusel:linear-gradient(135deg,#B78FFF,#82AEFF);--menuselTx:#170F2E;--menushadow:0 12px 32px rgba(0,0,0,.5),0 1px 4px rgba(0,0,0,.3);
-  --notch:#000000;--notchb:transparent;--notchshadow:none;
+  --notch:#000000;--notchopen:#000000;--notchb:transparent;--notchshadow:none;--guide:linear-gradient(90deg,#B78FFF,#82AEFF);
   --ntx:#FFFFFF;--ntx2:#C9C9C9;--ntx3:#9A9A9A;--tile:rgba(255,255,255,.07);--tileh:rgba(255,255,255,.12);--hair:rgba(255,255,255,.09);
   --ac:#B79CFF;--acfill:linear-gradient(135deg,#B78FFF,#82AEFF);--onac:#170F2E;--actint:rgba(183,156,255,.16);--agent:#E8875B;--track:rgba(255,255,255,.3);--knob:#454545;
   --dock:rgba(40,40,46,.45);--dockb:rgba(255,255,255,.13);--dockshadow:0 10px 30px rgba(0,0,0,.45);--dot:#E6E6E6;--tip:rgba(40,40,44,.94);
@@ -95,10 +95,13 @@ header.top p{margin:2px 0 0;color:var(--muted);font-size:13px;line-height:18px;m
 .win .line{height:10px;border-radius:5px;background:var(--winline)}
 
 /* notch */
-.notch{position:absolute;z-index:40;background:var(--notch);border:1px solid var(--notchb);box-shadow:var(--notchshadow);color:var(--ntx);overflow:hidden;cursor:default;
+.notch{position:absolute;z-index:40;background:var(--notch);backdrop-filter:blur(28px) saturate(1.8);-webkit-backdrop-filter:blur(28px) saturate(1.8);border:1px solid var(--notchb);box-shadow:var(--notchshadow);color:var(--ntx);overflow:hidden;cursor:default;
   transition:left .26s cubic-bezier(.2,.8,.2,1),top .2s,width .26s cubic-bezier(.2,.8,.2,1),height .26s cubic-bezier(.2,.8,.2,1),border-radius .22s}
 .notch.dragging{transition:width .18s,height .18s,top .18s,border-radius .18s;cursor:grabbing}
 .notch.lift{box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.notch.isopen{background:var(--notchopen)}
+.notch.free{transition:width .18s,height .18s,border-radius .18s;transform:scale(1.06) rotate(-3deg)}
+.guide{position:absolute;top:0;height:3px;border-radius:0 0 2px 2px;background:var(--guide);z-index:41;pointer-events:none;transition:left .12s,width .12s}
 .ears{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:0 11px;transition:opacity .12s}
 .ear{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
 .eq{display:flex;align-items:flex-end;gap:2px;height:12px}
@@ -211,7 +214,7 @@ header.top p{margin:2px 0 0;color:var(--muted);font-size:13px;line-height:18px;m
   <header class="top">
     <div>
       <h1>Chippi Mac-style desktop</h1>
-      <p>Hover the notch to open it. Drag it along the top bar: away from the middle it becomes a pill, back near the middle it snaps into the notch. Click dock apps to switch; right-click for their menu. Notepad++ shows an app with real menus; the others show only their name and Window.</p>
+      <p>Hover the notch to open it. Drag it along the top bar: away from the middle it becomes a pill, back near the middle it snaps into the notch. Pull it down to lift it off; a line on the bar shows where it lands. Click dock apps to switch; right-click for their menu. Notepad++ shows an app with real menus; the others show only their name and Window.</p>
     </div>
     <div class="ctrls">
       <div class="seg"><span>Theme</span><div class="opts" id="themeSeg"><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
@@ -429,14 +432,17 @@ function renderNotch() {
   notch.classList.toggle('isopen', S.open);
   ears.style.height = g.h + 'px';
   ears.style.padding = S.pill ? '0 9px' : '0 11px';
+  ears.innerHTML = earsHtml();
+  notch.setAttribute('aria-expanded', S.open ? 'true' : 'false');
+}
+function earsHtml() {
   const p = S.pill;
   let L = '', R = '';
   if (S.activity === 'none') { L = pet(p ? 16 : 19); }
   if (S.activity === 'agent') { L = `<span style="color:var(--agent)">${ic('sparkle', p ? 13 : 15, 'fl')}</span>`; R = `<span style="color:var(--agent)">${fmt(S.agentSecs)}</span>`; }
   if (S.activity === 'song') { L = `<span class="cov"${p ? ' style="width:15px;height:15px"' : ''}></span>`; R = `<span class="eq"><i></i><i></i><i></i></span>`; }
   if (S.activity === 'awake') { L = `<span style="color:var(--ac)">${ic('coffee', p ? 13 : 15)}</span>`; R = `<span style="color:var(--ac)">1 hr</span>`; }
-  ears.innerHTML = `<span class="ear">${L}</span><span class="ear">${R}</span>`;
-  notch.setAttribute('aria-expanded', S.open ? 'true' : 'false');
+  return `<span class="ear">${L}</span><span class="ear">${R}</span>`;
 }
 const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 setInterval(() => { if (S.activity === 'agent') { S.agentSecs++; if (!S.open) renderNotch(); } }, 1000);
@@ -503,21 +509,37 @@ notch.addEventListener('pointerdown', (e) => {
   press = { x: stageX(e), id: e.pointerId, moved: false };
   notch.setPointerCapture(e.pointerId);
 });
+let guide = null;
+const pillW = () => (S.activity !== 'none' ? 196 : 120);
 notch.addEventListener('pointermove', (e) => {
   if (!press) return;
-  const x = stageX(e);
-  if (!press.moved && Math.abs(x - press.x) < 4) return;
+  const x = stageX(e), y = stageY(e);
+  if (!press.moved && Math.abs(x - press.x) < 4 && y < BAR + 4) return;
   if (!press.moved) { press.moved = true; clearTimeout(hoverT); notch.classList.add('dragging', 'lift'); }
-  const halfPill = (S.activity !== 'none' ? 196 : 120) / 2;
-  const cx = Math.max(halfPill + 4, Math.min(W - halfPill - 4, x));
+  // Pulling down detaches it: a free pill follows the pointer, and a line on the top bar shows where it lands.
+  if (!press.free && y > BAR + 12) { press.free = true; notch.classList.add('free'); }
+  const half = pillW() / 2;
+  const cx = Math.max(half + 4, Math.min(W - half - 4, x));
   S.pill = Math.abs(cx - W / 2) > 40;
   S.cx = S.pill ? cx : null;
   renderNotch(); layoutBar();
+  if (press.free) {
+    const g = geom();
+    const pw = pillW(), ph = 22;
+    Object.assign(notch.style, { width: pw + 'px', height: ph + 'px', borderRadius: '11px', left: (x - pw / 2) + 'px', top: Math.max(3, Math.min(H - 120, y - ph / 2)) + 'px' });
+    notch.style.borderTopWidth = '1px';
+    ears.style.height = ph + 'px'; ears.style.padding = '0 9px';
+    if (!S.pill) renderEarsPill();
+    if (!guide) { guide = document.createElement('div'); guide.className = 'guide'; stage.appendChild(guide); }
+    guide.style.left = g.left + 'px'; guide.style.width = g.w + 'px';
+  }
 });
+function renderEarsPill() { const was = S.pill; S.pill = true; const html = earsHtml(); S.pill = was; ears.innerHTML = html; }
 function endPress(e) {
   if (!press) return;
   const moved = press.moved; press = null;
-  notch.classList.remove('dragging', 'lift');
+  notch.classList.remove('dragging', 'lift', 'free');
+  guide && guide.remove(); guide = null;
   if (moved) {
     store.set('chippi-notch', JSON.stringify({ f: (S.pill ? S.cx : W / 2) / W }));
     renderNotch(); layoutBar();
