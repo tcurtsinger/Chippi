@@ -5,28 +5,39 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using Chippi.Features.MacDesktop.Shell;
 using Chippi.UI.Actions;
 
-namespace Chippi.Features.MacDesktop.Dock;
+namespace Chippi.Features.MacDesktop.Shell;
 
 /// <summary>
-/// The keyboard, held for a dock menu or question while it's open. The dock never takes the keyboard, and a menu in a
-/// process that hasn't it can't close on Esc or on a click elsewhere, nor be worked with the arrow keys. This one clear
-/// pixel takes the foreground before the menu opens, as an app's own window holds it for the app's menus, so the menu
-/// behaves as any menu does: it closes when another app comes forward, and the app that was in front gets the keyboard
-/// back when it closes. Never in Alt+Tab or the taskbar.
+/// The keyboard, held for a menu or question of the menu bar or the dock while it's open. Neither surface ever takes the
+/// keyboard, and a menu in a process that hasn't it can't close on Esc or on a click elsewhere, nor be worked with the
+/// arrow keys. This one clear pixel takes the foreground before the menu opens, as an app's own window holds it for the
+/// app's menus, so the menu behaves as any menu does: it closes when another app comes forward, and the app that was in
+/// front gets the keyboard back when it closes. Never in Alt+Tab or the taskbar.
 /// </summary>
-internal sealed class DockFocus : Window
+internal sealed class MenuFocus : Window
 {
+    private static MenuFocus? _shared;
+
     private readonly uint _self = (uint)Environment.ProcessId;
     private readonly FocusLease _lease = new();
     private nint _hwnd, _before;
     private Action? _lost;
 
-    public DockFocus()
+    /// <summary>The one holder the menu bar and the dock share, made on first use on the UI thread.</summary>
+    public static MenuFocus Shared => _shared ??= new MenuFocus();
+
+    /// <summary>Closes the shared holder (the mode went off); the next menu makes another.</summary>
+    public static void CloseShared()
     {
-        Title = "Chippi dock menu";
+        _shared?.Close();
+        _shared = null;
+    }
+
+    private MenuFocus()
+    {
+        Title = "Chippi menu";
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
         Background = Brushes.Transparent;
@@ -57,6 +68,11 @@ internal sealed class DockFocus : Window
                 return;
             e.Handled = true;
             Lose();
+        };
+        Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_shared, this))
+                _shared = null;
         };
     }
 
@@ -94,7 +110,8 @@ internal sealed class DockFocus : Window
     /// <paramref name="holder"/> lets go, if the keyboard is still its own: a menu reports that it closed only once it has
     /// faded out, by when the question its item opened may hold the keyboard. The app that was in front gets the keyboard
     /// back while this window still has it (Windows picks another window otherwise); not when anything else has come
-    /// forward since, another app or one of Chippi's own windows (Settings, opened from a menu).
+    /// forward since, another app or one of Chippi's own windows (Settings, opened from a menu), and not a window that has
+    /// gone or been minimized meanwhile.
     /// </summary>
     public void Release(object holder)
     {
@@ -106,7 +123,8 @@ internal sealed class DockFocus : Window
         nint before = _before;
         _before = 0;
         nint now = Native.GetForegroundWindow();
-        if (before != 0 && before != _hwnd && Native.IsWindow(before) && (now == 0 || now == _hwnd))
+        if (before != 0 && before != _hwnd && Native.IsWindow(before) && Native.IsWindowVisible(before) && !Native.IsIconic(before)
+            && (now == 0 || now == _hwnd))
             ForegroundRight.Take(before);
         Hide();
     }

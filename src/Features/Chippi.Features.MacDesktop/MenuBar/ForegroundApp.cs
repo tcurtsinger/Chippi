@@ -41,8 +41,7 @@ internal sealed class ForegroundApp : IDisposable
         if (pid == _self)
             return;
         string cls = Native.ClassOf(window);
-        if (cls is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd" or "TopLevelWindowForOverflowXamlIsland" or "NotifyIconOverflowWindow"
-            or "Windows.UI.Core.CoreWindow" or "XamlExplorerHostIslandWindow")
+        if (PassesOver(cls))
             return; // Start, Search, Quick Settings and the taskbar's flyouts pass over the app in front
         if (cls is "Progman" or "WorkerW")
         {
@@ -52,6 +51,10 @@ internal sealed class ForegroundApp : IDisposable
         if (AppNames.Of(window) is { } found)
             Set(window, found.ProcessId, found.App);
     }
+
+    /// <summary>Windows' own surfaces that come and go over the app in front without replacing it.</summary>
+    public static bool PassesOver(string windowClass) => windowClass is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd"
+        or "TopLevelWindowForOverflowXamlIsland" or "NotifyIconOverflowWindow" or "Windows.UI.Core.CoreWindow" or "XamlExplorerHostIslandWindow";
 
     private void Set(nint window, uint pid, AppIdentity app)
     {

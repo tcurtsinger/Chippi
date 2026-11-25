@@ -39,7 +39,6 @@ internal sealed class DockWindow : Window
     private readonly DockController _dock;
     private readonly Grid _root = new();
     private readonly Border _band = new() { Background = Touchable, Visibility = Visibility.Collapsed };
-    private DockFocus? _focus;
     private double _fit = 1;
     private bool _holdMagnify;
     private bool _transparency = true;
@@ -59,7 +58,6 @@ internal sealed class DockWindow : Window
     private TimeSpan _lastFrame;
     private DateTime _edgeSince = DateTime.MaxValue;
     private DateTime _slideUntil = DateTime.MinValue;
-    private Popup? _confirm;
     private readonly TextBlock _labelText = new() { FontSize = 12, MaxWidth = 320, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TranslateTransform _slide = new();
     private readonly DispatcherTimer _watch;
@@ -169,12 +167,9 @@ internal sealed class DockWindow : Window
             ThemeManager.ThemeChanged -= OnThemeChanged;
             _appBar?.Dispose();
             ClosePreview();
-            if (_confirm is not null)
-                _confirm.IsOpen = false;
+            BarQuestion.Close();
             if (_menu is { IsOpen: true })
                 _menu.IsOpen = false;
-            _focus?.Close();
-            _focus = null;
             _backdrop?.Dispose();
             _backdrop = null;
         };
@@ -630,65 +625,8 @@ internal sealed class DockWindow : Window
     {
         if (_tiles.FirstOrDefault(t => t.IsBin) is not { } bin)
             return;
-        if (_confirm is { } open)
-        {
-            _confirm = null; // replaced, not answered: the keyboard stays held for the new one
-            open.IsOpen = false;
-        }
-        var cancel = new Button { Content = "Cancel" };
-        cancel.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
-        var empty = new Button { Content = "Empty", Margin = new Thickness(8, 0, 0, 0) };
-        empty.SetResourceReference(StyleProperty, "CriticalButtonStyle");
-        var question = new TextBlock { Text = "Empty Recycle Bin?", FontSize = 13 };
-        question.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
-        var card = new Border
-        {
-            Width = 260, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Margin = new Thickness(16),
-            Effect = new DropShadowEffect { BlurRadius = 32, ShadowDepth = 8, Direction = 270, Opacity = ThemeManager.IsLight ? 0.14 : 0.28 },
-            Child = new StackPanel
-            {
-                Margin = new Thickness(16),
-                Children =
-                {
-                    question,
-                    new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Children = { cancel, empty } },
-                },
-            },
-        };
-        card.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
-        card.SetResourceReference(Border.BorderBrushProperty, "BorderStrongBrush");
-        var popup = new Popup
-        {
-            PlacementTarget = bin,
-            Placement = Edge switch { DockEdge.Left => PlacementMode.Right, DockEdge.Right => PlacementMode.Left, _ => PlacementMode.Top },
-            StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.None, Child = card,
-        };
-        cancel.Click += (_, _) => popup.IsOpen = false;
-        empty.Click += (_, _) =>
-        {
-            popup.IsOpen = false;
-            _dock.EmptyRecycleBin();
-        };
-        card.KeyDown += (_, e) =>
-        {
-            if (e.Key != Key.Escape)
-                return;
-            e.Handled = true;
-            popup.IsOpen = false;
-        };
-        popup.Closed += (_, _) =>
-        {
-            if (_confirm != popup)
-                return;
-            _confirm = null;
-            _focus?.Release(popup);
-        };
-        _confirm = popup;
-        // The question holds the keyboard while it's open, as a menu does, so Esc and a click elsewhere answer Cancel.
-        _focus ??= new DockFocus();
-        _focus.Hold(popup, Native.Cursor(), () => popup.IsOpen = false);
-        popup.IsOpen = true;
-        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (popup.IsOpen) cancel.Focus(); });
+        var placement = Edge switch { DockEdge.Left => PlacementMode.Right, DockEdge.Right => PlacementMode.Left, _ => PlacementMode.Top };
+        BarQuestion.Ask(bin, placement, "Empty Recycle Bin?", "Empty", _dock.EmptyRecycleBin);
     }
 
     // ----- Clicks, menus and drags -----
@@ -868,23 +806,14 @@ internal sealed class DockWindow : Window
             replaced.IsOpen = false;
         }
         var placement = Edge switch { DockEdge.Left => PlacementMode.Right, DockEdge.Right => PlacementMode.Left, _ => PlacementMode.Top };
-        // The dock never takes the foreground, and a menu in a process that hasn't it can't close on a click elsewhere or
-        // on Esc. DockFocus takes the keyboard before the menu opens, as an app's window holds it for the app's own menus,
-        // and the menu then closes as any menu does. Windows refusing (rare, right after a click) leaves a menu that works
-        // with the mouse; only then is a press elsewhere watched for.
-        _focus ??= new DockFocus();
-        ContextMenu? opened = null;
-        var holder = new object(); // the menu itself isn't made yet
-        bool held = _focus.Hold(holder, Native.Cursor(), () => { if (opened is { IsOpen: true }) opened.IsOpen = false; });
         // Above the icon as it is now, grown or not, 8 clear of it; the icons stay as they are while it's open, so it isn't
-        // left hanging over a gap. (The menu's own card sits 16 inside its bottom edge, for its shadow.)
+        // left hanging over a gap. (The menu's own card sits 16 inside its bottom edge, for its shadow.) The menu holds the
+        // keyboard while it's open (BarMenu), so it closes on Esc or a click elsewhere.
         double above = (DockLayout.Slot - (DockLayout.Padding - DockLayout.Edge) - tile.Size - 8) * _fit + 16;
         _holdMagnify = true;
+        ContextMenu? opened = null;
         void Closed()
         {
-            // A menu reports this once it has faded out. By then its item has run, and what that opened (the Empty
-            // question, another menu) may hold the keyboard: this lets go only of its own hold.
-            _focus?.Release(holder);
             if (opened is not null && _menu != opened)
                 return;
             _menu = null;
@@ -892,49 +821,10 @@ internal sealed class DockWindow : Window
             // The pointer may be anywhere by now: the icons rest unless it's still on the dock.
             Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { if (!_root.IsMouseOver && !_dragging && !_holdMagnify) Magnify(null); });
         }
-        try
-        {
-            opened = BarMenu.Open(tile, items, placement, horizontalOffset: Horizontal ? -12 : 0, verticalOffset: Horizontal ? above : -16, closed: Closed);
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
-        {
-            Chippi.Core.Diagnostics.Log.Warn("Mac-style desktop: a dock menu didn't open", ex);
-            Closed();
-            return;
-        }
-        if (!opened.IsOpen)
-            return; // it couldn't open: its closing has already let go
-        _menu = opened;
-        _menuWatched = !held;
-        _menuPressed = Pressing();
+        opened = BarMenu.Open(tile, items, placement, horizontalOffset: Horizontal ? -12 : 0, verticalOffset: Horizontal ? above : -16, closed: Closed);
+        if (opened.IsOpen)
+            _menu = opened;
     }
-
-    private bool _menuPressed, _menuWatched;
-
-    private static bool Pressing() => (Native.GetAsyncKeyState(0x01) & 0x8000) != 0 || (Native.GetAsyncKeyState(0x02) & 0x8000) != 0;
-
-    /// <summary>
-    /// Only for a menu that opened without the keyboard (Windows refused it): a press outside it closes it, which its own
-    /// hold on the mouse can't see from a process that isn't in front.
-    /// </summary>
-    private void WatchMenu()
-    {
-        if (!_menuWatched || _menu is not { IsOpen: true } menu)
-            return;
-        bool pressing = Pressing();
-        if (pressing && !_menuPressed && PresentationSource.FromVisual(menu) is not null)
-        {
-            var p = menu.PointFromScreen(Native.Cursor());
-            if (!new Rect(menu.RenderSize).Contains(p) && !SubmenuUnder())
-                menu.IsOpen = false;
-        }
-        _menuPressed = pressing;
-    }
-
-    /// <summary>Whether the pointer is over one of the menu's open submenus, which are popups of their own.</summary>
-    private bool SubmenuUnder() => _menu is { } menu && menu.Items.OfType<MenuItem>().Any(item =>
-        item.IsSubmenuOpen && item.Template.FindName("PART_Popup", item) is Popup { Child: FrameworkElement child }
-        && PresentationSource.FromVisual(child) is not null && new Rect(child.RenderSize).Contains(child.PointFromScreen(Native.Cursor())));
 
     internal DockController Controller => _dock;
 
@@ -1017,7 +907,6 @@ internal sealed class DockWindow : Window
     {
         if (_hwnd == 0)
             return;
-        WatchMenu();
         if (_tick % 50 == 0)
         {
             CheckBin();
@@ -1044,7 +933,7 @@ internal sealed class DockWindow : Window
         var hide = _dock.Settings.DockHide;
         if (hide == DockHiding.AlwaysShown || _fullscreen)
             return;
-        bool busy = _dragging || _menu is { IsOpen: true } || _preview is not null || _confirm is { IsOpen: true } || _status.IsVisible || IsMouseOver;
+        bool busy = _dragging || _menu is { IsOpen: true } || _preview is not null || BarQuestion.IsOpen || _status.IsVisible || IsMouseOver;
         if (!_shown)
         {
             // The pointer rests at the edge a moment first, so reaching for a scrollbar or a window's edge doesn't show it.

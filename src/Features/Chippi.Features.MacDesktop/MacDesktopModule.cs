@@ -211,6 +211,8 @@ public sealed class MacDesktopModule : IFeatureModule
             _dock?.Dispose();
             _dock = null;
         }
+        if (_menuBar is null && _dock is null)
+            MenuFocus.CloseShared(); // the window their menus hold the keyboard with
         _context.Logger.LogInformation("Mac-style desktop: {Style}, menu bar {MenuBar}, dock {Dock}, notch {Notch}", Settings.Style,
             _menuBar is not null, _dock is not null, NotchActive);
         Changed?.Invoke();
@@ -260,6 +262,7 @@ public sealed class MacDesktopModule : IFeatureModule
         _menuBar = null;
         _dock?.Dispose();
         _dock = null;
+        MenuFocus.CloseShared();
         _events?.Dispose();
         _events = null;
         // Signing out or shutting down: the taskbar stays hidden for the next start, which takes it again or gives it back;

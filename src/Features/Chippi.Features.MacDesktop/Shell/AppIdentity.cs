@@ -40,6 +40,9 @@ internal static class AppNames
 
     public static string Name(string path) => Names.GetOrAdd(path, static exe =>
     {
+        // Windows 11 calls it File Explorer; the program still describes itself as "Windows Explorer".
+        if (AppIdentity.Desktop.Is(exe))
+            return AppIdentity.Desktop.Name;
         try
         {
             var info = FileVersionInfo.GetVersionInfo(exe);

@@ -5,6 +5,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Chippi.Core.Actions;
 using Chippi.Features.MacDesktop.Dock;
+using Chippi.Features.MacDesktop.Shell;
 using Chippi.UI.Controls;
 
 namespace Chippi.Features.MacDesktop.Tests;
