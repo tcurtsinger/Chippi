@@ -232,6 +232,14 @@ public static class DockApps
         return index;
     }
 
+    /// <summary>
+    /// The place among <paramref name="count"/> pins that a dragged pin's middle is over: places are
+    /// <paramref name="pitch"/> apart from the first one's middle at <paramref name="first"/>. The index is the pin's own
+    /// place once it lands, as <see cref="Move"/> takes it; past either end it's the end.
+    /// </summary>
+    public static int SlotAt(double center, double first, double pitch, int count) =>
+        count <= 0 || !(pitch > 0) ? 0 : Math.Clamp((int)Math.Round((center - first) / pitch, MidpointRounding.AwayFromZero), 0, count - 1);
+
     /// <summary>A name for <paramref name="name"/> that's free in <paramref name="exists"/>: "name (2).ext", as Explorer does.</summary>
     public static string FreeName(string name, Func<string, bool> exists)
     {

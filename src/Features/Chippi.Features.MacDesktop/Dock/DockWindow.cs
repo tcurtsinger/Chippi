@@ -76,7 +76,8 @@ internal sealed class DockWindow : Window
     private DateTime _leftAt = DateTime.MaxValue;
     private int _tick;
     private DockTile? _pressed;
-    private Point _pressAt;
+    private Point _pressAt, _dragOrigin;
+    private Vector _grip;
     private bool _dragging;
     private DockPreview? _preview;
     private DockTile? _previewTile;
@@ -712,15 +713,22 @@ internal sealed class DockWindow : Window
             return; // Start, Downloads and the Recycle Bin stay put
         if (!_dragging)
         {
-            // The icons settle at rest for the drag, so the gaps it opens are one slot wide; the press point follows.
+            // The icons settle at rest for the drag, so the gaps it opens are one slot wide. The pressed icon has just
+            // shrunk and moved under the pointer: it's picked up where the pointer holds it now, or by its nearest edge
+            // when the pointer is no longer on it, so the icon stays under the pointer for the whole drag.
             StopFrames();
             Rest();
             _root.UpdateLayout();
             _dragging = true;
             HideLabel();
             ClosePreview();
+            var art = tile.Art;
+            _dragOrigin = art.TranslatePoint(new Point(art.ActualWidth / 2, art.ActualHeight / 2), _root);
+            double half = DockLayout.Icon / 2 * _fit;
+            var grip = at - _dragOrigin;
+            _grip = new Vector(Math.Clamp(grip.X, -half, half), Math.Clamp(grip.Y, -half, half));
         }
-        var delta = (at - _pressAt) / _fit; // the icon moves in the shelf's own units, which a crowded shelf scales down
+        var delta = (at - _grip - _dragOrigin) / _fit; // in the shelf's own units, which a crowded shelf scales down
         bool away = Away(at);
         tile.Lift(Horizontal ? new Vector(delta.X, Math.Min(0, delta.Y)) : new Vector(Edge == DockEdge.Left ? Math.Max(0, delta.X) : Math.Min(0, delta.X), delta.Y), away);
         OpenGap(tile, away ? null : Landing(tile, at));
@@ -735,20 +743,29 @@ internal sealed class DockWindow : Window
     /// Where a dragged app would land among the pins (an index for DockApps.Move), or null where it wouldn't: an app that
     /// isn't pinned is pinned only when let go among the pins, so a small nudge doesn't pin it.
     /// </summary>
+    /// <remarks>
+    /// Measured from the middle of the icon as it's drawn, not from the pointer, against the places the pins hold in the
+    /// row, not where the drag has moved them aside to: measuring the moved tiles made the answer chase its own animation.
+    /// A pin lands in the place its middle is over, so it gives way to a neighbor half a place in, the same both ways.
+    /// </remarks>
     private int? Landing(DockTile dragged, Point at)
     {
         var pins = _tiles.Where(t => t.App is { Pinned: true }).ToList();
-        var centers = pins.Select(t => Along(t.TranslatePoint(new Point(t.ActualWidth / 2, t.ActualHeight / 2), _root))).ToArray();
-        double along = Along(at);
-        if (dragged.App is { Pinned: false })
-        {
-            double end = pins.Count > 0
-                ? Along(pins[^1].TranslatePoint(new Point(pins[^1].ActualWidth, pins[^1].ActualHeight), _root)) + DockLayout.Gap
-                : Along(_tiles[0].TranslatePoint(new Point(_tiles[0].ActualWidth, _tiles[0].ActualHeight), _root)) + DockLayout.Icon / 2;
-            if (along > end)
-                return null;
-        }
-        return DockApps.InsertIndex(centers, pins.IndexOf(dragged), along);
+        var centers = pins.Select(RestCenter).ToArray();
+        double icon = Along(at - _grip);
+        double pitch = (DockLayout.Icon + DockLayout.Gap) * _fit;
+        if (pins.Contains(dragged))
+            return DockApps.SlotAt(icon, centers[0], pitch, pins.Count);
+        // Not pinned: it goes between the pins it's dropped among, and stays as it is past the last of them.
+        double end = pins.Count > 0 ? centers[^1] + pitch / 2 : RestCenter(_tiles[0]) + pitch;
+        return icon > end ? null : DockApps.InsertIndex(centers, -1, icon);
+    }
+
+    /// <summary>The middle of the tile's own place in the row, along the shelf: where it rests, not where a drag has shifted it.</summary>
+    private double RestCenter(DockTile tile)
+    {
+        var offset = VisualTreeHelper.GetOffset(tile);
+        return Along(_row.TranslatePoint(new Point(offset.X + tile.ActualWidth / 2, offset.Y + tile.ActualHeight / 2), _root));
     }
 
     private double Along(Point p) => Horizontal ? p.X : p.Y;

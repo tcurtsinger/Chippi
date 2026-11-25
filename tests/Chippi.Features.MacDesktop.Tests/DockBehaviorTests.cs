@@ -38,6 +38,33 @@ public sealed class DockClickTests
     public void A_minimized_window_that_holds_the_keyboard_is_shown() =>
         Assert.Equal((DockClick.Show, (nint)7), DockApps.OnClick(App(Window(7, minimized: true)), front: 7));
 
+    /// <summary>Four pins 54 apart, the first one's middle at 100.</summary>
+    [Theory]
+    [InlineData(100, 0)]
+    [InlineData(126, 0)]  // not yet half a place over
+    [InlineData(128, 1)]  // half a place in: the neighbor gives way
+    [InlineData(154, 1)]
+    [InlineData(180, 1)]
+    [InlineData(182, 2)]
+    [InlineData(262, 3)]
+    [InlineData(900, 3)]  // past the last pin: the last place
+    [InlineData(-50, 0)]
+    public void A_dragged_pin_lands_in_the_place_its_middle_is_over(double middle, int place) =>
+        Assert.Equal(place, DockApps.SlotAt(middle, first: 100, pitch: 54, count: 4));
+
+    [Fact]
+    public void A_pin_lands_where_it_is_dropped_from_either_side()
+    {
+        string[] pins = ["a", "b", "c", "d"];
+        // "a" dragged one place right, then "d" dragged one place left: each moves exactly one place.
+        Assert.Equal(["b", "a", "c", "d"], DockApps.Move(pins, "a", DockApps.SlotAt(154, 100, 54, 4)));
+        Assert.Equal(["a", "b", "d", "c"], DockApps.Move(pins, "d", DockApps.SlotAt(208, 100, 54, 4)));
+        // Dropped back on its own place, nothing moves.
+        Assert.Equal(pins, DockApps.Move(pins, "b", DockApps.SlotAt(160, 100, 54, 4)));
+        // Three places over lands three places over.
+        Assert.Equal(["b", "c", "d", "a"], DockApps.Move(pins, "a", DockApps.SlotAt(262, 100, 54, 4)));
+    }
+
     [Fact]
     public void A_shelf_that_fits_is_not_scaled()
     {
