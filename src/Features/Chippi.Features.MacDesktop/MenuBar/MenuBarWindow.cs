@@ -20,6 +20,7 @@ namespace Chippi.Features.MacDesktop.MenuBar;
 /// One display's menu bar (docs/mac-style/brief.md, Menu bar): 28 DIPs across the top, an AppBar so maximized windows start
 /// below it. No fill and no blur: the wallpaper shows through, and the ink follows it, each group by what's under it. Hidden
 /// while a fullscreen app covers its display. The bar itself never takes the keyboard; its menus hold it while they're open.
+/// Its right side is Chippi's own items (BarItems), then the clock.
 /// </summary>
 internal sealed class MenuBarWindow : Window
 {
@@ -35,13 +36,16 @@ internal sealed class MenuBarWindow : Window
     private readonly BarItem _mark, _appName, _overflow, _windowMenu;
     private readonly TextBlock _nameText = Text("", FontWeights.SemiBold);
     private readonly List<BarItem> _menus = [];
-    private readonly StackPanel _badges = new() { Orientation = Orientation.Horizontal };
-    private readonly BarItem _chevron, _language, _quick, _controls, _clock;
-    private readonly UIElement[] _canGo; // the right group's items that give way on a narrow bar, in the order they go
-    private readonly TextBlock _languageText = Text(""), _clockText = Text("");
-    private readonly LucideIcon _wired = Glyph(LucideIcons.Network), _volume = Glyph(LucideIcons.Volume);
-    private readonly WifiGlyph _wifi = new();
-    private readonly BatteryGlyph _battery = new();
+    private readonly List<(string Id, BarItem Item)> _items = []; // the right group's items, left to right: on a narrow bar they go from the left
+    private readonly BarItem _clock;
+    private readonly TextBlock _clockText = Text("");
+    private IReadOnlyList<string> _ids = [];
+    private BarStates _states;
+    private StatusReadings? _status;
+    private string _shape = "";
+    private TextBlock? _recordText, _cpuText, _languageText;
+    private WifiGlyph? _wifi;
+    private BatteryGlyph? _battery;
     private readonly ChippiPet _pet = new() { Size = 17, IsDecorative = true, Mood = PetMood.Idle };
     private AppBar? _appBar;
     private nint _hwnd;
@@ -50,7 +54,7 @@ internal sealed class MenuBarWindow : Window
     private (double From, double To) _leftSpan = (0, 0.3), _rightSpan = (0.8, 1);
     private ContextMenu? _open;
     private BarItem? _openItem;
-    private bool _hidden, _languageWanted, _appHasWindow, _helpLast;
+    private bool _hidden, _appHasWindow, _helpLast;
 
     public nint Monitor { get; }
 
@@ -92,24 +96,10 @@ internal sealed class MenuBarWindow : Window
         _windowMenu = new BarItem(Text("Window"), "Window");
         _windowMenu.Pressed += () => Toggle(_windowMenu, _bar.WindowMenu);
 
-        _chevron = new BarItem(Glyph(LucideIcons.Up), "Hidden icons", tip: true);
-        _chevron.Pressed += () => _ = _bar.ToggleHiddenIconsAsync(this, _chevron);
-        _language = new BarItem(_languageText, "Input language");
-        _language.Pressed += () => _ = _bar.Shell.PressAsync("Win+Space");
-        var quick = new StackPanel { Orientation = Orientation.Horizontal, Children = { _wired, _wifi, _volume, _battery } };
-        _volume.Margin = new Thickness(6, 0, 6, 0);
-        _quick = new BarItem(quick, "Network, volume, battery");
-        _quick.Pressed += () => _ = _bar.ToggleFlyoutAsync(this, _quick, "Win+A");
-        _controls = new BarItem(Glyph(LucideIcons.Sliders), "Controls", tip: true);
-        _controls.Pressed += () => _bar.Shell.OpenNotchHome();
         _clockText.FontFeatures(); // tabular figures
         _clock = new BarItem(_clockText, "Notifications");
-        _clock.Pressed += () => _ = _bar.ToggleFlyoutAsync(this, _clock, "Win+N");
-        foreach (var item in new UIElement[] { _badges, _chevron, _language, _quick, _controls, _clock })
-            _right.Children.Add(item);
-        // Controls is the notch's own home, a click away; the language and the hidden icons have keys of their own (Win+Space,
-        // Win+B); Chippi's badges and the network, volume and battery go last. The clock never goes.
-        _canGo = [_controls, _language, _chevron, _badges, _quick];
+        _clock.Pressed += () => _bar.Press(MenuBarController.Clock);
+        _right.Children.Add(_clock);
         Order(windowBeforeLast: false);
 
         SourceInitialized += (_, _) =>
@@ -196,7 +186,7 @@ internal sealed class MenuBarWindow : Window
             return;
         (_leftInk, _rightInk) = (left, right);
         Paint(_left.Children.OfType<BarItem>(), left);
-        Paint(_right.Children.OfType<BarItem>().Concat(_badges.Children.OfType<BarItem>()), right);
+        Paint(_right.Children.OfType<BarItem>(), right);
     }
 
     private static void Paint(IEnumerable<BarItem> items, BarInk ink)
@@ -257,39 +247,159 @@ internal sealed class MenuBarWindow : Window
             _left.Children.Add(item);
     }
 
+    // ----- The right side: Chippi's items -----
+
+    /// <summary>The items to show, left to right, before the clock.</summary>
+    public void SetItems(IReadOnlyList<string> ids)
+    {
+        _ids = ids;
+        Refresh();
+    }
+
+    /// <summary>What the stateful items show: a muted mic, keep awake on, an agent at work, a recording.</summary>
+    public void SetStates(BarStates states)
+    {
+        _states = states;
+        Refresh();
+    }
+
     public void SetStatus(StatusReadings status)
     {
-        _languageWanted = status.Language is not null;
-        _languageText.Text = status.Language ?? "";
-        bool wifi = status.Connection != StatusReadings.Network.Wired;
-        _wifi.Visibility = wifi ? Visibility.Visible : Visibility.Collapsed;
-        _wired.Visibility = wifi ? Visibility.Collapsed : Visibility.Visible;
-        _wifi.Bars = status.Connection == StatusReadings.Network.None ? 0 : status.Bars;
-        _wifi.Opacity = status.Connection == StatusReadings.Network.None ? 0.45 : 1;
-        bool silent = status.Muted || status.Volume == 0;
-        _volume.Data = silent ? LucideIcons.VolumeMuted : LucideIcons.Volume;
-        _battery.Visibility = status.Battery is null ? Visibility.Collapsed : Visibility.Visible;
-        _battery.Level = (status.Battery ?? 100) / 100.0;
-        _battery.Charging = status.Charging;
-        _quick.ToolTip = StatusText(status);
+        _status = status;
+        Refresh();
+    }
+
+    /// <summary>
+    /// Brings the items in line with what they stand for. They're built again only when which glyphs show changes; a
+    /// recording's time, the processors' load, the battery and the names change in place.
+    /// </summary>
+    private void Refresh()
+    {
+        var status = _status;
+        bool silent = status is not null && (status.Muted || status.Volume == 0);
+        var network = status?.Connection ?? StatusReadings.Network.WiFi;
+        string shape = $"{string.Join(',', _ids)}|{_states.MicMuted}|{_states.Awake}|{_states.AgentWorking}|{_states.Recording is not null}|{silent}|{network}";
+        if (shape != _shape)
+        {
+            _shape = shape;
+            (_recordText, _cpuText, _languageText, _wifi, _battery) = (null, null, null, null, null);
+            _items.Clear();
+            _right.Children.Clear();
+            foreach (string id in _ids)
+            {
+                var item = Make(id, silent, network);
+                _items.Add((id, item));
+                _right.Children.Add(item);
+            }
+            _right.Children.Add(_clock);
+            ApplyInk(force: true);
+        }
+        if (_recordText is not null) _recordText.Text = _states.Recording ?? "";
+        if (_cpuText is not null)
+        {
+            _cpuText.Text = status?.Cpu is { } cpu ? $"{cpu}%" : "";
+            _cpuText.Visibility = _cpuText.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        if (_languageText is not null) _languageText.Text = status?.Language ?? "";
+        if (_wifi is not null)
+        {
+            _wifi.Bars = network == StatusReadings.Network.None ? 0 : status?.Bars;
+            _wifi.Opacity = network == StatusReadings.Network.None ? 0.45 : 1;
+        }
+        if (_battery is not null)
+        {
+            _battery.Level = (status?.Battery ?? 100) / 100.0;
+            _battery.Charging = status?.Charging == true;
+        }
+        foreach (var (id, item) in _items)
+            item.Named(Tip(id, _states, status));
         Arrange();
     }
 
-    /// <summary>"Wi-Fi · Volume 45% · Battery 64%": what the three glyphs stand for.</summary>
-    internal static string StatusText(StatusReadings status)
+    private BarItem Make(string id, bool silent, StatusReadings.Network network)
     {
-        var parts = new List<string>
+        UIElement face;
+        bool disc = false;
+        switch (id)
         {
-            status.Connection switch { StatusReadings.Network.Wired => "Ethernet", StatusReadings.Network.WiFi => "Wi-Fi", _ => "Offline" },
-        };
-        if (status.Muted)
-            parts.Add("Muted");
-        else if (status.Volume is { } volume)
-            parts.Add($"Volume {volume}%");
-        if (status.Battery is { } battery)
-            parts.Add($"Battery {battery}%");
-        return string.Join(" · ", parts);
+            case BarItems.Microphone when _states.MicMuted:
+                (face, disc) = (Disc(LucideIcons.MicOff, Critical, Brushes.White), true);
+                break;
+            case BarItems.KeepAwake when _states.Awake:
+                (face, disc) = (Disc(LucideIcons.Coffee, AccentFill, OnAccent), true);
+                break;
+            case BarItems.Agents when _states.AgentWorking:
+                (face, disc) = (Disc(LucideIcons.Gauge, Agent, Brushes.White), true);
+                break;
+            case BarItems.Record when _states.Recording is not null:
+                _recordText = Text("");
+                _recordText.FontFeatures();
+                _recordText.Margin = new Thickness(6, 0, 0, 0);
+                face = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Children = { new System.Windows.Shapes.Ellipse { Width = 10, Height = 10, Fill = Critical, VerticalAlignment = VerticalAlignment.Center }, _recordText },
+                };
+                break;
+            case BarItems.System:
+                _cpuText = Text("");
+                _cpuText.FontFeatures();
+                _cpuText.Margin = new Thickness(6, 0, 0, 0);
+                face = new StackPanel { Orientation = Orientation.Horizontal, Children = { Glyph(LucideIcons.Activity), _cpuText } };
+                break;
+            case BarItems.Language:
+                face = _languageText = Text("");
+                break;
+            case BarItems.Battery:
+                face = _battery = new BatteryGlyph();
+                break;
+            case BarItems.Network when network != StatusReadings.Network.Wired:
+                face = _wifi = new WifiGlyph();
+                break;
+            case BarItems.Sound:
+                face = Glyph(silent ? LucideIcons.VolumeMuted : LucideIcons.Volume);
+                break;
+            default:
+                face = Glyph(Glyphs.Of(id));
+                break;
+        }
+        var item = new BarItem(face, id, keepsColor: disc, inset: disc ? 5 : 8, tip: true);
+        item.Pressed += () => _bar.Press(id);
+        return item;
     }
+
+    private static readonly Brush Critical = Frozen(new SolidColorBrush(Color.FromRgb(0xC4, 0x2B, 0x1C)));
+    private static readonly Brush Agent = Frozen(new SolidColorBrush(Color.FromRgb(0xE8, 0x87, 0x5B)));
+    private static readonly Brush OnAccent = Frozen(new SolidColorBrush(Color.FromRgb(0x17, 0x0F, 0x2E)));
+    private static readonly Brush AccentFill = Frozen(new LinearGradientBrush(Color.FromRgb(0xB7, 0x8F, 0xFF), Color.FromRgb(0x82, 0xAE, 0xFF), new Point(0, 0), new Point(1, 1)));
+
+    private static Brush Frozen(Brush brush)
+    {
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>An item that's on: its glyph on a filled disc, in its own colours whatever the ink.</summary>
+    private static Border Disc(Geometry glyph, Brush fill, Brush ink) => new()
+    {
+        Width = 18, Height = 18, CornerRadius = new CornerRadius(9), Background = fill,
+        Child = new LucideIcon { Data = glyph, Size = 11, Brush = ink, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+    };
+
+    /// <summary>What an item is called now, for its tooltip and for screen readers: what a press does, or what it reads.</summary>
+    internal static string Tip(string id, BarStates states, StatusReadings? status) => id switch
+    {
+        BarItems.Capture => "Capture region",
+        BarItems.Microphone => states.MicMuted ? "Unmute microphone" : "Mute microphone",
+        BarItems.KeepAwake => states.Awake ? "Stop keep awake" : "Keep awake",
+        BarItems.Record => states.Recording is not null ? "Stop recording" : "Screen recording",
+        BarItems.Sound => status is null ? "Sound" : status.Muted ? "Muted" : status.Volume is { } volume ? $"Volume {volume}%" : "Sound",
+        BarItems.System => status?.Cpu is { } cpu ? $"System · CPU {cpu}%" : "System",
+        BarItems.Network => status?.Connection switch { StatusReadings.Network.Wired => "Ethernet", StatusReadings.Network.None => "Offline", _ => "Wi-Fi" },
+        BarItems.Battery => status?.Battery is { } battery ? $"Battery {battery}%" : "Battery",
+        BarItems.Language => "Input language",
+        _ => BarItems.Find(id)?.Name ?? id,
+    };
 
     public void SetClock(string text)
     {
@@ -299,28 +409,9 @@ internal sealed class MenuBarWindow : Window
         Arrange();
     }
 
-    /// <summary>Chippi's status badges: each a coloured disc with its glyph, opening its page.</summary>
-    public void SetBadges(IReadOnlyList<(string Name, Geometry Glyph, Brush Fill, Brush Ink, Action Open)> badges)
-    {
-        _badges.Children.Clear();
-        foreach (var badge in badges)
-        {
-            var disc = new Border
-            {
-                Width = 18, Height = 18, CornerRadius = new CornerRadius(9), Background = badge.Fill,
-                Child = new LucideIcon { Data = badge.Glyph, Size = 11, Brush = badge.Ink, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
-            };
-            var item = new BarItem(disc, badge.Name, keepsColor: true, inset: 5, tip: true);
-            item.Pressed += badge.Open;
-            _badges.Children.Add(item);
-        }
-        ApplyInk(force: true);
-        Arrange();
-    }
-
     /// <summary>
     /// Lays the two groups out, clear of the notch when it's on this bar and of each other: the app's menus that don't fit
-    /// go into », then the right group's lesser items go, then the app's name is cut short (MenuBarLayout). Called again
+    /// go into », then the right group's items go from the left, then the app's name is cut short (MenuBarLayout). Called again
     /// while the notch is dragged, so the items make room before the drop.
     /// </summary>
     public void Arrange()
@@ -337,10 +428,8 @@ internal sealed class MenuBarWindow : Window
             menu.Visibility = Visibility.Visible;
         _overflow.Visibility = Visibility.Visible;
         _windowMenu.Visibility = _appHasWindow ? Visibility.Collapsed : Visibility.Visible;
-        _language.Visibility = _languageWanted ? Visibility.Visible : Visibility.Collapsed;
-        foreach (var item in _canGo)
-            if (item != _language)
-                item.Visibility = Visibility.Visible;
+        foreach (var (_, item) in _items)
+            item.Visibility = Visibility.Visible;
         _nameText.MaxWidth = double.PositiveInfinity;
         _mark.Reach(0, 0);
         _clock.Reach(0, 0);
@@ -349,7 +438,7 @@ internal sealed class MenuBarWindow : Window
         double fixedLeft = Width(_mark) + Width(_appName) + Width(_windowMenu);
         var widths = _menus.Select(m => Width(m)).ToArray();
         double overflow = Width(_overflow);
-        var canGo = _canGo.Select(Width).ToArray();
+        var canGo = _items.Select(i => Width(i.Item)).ToArray();
         double right = Width(_right);
         (double, double)? notch = null;
         if (_bar.Shell.Notch() is { } n && n.Monitor == Monitor && Scale > 0)
@@ -362,7 +451,7 @@ internal sealed class MenuBarWindow : Window
         _overflow.Visibility = overflows ? Visibility.Visible : Visibility.Collapsed;
         Order(windowBeforeLast: _helpLast && !overflows && !_appHasWindow);
         for (int i = 0; i < arrangement.RightDropped; i++)
-            _canGo[i].Visibility = Visibility.Collapsed;
+            _items[i].Item.Visibility = Visibility.Collapsed;
         if (arrangement.NameTrim > 0)
             _nameText.MaxWidth = Math.Max(LeastName, name - arrangement.NameTrim);
         // The ends of the bar are the mark's and the clock's: a press in the corner, or on the top row of pixels, lands.
@@ -395,9 +484,11 @@ internal sealed class MenuBarWindow : Window
         new Rect(Canvas.GetLeft(_right), 0, _right.ActualWidth, Height28));
 
     /// <summary>The titles and status items showing now, left to right, by name.</summary>
-    internal IReadOnlyList<string> Showing => [.. _left.Children.OfType<BarItem>().Concat(_right.Children.OfType<UIElement>().SelectMany(
-            child => child is Panel panel ? panel.Children.OfType<BarItem>().Where(_ => panel.Visibility == Visibility.Visible) : child is BarItem item ? [item] : []))
+    internal IReadOnlyList<string> Showing => [.. _left.Children.OfType<BarItem>().Concat(_right.Children.OfType<BarItem>())
         .Where(item => item.Visibility == Visibility.Visible).Select(AutomationProperties.GetName)];
+
+    /// <summary>The right group's items showing now, left to right, by id.</summary>
+    internal IReadOnlyList<string> ItemsShowing => [.. _items.Where(i => i.Item.Visibility == Visibility.Visible).Select(i => i.Id)];
 
     // ----- Menus -----
 
@@ -455,13 +546,6 @@ internal sealed class MenuBarWindow : Window
             && new Rect(item.TranslatePoint(new Point(), _root), item.RenderSize).Contains(local));
     }
 
-    /// <summary>A pixel of the bar, for the hidden icons' flyout to hang under.</summary>
-    public Point Below(FrameworkElement item)
-    {
-        var center = item.PointToScreen(new Point(item.ActualWidth / 2, 0));
-        return new Point(center.X, Bounds.Bottom);
-    }
-
     /// <summary>
     /// One title or status item. What's drawn is 22 tall with 5 corners and the ink's hover; what takes the press is the
     /// bar's whole height, so the top row of pixels works, and the first and last reach to the ends of the bar.
@@ -469,7 +553,7 @@ internal sealed class MenuBarWindow : Window
     internal sealed class BarItem : Border
     {
         private readonly Border _pill;
-        private readonly bool _keepsColor;
+        private readonly bool _keepsColor, _tip;
         private Brush _hover = Brushes.Transparent;
         private bool _open;
 
@@ -484,6 +568,7 @@ internal sealed class MenuBarWindow : Window
         public BarItem(UIElement content, string name, bool keepsColor = false, double inset = 8, bool tip = false)
         {
             _keepsColor = keepsColor;
+            _tip = tip;
             _pill = new Border
             {
                 Child = content,
@@ -508,6 +593,16 @@ internal sealed class MenuBarWindow : Window
         }
 
         public void Activate() => Pressed?.Invoke();
+
+        /// <summary>What it's called now: a toggle names what the next press does.</summary>
+        public void Named(string name)
+        {
+            if (AutomationProperties.GetName(this) == name)
+                return;
+            AutomationProperties.SetName(this, name);
+            if (_tip)
+                ToolTip = name;
+        }
 
         /// <summary>
         /// Extends what takes the press by <paramref name="left"/> and <paramref name="right"/> DIPs past the item's own

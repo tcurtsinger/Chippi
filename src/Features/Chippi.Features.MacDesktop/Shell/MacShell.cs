@@ -30,6 +30,22 @@ internal sealed class MacShell(ModuleContext context, IslandActivityHub? activit
     /// <summary>Opens the notch's home (the menu bar's Controls). Set by the shell.</summary>
     public Action OpenNotchHome { get; set; } = () => { };
 
+    /// <summary>
+    /// A press on a menu bar item that opens an island page (null for the home): true when the page was open and the press
+    /// closed it, so the item doesn't open it again. Set by the shell.
+    /// </summary>
+    public Func<string?, bool> ClosePage { get; set; } = _ => false;
+
+    /// <summary>The saved menu bar items; null for the start set.</summary>
+    public Func<IReadOnlyList<string>?> BarItems { get; set; } = () => null;
+
+    /// <summary>Whether a menu bar item can show on this PC now. The battery and the input languages are read once per call of this, not per item.</summary>
+    public Func<string, bool> Availability()
+    {
+        bool battery = MenuBar.StatusReadings.HasBattery(), languages = MenuBar.StatusReadings.HasLanguages();
+        return id => MenuBar.BarItems.Available(id, Context.IsFeatureRunning, battery, languages);
+    }
+
     /// <summary>The notch on a display's bar: its monitor and left and right edges in physical pixels; null without one.</summary>
     public Func<(nint Monitor, double Left, double Right)?> Notch { get; set; } = () => null;
 

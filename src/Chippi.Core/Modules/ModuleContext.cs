@@ -42,6 +42,15 @@ public sealed class ModuleContext(
     /// <summary>Opens Settings on this module's page, at <c>section</c> when given (a notice click opening History).</summary>
     public Action<string?> OpenSettings { get; init; } = _ => { };
 
+    /// <summary>
+    /// Opens Settings on any page by its id, another feature's included ("page:sound-output", "module:app-volume"): the
+    /// Mac-style menu bar's Sound item.
+    /// </summary>
+    public Action<string> OpenSettingsPage { get; init; } = _ => { };
+
+    /// <summary>Whether the feature with this id is installed and running now.</summary>
+    public Func<string, bool> IsFeatureRunning { get; init; } = _ => false;
+
     /// <summary>The <see cref="OpenSettings"/> section that opens Add features, where the module's requirement installs.</summary>
     public const string RequirementSection = "requirement";
 

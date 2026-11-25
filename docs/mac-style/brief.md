@@ -20,7 +20,7 @@ An optional mode that gives Windows a top menu bar, a bottom dock and turns the 
 
 - Hidden on every display while the menu bar or dock is on: auto-hide turned on, then the taskbar windows (`Shell_TrayWnd`, `Shell_SecondaryTrayWnd`) made invisible and click-through. `ShowWindow(SW_HIDE)` doesn't last on Windows 11.
 - The user's own auto-hide setting is saved to a file before the first change and deleted only after it is restored, so a crash and restart never mistakes Chippi's auto-hide for the user's. Explorer restarting is detected (`TaskbarCreated`) and the takeover is repeated.
-- The Windows key, Win+A (Quick Settings), Win+N (notifications) and Win+Tab keep working.
+- The Windows key, Win+A (Quick Settings), Win+N (notifications) and Win+Tab keep working. Chippi never moves Windows' own flyouts: they open where Windows opens them.
 
 ## Menu bar
 
@@ -33,18 +33,46 @@ An optional mode that gives Windows a top menu bar, a bottom dock and turns the 
   - **App name** of the foreground window, 13 / 600, as the Start menu calls the app (`AppCatalog`: by the window's taskbar identity, then its program, then the one app installed in a folder above it, so Steam's helper is "Steam"); the program's own description only when the Start menu doesn't list it. Its menu: About, Show in Explorer, Hide, Quit (closes the app's windows), End task. With nothing in front but the desktop it reads **Desktop** (Travis, 2026-11-25), with New File Explorer window, Display settings and Personalize.
   - **The app's real menus** when it has a classic Win32 menu, read from `GetMenu` and invoked with `WM_COMMAND`, or a UI Automation menu bar. Most modern apps (Edge, Chrome, Teams, Electron, Settings) have none, and then nothing is shown in their place. An app running as administrator takes no commands from Chippi, so its menus aren't shown and the rows that act on its window are greyed out. Entries the app draws itself have no words and are left out.
   - **Window:** Minimize, Maximize, Snap (left, right, the saved layouts), Move to (each display, by its own name; two of the same monitor by their sizes), Bring all to front, Close window. Runs through the shared action PC. It sits before the app's Help; an app with a Window menu of its own gets these items at the top of that menu, not a second "Window".
-- **Right, from the right:** date and time (`Wed Nov 25  10:02 AM`, opens Win+N); Controls (opens the notch's home); Wi-Fi, volume and battery (open Quick Settings); input language; the tray chevron (opens Windows' own hidden-icons flyout); Chippi's status badges (Mic muted, Keep awake, Agents). CPU, RAM and network readouts are optional, off by default.
+- **Right:** Chippi's own items, then the date and time (`Wed Nov 25  10:02 AM`). See Menu bar items below.
 - Menus are the island's flyout style: 8 corners, 30-DIP rows, 13 text, shortcut hints right-aligned in tertiary. One longer than its display scrolls.
 - **After the audit** (Travis, 2026-11-25, "Fix everything"):
   - **Menus hold the keyboard** while they're open, as the dock's do (`MenuFocus`, one clear pixel, through `BarMenu`): Esc, the arrow keys and a click elsewhere work. A row that acts in the app in front (its own command, Minimize, Close window) gives that app the keyboard back before it runs, so a dialog it opens comes up with the keyboard. The app's title bar shows inactive while a bar menu is open.
   - **The app in front is read again when a menu closes**, so the bar never names an app whose window the menu just minimized or closed.
   - **Questions** are Chippi's own, under the title that asked: "Restart?", "Shut down?", "Sign out?", "End chrome.exe?" with Cancel and the verb (`BarQuestion`, shared with the dock's Empty Recycle Bin).
   - **Edges:** an item takes a press over the bar's whole height, and the mark and the clock reach to the ends of the bar, so the corners and the top row of pixels work.
-  - **Narrow bars:** when both groups don't fit, the app's menus go into », then the right group gives up Controls, the language, the hidden icons, the badges, and the network, volume and battery, in that order, then the app's name is cut short. The clock never goes, and nothing is drawn over anything else.
-  - **Status:** the speaker shows mute (read from the default output once a second, never set), Wi-Fi shows its signal, and the glyph-only items have tooltips ("Wi-Fi · Volume 45% · Battery 64%").
-  - **Windows' flyouts open at the bar** (Travis, 2026-11-25): the hidden icons, Quick Settings and notifications are Windows' own, and Windows slides them in from the hidden taskbar's edge. While one slides in it's kept below every display; once it's whole it's put under the item that opened it, on that item's display, and kept there for as long as it's open. The app that was in front gets the keyboard back when the hidden icons close.
+  - **Narrow bars:** when both groups don't fit, the app's menus go into », then the right group's items go from the left, then the app's name is cut short. The clock never goes, and nothing is drawn over anything else.
   - **A second press on an open title closes its menu.**
-  - Left as they are: Controls opens the notch where the notch is, and moving along the bar with the keyboard needs a shortcut of its own.
+  - Left as they are: an item's page opens in the notch where the notch is, and moving along the bar with the keyboard needs a shortcut of its own.
+
+### Menu bar items
+
+Travis, 2026-11-25, after trying Windows' flyouts moved under the bar ("instead of messing with the default windows behavior, we change the formula"): the right side is Chippi's own buttons, each doing one thing at once. Mockup: [design/menu-bar-items.html](design/menu-bar-items.html), approved the same day ("Build it").
+
+- **Chosen in Settings › Mac-style desktop › Menu bar:** a row per item, top to bottom as they sit left to right, each with a grip (drag, or Up and Down on it) and ⋯ (Move up, Move down, Remove); **Add item** lists the rest, Chippi's first, then Windows' own, and a pick goes next to the clock. The clock's row is last and locked. Only what this PC has is offered: an item whose feature isn't installed, Battery without a battery and Language with one input language are left out, saved or not, and come back with what they need.
+- **To start:** Search, Capture, Clipboard, Microphone, Sound, Battery, Language, Hidden icons, Controls.
+
+| Item | A press | Shows |
+|---|---|---|
+| Search | Opens Search with the keyboard in its field | |
+| Capture | Starts a region capture | |
+| Clipboard, Scratchpad, Shelf, Displays, Actions | Opens its page | |
+| Microphone | Mutes, unmutes | A red disc while muted |
+| Sound | Opens Chippi Settings › Output (App volume without Output; Windows' sound settings without either) | The speaker, crossed while muted or at 0; read once a second, never set |
+| Controls | Opens the notch's home | |
+| Record | Opens Screen recording; while recording, stops | A red dot and the time while recording |
+| Copy text, Pick color | Starts it | |
+| Keep awake | Turns it on, off | An accent disc while on |
+| System | Opens its page | The processors' load, read every 2 seconds only while the item is on the bar |
+| Agents | Opens its page | An orange disc while a session works |
+| Hidden icons | Opens Windows' own flyout, where Windows opens it; a second press closes it and the app in front gets the keyboard back | |
+| Network | Opens Windows Settings › Network & internet | Wi-Fi's signal, or the wired glyph |
+| Battery | Opens Windows Settings › Power & battery | The charge |
+| Language | Switches input language (Win+Space) | The language in use |
+| Clock | Opens Windows' notifications, where Windows opens them | Always last |
+
+- **A page opens in the notch,** and a second press on its item closes it. The press itself closes the panel first, as any press off the panel does, so the panel remembers what a press just closed (`PageToggle`).
+- **Names:** each item is named for what a press does now ("Mute microphone", "Stop recording", "Volume 45%"), in its tooltip and for screen readers.
+- **What went:** the Wi-Fi, volume and battery group that opened Quick Settings, and the badges that appeared by themselves (the notch's ears show those activities).
 
 ## Dock
 

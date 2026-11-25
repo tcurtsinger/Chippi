@@ -21,8 +21,9 @@ using Chippi.UI.Displays;
 namespace Chippi.Features.MacDesktop.MenuBar;
 
 /// <summary>
-/// The menu bars, one per display, and what they show: the app in front and its menus, the Chippi and Window menus, the
-/// status items, the clock and the ink each display's wallpaper calls for. Lives on the UI thread from start to stop.
+/// The menu bars, one per display, and what they show: the app in front and its menus, the Chippi and Window menus,
+/// Chippi's items and what each does on a press, the clock and the ink each display's wallpaper calls for. Lives on the UI
+/// thread from start to stop.
 /// </summary>
 internal sealed class MenuBarController : IDisposable
 {
@@ -36,6 +37,8 @@ internal sealed class MenuBarController : IDisposable
     private readonly StatusReadings _status;
     private readonly DispatcherTimer _clock, _wallpaperPoll;
     private IReadOnlyList<AppMenuEntry> _titles = [];
+    private IReadOnlyList<string> _items = [];
+    private BarStates _states;
     private nint _titlesWindow;
     private bool _elevated, _disposed;
 
@@ -59,6 +62,7 @@ internal sealed class MenuBarController : IDisposable
 
     public void Start()
     {
+        RefreshItems();
         RefreshDisplays();
         OnFrontChanged();
         TickClock();
@@ -101,6 +105,8 @@ internal sealed class MenuBarController : IDisposable
             var bar = new MenuBarWindow(this, monitor, _lastStrip);
             _bars[monitor] = bar;
             bar.Show();
+            bar.SetItems(_items);
+            bar.SetStates(_states);
             bar.SetStatus(_status);
             bar.SetApp(_front.App.Name, _titles.Select(t => t.Text).ToArray());
             bar.SetClock(ClockText(DateTime.Now));
@@ -403,25 +409,122 @@ internal sealed class MenuBarController : IDisposable
 
     // ----- The right side -----
 
+    /// <summary>The clock's own id for <see cref="Press"/>: it isn't one of the items.</summary>
+    public const string Clock = "clock";
+
+    /// <summary>The saved items changed: the bars show them.</summary>
+    public void SettingsChanged() => RefreshItems();
+
+    private void RefreshItems()
+    {
+        if (_disposed)
+            return;
+        var shown = BarItems.Shown(Shell.BarItems(), Shell.Availability());
+        _status.WantsCpu = shown.Contains(BarItems.System);
+        if (shown.SequenceEqual(_items))
+            return;
+        _items = shown;
+        ForEach(b => b.SetItems(shown));
+    }
+
     /// <summary>
-    /// The taskbar's hidden icons, Windows' own flyout: Win+B gives the hidden taskbar's notification area the keyboard and
-    /// Space opens it (Enter's key-up would start the first icon's app). It opens where the taskbar would be, so it's put
-    /// under the chevron. A second click closes it. Follows Muelle (MIT).
+    /// A press on one of the right side's items, or on the clock: each does one thing at once. An item that opens an
+    /// island page closes it on a second press.
     /// </summary>
-    public async Task ToggleHiddenIconsAsync(MenuBarWindow bar, FrameworkElement chevron)
+    public void Press(string id)
+    {
+        if (_disposed)
+            return;
+        if (id == Clock)
+        {
+            // Windows' own notifications, where Windows opens them.
+            _ = Shell.PressAsync("Win+N");
+            return;
+        }
+        var press = BarItems.Press(id);
+        switch (press.Kind)
+        {
+            case BarPressKind.Command:
+                Run(press.Target);
+                break;
+            case BarPressKind.Page:
+                if (!Shell.ClosePage(press.Target))
+                    Shell.Context.OpenIslandPage(press.Target);
+                break;
+            case BarPressKind.Search:
+                if (!Shell.ClosePage(press.Target))
+                    Run(BarItems.SearchCommand);
+                break;
+            case BarPressKind.Home:
+                if (!Shell.ClosePage(null))
+                    Shell.OpenNotchHome();
+                break;
+            case BarPressKind.Record:
+                // While recording, the item is the Stop button.
+                if (_states.Recording is not null)
+                    Run(BarItems.StopRecordingCommand);
+                else if (!Shell.ClosePage(press.Target))
+                    Shell.Context.OpenIslandPage(press.Target);
+                break;
+            case BarPressKind.Sound:
+                OpenSound();
+                break;
+            case BarPressKind.HiddenIcons:
+                _ = ToggleHiddenIconsAsync();
+                break;
+            case BarPressKind.Keys:
+                _ = Shell.PressAsync(press.Target);
+                break;
+            case BarPressKind.Open:
+                Open(press.Target);
+                break;
+        }
+    }
+
+    /// <summary>Runs one of Chippi's commands by its key, as Search and a shortcut would.</summary>
+    private void Run(string key)
+    {
+        var command = Shell.Context.Commands().FirstOrDefault(c => c.Key == key);
+        if (command is null)
+        {
+            Log.Warn($"Mac-style desktop: nothing runs {key}");
+            return;
+        }
+        _ = Do();
+
+        async Task Do()
+        {
+            try { await command.Run(); }
+            catch (Exception ex) { Log.Warn($"Mac-style desktop: {key} failed", ex); }
+        }
+    }
+
+    /// <summary>Chippi Settings on Output; on App volume without the Output feature; Windows' own sound settings without either.</summary>
+    private void OpenSound()
+    {
+        var context = Shell.Context;
+        if (context.IsFeatureRunning("audio-routing"))
+            context.OpenSettingsPage("page:sound-output");
+        else if (context.IsFeatureRunning("app-volume"))
+            context.OpenSettingsPage("module:app-volume");
+        else
+            Open("ms-settings:sound");
+    }
+
+    /// <summary>
+    /// The taskbar's hidden icons, Windows' own flyout, where Windows opens it: Win+B gives the hidden taskbar's
+    /// notification area the keyboard and Space opens it (Enter's key-up would start the first icon's app). A second press
+    /// closes it, and the app that was in front gets the keyboard back. Follows Muelle (MIT).
+    /// </summary>
+    private async Task ToggleHiddenIconsAsync()
     {
         if (Overflow() is var open && open != 0)
         {
             Native.SetForegroundWindow(open);
             await Shell.TapAsync(0x1B); // Esc
-            return; // the first click's watch gives the keyboard back
+            return; // the first press's wait gives the keyboard back
         }
         nint before = _front.Window;
-        var anchor = bar.Below(chevron);
-        // Out of sight before it shows: it's where the last one was left until Windows moves it to the taskbar's place.
-        foreach (string cls in OverflowClasses)
-            if (Native.FindWindow(cls, null) is var hidden && hidden != 0)
-                KeepAway(hidden);
         await Shell.PressAsync("Win+B");
         var pressed = Stopwatch.StartNew();
         while (!IsTaskbar(Native.GetForegroundWindow()))
@@ -434,56 +537,21 @@ internal sealed class MenuBarController : IDisposable
         if (wait > 0)
             await Task.Delay(wait);
         await Shell.TapAsync(0x20); // Space
-        await KeepUnderAsync(Overflow, anchor, bar);
-        // Closed with the keyboard still on the hidden taskbar (Esc, or a second click on the chevron): the app that was
-        // in front gets it back. Anything else that came forward meanwhile keeps it.
+        // Until it has shown and gone again.
+        var waited = Stopwatch.StartNew();
+        bool seen = false;
+        while (!_disposed)
+        {
+            if (Overflow() != 0)
+                seen = true;
+            else if (seen || waited.ElapsedMilliseconds > 1500)
+                break;
+            await Task.Delay(seen ? 100 : 20);
+        }
+        // Closed with the keyboard still on the hidden taskbar (Esc, or a second press): the app that was in front gets it
+        // back. Anything else that came forward meanwhile keeps it.
         if (!_disposed && IsTaskbar(Native.GetForegroundWindow()) && before != 0 && Native.IsWindow(before) && !Native.IsIconic(before))
             ForegroundRight.Take(before);
-    }
-
-    /// <summary>
-    /// Quick Settings (Win+A) and notifications (Win+N), Windows' own flyouts: they open by the hidden taskbar, at the
-    /// bottom of the main display, so they're put under the bar item that opened them, on its display. The flyout is the
-    /// window of Windows' shell that takes the keyboard after the keys. A second press closes it (the keys toggle).
-    /// </summary>
-    public async Task ToggleFlyoutAsync(MenuBarWindow bar, FrameworkElement item, string keys)
-    {
-        nint was = Native.GetForegroundWindow();
-        var anchor = bar.Below(item);
-        await Shell.PressAsync(keys);
-        bool wasOpen = IsShellFlyout(was); // one of them was open: these keys closed it, or opened the other in its place
-        var waited = Stopwatch.StartNew();
-        nint flyout = 0;
-        while (!_disposed && waited.ElapsedMilliseconds < 1500)
-        {
-            nint front = Native.GetForegroundWindow();
-            if (front != 0 && front != was && IsShellFlyout(front))
-            {
-                flyout = Native.GetAncestor(front, Native.GaRoot) is var root && root != 0 ? root : front;
-                break;
-            }
-            await Task.Delay(10);
-        }
-        if (flyout == 0 && wasOpen)
-            return;
-        if (flyout == 0)
-        {
-            Log.Info($"Mac-style desktop: {keys} opened nothing the bar could place (in front: {Native.ClassOf(Native.GetForegroundWindow())})");
-            return;
-        }
-        KeepAway(flyout);
-        if (Native.GetWindowRect(flyout, out var rect))
-            Log.Info($"Mac-style desktop: {keys} opened {Native.ClassOf(flyout)} '{Native.TitleOf(flyout)}', {rect.Width}x{rect.Height}, on a {bar.Bounds.Width:0}-wide bar");
-        await KeepUnderAsync(() => Native.IsShown(flyout) ? flyout : 0, anchor, bar);
-    }
-
-    /// <summary>A window of the hosts Windows draws Quick Settings and notifications in; not Start or Search, which have hosts of their own.</summary>
-    private static bool IsShellFlyout(nint window)
-    {
-        if (window == 0 || Native.GetWindowThreadProcessId(window, out uint pid) == 0)
-            return false;
-        string host = Path.GetFileName(AppNames.ImagePath(pid) ?? "");
-        return host.Equals("ShellHost.exe", StringComparison.OrdinalIgnoreCase) || host.Equals("ShellExperienceHost.exe", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsTaskbar(nint window) => Native.ClassOf(window) is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd";
@@ -501,73 +569,7 @@ internal sealed class MenuBarController : IDisposable
         return 0;
     }
 
-    /// <summary>How long Windows' flyouts take to slide in from the taskbar's edge.</summary>
-    private const int SlideIn = 230;
-
-    /// <summary>
-    /// Keeps one of Windows' flyouts under <paramref name="anchor"/> for as long as it's open. Windows slides it in from the
-    /// taskbar's edge and puts it back there whenever it changes size, so while it slides in it's kept off every display,
-    /// and it's shown under the bar once it's whole: it opens at the bar, not at the bottom.
-    /// </summary>
-    private async Task KeepUnderAsync(Func<nint> find, Point anchor, MenuBarWindow bar)
-    {
-        var held = Stopwatch.StartNew();
-        long seen = -1;
-        int slide = SystemParameters.ClientAreaAnimation ? SlideIn : 0;
-        double bottom = Native.Area(bar.Monitor) is { } area ? area.Monitor.Bottom : bar.Bounds.Bottom + 2000;
-        while (!_disposed)
-        {
-            nint flyout = find();
-            if (flyout != 0)
-            {
-                if (seen < 0)
-                    seen = held.ElapsedMilliseconds;
-                if (held.ElapsedMilliseconds - seen < slide)
-                    KeepAway(flyout);
-                else
-                    KeepUnder(flyout, anchor, bar.Bounds, bottom);
-            }
-            else if (seen >= 0 || held.ElapsedMilliseconds > 1500)
-                break;
-            await Task.Delay(seen >= 0 && held.ElapsedMilliseconds - seen > 1000 ? 30 : 10);
-        }
-    }
-
-    /// <summary>Puts a flyout below every display, where it can't be seen, keeping its place across.</summary>
-    private static void KeepAway(nint flyout)
-    {
-        if (!Native.GetWindowRect(flyout, out var rect))
-            return;
-        int away = (int)Native.Desktop().Bottom + 200;
-        if (rect.Top != away)
-            Native.SetWindowPos(flyout, 0, rect.Left, away, 0, 0, Native.SwpNoSize | Native.SwpNoZOrder | Native.SwpNoActivate);
-    }
-
-    /// <summary>
-    /// Under the anchor, centered on it and kept inside the bar's display; one too tall for the room under the bar sits
-    /// as low as it must.
-    /// </summary>
-    private static void KeepUnder(nint flyout, Point anchor, Rect bar, double displayBottom)
-    {
-        if (!Native.GetWindowRect(flyout, out var rect))
-            return;
-        var (left, top) = FlyoutPlace(new Size(rect.Width, rect.Height), anchor.X, bar, displayBottom);
-        if (rect.Left != left || rect.Top != top)
-            Native.SetWindowPos(flyout, 0, left, top, 0, 0, Native.SwpNoSize | Native.SwpNoZOrder | Native.SwpNoActivate);
-    }
-
-    /// <summary>Where a flyout of <paramref name="size"/> goes under a bar item centered at <paramref name="anchorX"/>. Physical pixels.</summary>
-    public static (int Left, int Top) FlyoutPlace(Size size, double anchorX, Rect bar, double displayBottom)
-    {
-        int gap = (int)Math.Round(6 * (bar.Height / MenuBarWindow.Height28));
-        double least = bar.Left + gap, most = Math.Max(least, bar.Right - gap - size.Width);
-        int left = (int)Math.Clamp(anchorX - size.Width / 2.0, least, most);
-        int top = (int)bar.Bottom + gap;
-        if (top + size.Height > displayBottom)
-            top = (int)Math.Max(bar.Top, displayBottom - size.Height);
-        return (left, top);
-    }
-
+    /// <summary>The island's activities the items stand for: a muted mic, keep awake, an agent at work, a recording.</summary>
     private void OnActivities(object? sender, EventArgs e)
     {
         if (!_dispatcher.CheckAccess())
@@ -578,37 +580,23 @@ internal sealed class MenuBarController : IDisposable
         if (_disposed || Shell.Activities is not { } hub)
             return;
         var activities = hub.Activities;
-        var badges = new List<(string, Geometry, Brush, Brush, Action)>();
-        Action Opens(IslandActivity a) => () => Shell.Context.OpenIslandPage(a.TileKey ?? a.OpensTile ?? a.Key);
-        if (activities.FirstOrDefault(a => a.ModuleId == "mic-mute" && a.NeedsAttention) is { } mic)
-            badges.Add(("Microphone muted", LucideIcons.MicOff, Frozen(Color.FromRgb(0xC4, 0x2B, 0x1C)), Brushes.White, Opens(mic)));
-        if (activities.FirstOrDefault(a => a.ModuleId == "keep-awake" && a.Kind == IslandActivityKind.Status) is { } awake)
-            badges.Add(("Keep awake", LucideIcons.Coffee, AccentFill, Frozen(Color.FromRgb(0x17, 0x0F, 0x2E)), Opens(awake)));
-        if (activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Agent) is { } agent)
-            badges.Add(("Agents", Glyphs.Sparkle, Frozen(Color.FromRgb(0xE8, 0x87, 0x5B)), Brushes.White, Opens(agent)));
-        ForEach(b => b.SetBadges(badges));
-    }
-
-    private static readonly Brush AccentFill = MakeAccentFill();
-
-    private static Brush MakeAccentFill()
-    {
-        var fill = new LinearGradientBrush(Color.FromRgb(0xB7, 0x8F, 0xFF), Color.FromRgb(0x82, 0xAE, 0xFF), new Point(0, 0), new Point(1, 1));
-        fill.Freeze();
-        return fill;
-    }
-
-    private static SolidColorBrush Frozen(Color color)
-    {
-        var brush = new SolidColorBrush(color);
-        brush.Freeze();
-        return brush;
+        var states = new BarStates(
+            activities.Any(a => a.ModuleId == "mic-mute" && a.NeedsAttention),
+            activities.Any(a => a.ModuleId == "keep-awake" && a.Kind == IslandActivityKind.Status),
+            activities.Any(a => a.Kind == IslandActivityKind.Agent),
+            activities.FirstOrDefault(a => a.Kind == IslandActivityKind.Recording)?.Title);
+        if (states == _states)
+            return;
+        _states = states;
+        ForEach(b => b.SetStates(states));
     }
 
     private void TickClock()
     {
         string text = ClockText(DateTime.Now);
         ForEach(b => b.SetClock(text));
+        // A feature installed or removed, a battery or a second input language that came or went: the items follow.
+        RefreshItems();
         // Each second, too: an app can leave fullscreen with the same window still in front, and Windows' notice of it to
         // the bar isn't one to rely on alone.
         FullscreenChanged();
@@ -662,12 +650,44 @@ internal sealed class MenuBarController : IDisposable
     }
 }
 
-/// <summary>Lucide glyphs the shared set doesn't have (ISC).</summary>
+/// <summary>The menu bar items' glyphs: Lucide's (ISC), the ones the shared set doesn't have drawn here.</summary>
 internal static class Glyphs
 {
-    public static Geometry Sparkle { get; } = Frozen("M9.937,15.5 A2,2 0 0 0 8.5,14.063 l-6.135,-1.582 a.5,.5 0 0 1 0,-.962 L8.5,9.936 A2,2 0 0 0 9.937,8.5 l1.582,-6.135 a.5,.5 0 0 1 .963,0 L14.063,8.5 A2,2 0 0 0 15.5,9.937 l6.135,1.581 a.5,.5 0 0 1 0,.964 L15.5,14.063 a2,2 0 0 0 -1.437,1.437 l-1.582,6.135 a.5,.5 0 0 1 -.963,0 Z");
+    /// <summary>Lucide's "focus": the capture selector's corners around its target.</summary>
+    public static Geometry Capture { get; } = Frozen("M3,7 V5 a2,2 0 0 1 2,-2 h2 M17,3 h2 a2,2 0 0 1 2,2 v2 M21,17 v2 a2,2 0 0 1 -2,2 h-2 M7,21 H5 a2,2 0 0 1 -2,-2 v-2 M15,12 a3,3 0 1 0 -6,0 a3,3 0 1 0 6,0 Z");
 
-    public static Geometry LayoutGrid => LucideIcons.LayoutGrid;
+    /// <summary>Lucide's "battery-medium", for the Settings row; the bar draws its own with the charge in it.</summary>
+    public static Geometry Battery { get; } = Frozen("M4,6 h12 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 H4 a2,2 0 0 1 -2,-2 V8 a2,2 0 0 1 2,-2 Z M22,10.5 v3 M6,10 v4 M10,10 v4");
+
+    /// <summary>Lucide's "languages".</summary>
+    public static Geometry Language { get; } = Frozen("M5,8 l6,6 M4,14 l6,-6 l2,-3 M2,5 h12 M7,2 h1 M22,22 l-5,-10 l-5,10 M14,18 h6");
+
+    /// <summary>An item's glyph at rest, on the bar and in Settings.</summary>
+    public static Geometry Of(string id) => id switch
+    {
+        BarItems.Search => LucideIcons.Search,
+        BarItems.Capture => Capture,
+        BarItems.Clipboard => LucideIcons.ClipboardList,
+        BarItems.Microphone => LucideIcons.Mic,
+        BarItems.Sound => LucideIcons.Volume,
+        BarItems.HiddenIcons => LucideIcons.Up,
+        BarItems.Controls => LucideIcons.Sliders,
+        BarItems.Record => LucideIcons.Video,
+        BarItems.CopyText => LucideIcons.ScanText,
+        BarItems.PickColor => LucideIcons.Pipette,
+        BarItems.Scratchpad => LucideIcons.NotebookPen,
+        BarItems.Shelf => LucideIcons.Inbox,
+        BarItems.KeepAwake => LucideIcons.Coffee,
+        BarItems.Displays => LucideIcons.Sun,
+        BarItems.System => LucideIcons.Activity,
+        BarItems.Agents => LucideIcons.Gauge,
+        BarItems.Actions => LucideIcons.ToggleRight,
+        BarItems.Network => LucideIcons.Network,
+        BarItems.Battery => Battery,
+        BarItems.Language => Language,
+        MenuBarController.Clock => LucideIcons.Clock,
+        _ => LucideIcons.LayoutGrid,
+    };
 
     private static Geometry Frozen(string data)
     {

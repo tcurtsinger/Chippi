@@ -710,7 +710,24 @@ public partial class IslandWindow : Window
         if (_peeking || !_panel.IsOpen || _panel.Covers(physical) || (IsVisible && CoversWidget(physical)) || _notch?.Covers(physical) == true
             || Menu.IsOpen || Mouse.Captured is not null)
             return;
+        _pageToggle.ClosedByPress(_panel.CurrentPage, Environment.TickCount64);
         Dispatcher.BeginInvoke(() => { if (!_peeking) CloseIsland(); });
+    }
+
+    private readonly PageToggle _pageToggle = new();
+
+    /// <summary>
+    /// A press on a button outside the panel that opens <paramref name="key"/>'s page (null for the home): the Mac-style
+    /// menu bar's items. True when the page was open, and it's closed now: the press closes it, and the button must not
+    /// open it again.
+    /// </summary>
+    internal bool ClosePressed(string? key)
+    {
+        if (!_pageToggle.WasOn(key, _panel.IsOpen, _panel.CurrentPage, Environment.TickCount64))
+            return false;
+        if (_panel.IsOpen && !_peeking)
+            CloseIsland();
+        return true;
     }
 
     // ----- Open and close -----

@@ -1,0 +1,589 @@
+<title>Chippi Menu Bar Items</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one 1600×900 desktop, scaled to fit, with the bar live at its top. Under it, the Settings section that
+   edits the bar (real size) beside the list of what every item does. Tokens are DESIGN.md's: the island brushes
+   for the bar and its menus, the general theme for Settings. */
+:root{
+  --bg:#ECEBF0;--fg:#1A1A1A;--muted:#5D5D5D;--chip:#FFFFFF;--chipb:rgba(0,0,0,.10);--chipon:#7444F0;--chiponTx:#FFFFFF;--line:rgba(0,0,0,.09);
+  --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(190,160,255,.75),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(150,200,255,.7),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(245,170,230,.55),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(150,215,245,.6),transparent 70%),linear-gradient(160deg,#F1EDFB,#E9F0FB);
+  --bartx:#1A1A1A;--barhov:rgba(0,0,0,.08);--barshadow:0 0 6px rgba(255,255,255,.45);
+  --menu:rgba(246,246,248,.97);--menub:rgba(0,0,0,.09);--menutx:#1A1A1A;--menutx2:#4A4A4A;--menutx3:#707070;--menushadow:0 12px 32px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.08);
+  --ac:#7444F0;--acfill:linear-gradient(135deg,#8F5CFF,#5B86FF);--onac:#FFFFFF;--actint:rgba(116,68,240,.11);--agent:#C8613A;--crit:#C42B1C;--oncrit:#FFFFFF;
+  --dock:rgba(255,255,255,.42);--dockb:rgba(255,255,255,.7);--dockshadow:0 10px 30px rgba(60,40,120,.18);
+  --awin:#FBFBFB;--awintitle:#F0F0F3;--awintx:#1A1A1A;--awinline:rgba(0,0,0,.09);--awinshadow:0 24px 60px rgba(40,30,90,.22),0 2px 10px rgba(0,0,0,.1);
+  --swin:#F3F3F3;--surf:#FBFBFB;--sbord:rgba(0,0,0,.059);--div:rgba(0,0,0,.071);--st1:#1A1A1A;--st2:#404040;--st3:#5D5D5D;--st4:#616161;
+  --ssel:rgba(0,0,0,.055);--shov:rgba(0,0,0,.043);--sbtn:#FFFFFF;--sbtnb:rgba(0,0,0,.10);--sacc:#6B4FBB;--sonacc:#FFFFFF;--pop:#F9F9F9;--popshadow:0 8px 24px rgba(0,0,0,.16),0 1px 3px rgba(0,0,0,.08);
+  --dim:rgba(0,0,0,.38);--selb:#FFFFFF;--pill:#1B1B1F;--pilltx:#FFFFFF;
+  --ui:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,sans-serif;--display:'Segoe UI Variable Display','Segoe UI',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141418;--fg:#F2F2F2;--muted:#ABABAB;--chip:#2B2B2F;--chipb:rgba(255,255,255,.09);--chipon:#B79CFF;--chiponTx:#170F2E;--line:rgba(255,255,255,.09);
+  --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);
+  --bartx:#FFFFFF;--barhov:rgba(255,255,255,.12);--barshadow:0 1px 3px rgba(0,0,0,.45);
+  --menu:rgba(40,40,44,.97);--menub:rgba(255,255,255,.09);--menutx:#FFFFFF;--menutx2:#C9C9C9;--menutx3:#9A9A9A;--menushadow:0 12px 32px rgba(0,0,0,.5),0 1px 4px rgba(0,0,0,.3);
+  --ac:#B79CFF;--acfill:linear-gradient(135deg,#B78FFF,#82AEFF);--onac:#170F2E;--actint:rgba(183,156,255,.16);--agent:#E8875B;--crit:#C42B1C;--oncrit:#FFFFFF;
+  --dock:rgba(40,40,46,.45);--dockb:rgba(255,255,255,.13);--dockshadow:0 10px 30px rgba(0,0,0,.45);
+  --awin:#202020;--awintitle:#2B2B2B;--awintx:#FFFFFF;--awinline:rgba(255,255,255,.08);--awinshadow:0 24px 60px rgba(0,0,0,.55),0 2px 10px rgba(0,0,0,.3);
+  --swin:#202020;--surf:#2B2B2B;--sbord:rgba(255,255,255,.031);--div:rgba(255,255,255,.059);--st1:#FFFFFF;--st2:#C5C5C5;--st3:#ABABAB;--st4:#9D9D9D;
+  --ssel:rgba(255,255,255,.059);--shov:rgba(255,255,255,.043);--sbtn:rgba(255,255,255,.059);--sbtnb:rgba(255,255,255,.09);--sacc:#B79CFF;--sonacc:#000000;--pop:#2C2C2C;--popshadow:0 8px 24px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.3);
+  --dim:rgba(0,0,0,.5);--selb:#FFFFFF;--pill:#1B1B1F;--pilltx:#FFFFFF;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141418;--fg:#F2F2F2;--muted:#ABABAB;--chip:#2B2B2F;--chipb:rgba(255,255,255,.09);--chipon:#B79CFF;--chiponTx:#170F2E;--line:rgba(255,255,255,.09);
+  --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);
+  --bartx:#FFFFFF;--barhov:rgba(255,255,255,.12);--barshadow:0 1px 3px rgba(0,0,0,.45);
+  --menu:rgba(40,40,44,.97);--menub:rgba(255,255,255,.09);--menutx:#FFFFFF;--menutx2:#C9C9C9;--menutx3:#9A9A9A;--menushadow:0 12px 32px rgba(0,0,0,.5),0 1px 4px rgba(0,0,0,.3);
+  --ac:#B79CFF;--acfill:linear-gradient(135deg,#B78FFF,#82AEFF);--onac:#170F2E;--actint:rgba(183,156,255,.16);--agent:#E8875B;--crit:#C42B1C;--oncrit:#FFFFFF;
+  --dock:rgba(40,40,46,.45);--dockb:rgba(255,255,255,.13);--dockshadow:0 10px 30px rgba(0,0,0,.45);
+  --awin:#202020;--awintitle:#2B2B2B;--awintx:#FFFFFF;--awinline:rgba(255,255,255,.08);--awinshadow:0 24px 60px rgba(0,0,0,.55),0 2px 10px rgba(0,0,0,.3);
+  --swin:#202020;--surf:#2B2B2B;--sbord:rgba(255,255,255,.031);--div:rgba(255,255,255,.059);--st1:#FFFFFF;--st2:#C5C5C5;--st3:#ABABAB;--st4:#9D9D9D;
+  --ssel:rgba(255,255,255,.059);--shov:rgba(255,255,255,.043);--sbtn:rgba(255,255,255,.059);--sbtnb:rgba(255,255,255,.09);--sacc:#B79CFF;--sonacc:#000000;--pop:#2C2C2C;--popshadow:0 8px 24px rgba(0,0,0,.45),0 1px 3px rgba(0,0,0,.3);
+  --dim:rgba(0,0,0,.5);--selb:#FFFFFF;--pill:#1B1B1F;--pilltx:#FFFFFF;
+  color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/20px var(--ui);-webkit-font-smoothing:antialiased;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+button{font:inherit;color:inherit;margin:0}
+::selection{background:var(--actint)}
+.wrap{max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 24px}
+header.top h1{font:600 22px/28px var(--display);margin:0;text-wrap:balance}
+header.top p{margin:2px 0 0;color:var(--muted);font-size:13px;line-height:18px;max-width:72ch}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px 16px;margin-left:auto;align-items:center}
+.seg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.seg .opts{display:flex;background:var(--chip);border:1px solid var(--chipb);border-radius:6px;padding:2px}
+.seg button{font-size:12px;border:0;background:transparent;color:var(--fg);padding:4px 10px;border-radius:4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--chipon);color:var(--chiponTx);font-weight:600}
+.seg button:focus-visible,.reset:focus-visible{outline:2px solid var(--chipon);outline-offset:1px}
+.reset{font-size:12px;border:1px solid var(--chipb);background:var(--chip);color:var(--fg);padding:5px 10px;border-radius:6px;cursor:pointer}
+.frame{position:relative;width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;box-shadow:0 1px 0 var(--chipb),0 20px 50px rgba(0,0,0,.18);max-width:100%}
+.said{margin:0;min-height:18px;font-size:13px;line-height:18px;color:var(--muted)}
+.said b{color:var(--fg);font-weight:600}
+
+/* ---------- stage ---------- */
+.stage{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:0 0;background:var(--wall);font-family:var(--ui);font-size:13px;line-height:18px;user-select:none;-webkit-user-select:none;overflow:hidden}
+.stage.wall-light{--wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(190,160,255,.75),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(150,200,255,.7),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(245,170,230,.55),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(150,215,245,.6),transparent 70%),linear-gradient(160deg,#F1EDFB,#E9F0FB);--bartx:#1A1A1A;--barhov:rgba(0,0,0,.08);--barshadow:0 0 6px rgba(255,255,255,.45)}
+.stage.wall-dark{--wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);--bartx:#FFFFFF;--barhov:rgba(255,255,255,.12);--barshadow:0 1px 3px rgba(0,0,0,.45)}
+.ic{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
+
+/* the bar: no fill, ink by the wallpaper */
+.bar{position:absolute;left:0;top:0;width:1600px;height:28px;text-shadow:var(--barshadow);color:var(--bartx);font-size:13px;z-index:20}
+.grp{position:absolute;top:0;height:28px;display:flex;align-items:center;gap:2px;white-space:nowrap}
+.grp.l{left:8px}.grp.r{right:8px}
+.bi{height:22px;padding:0 8px;border:0;border-radius:5px;background:transparent;display:flex;align-items:center;gap:6px;cursor:default;color:var(--bartx);text-shadow:inherit;font-size:13px}
+.bi svg{filter:drop-shadow(var(--barshadow))}
+.bi:hover,.bi.open{background:var(--barhov)}
+.bi:focus-visible{outline:2px solid var(--bartx);outline-offset:1px}
+.bi.app{font-weight:700}
+.bi .num{font-variant-numeric:tabular-nums}
+.bi.clock{gap:8px}
+.lang{font-size:12px;font-weight:600;letter-spacing:.02em}
+.disc{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;flex:none}
+.disc svg{filter:none}
+.disc.ac{background:var(--acfill);color:var(--onac)}
+.disc.mic{background:var(--crit);color:var(--oncrit)}
+.disc.agent{background:var(--agent);color:var(--oncrit)}
+.recdot{width:10px;height:10px;border-radius:50%;background:var(--crit);display:inline-block;flex:none}
+.tip{position:absolute;padding:3px 10px;border-radius:6px;background:var(--menu);border:1px solid var(--menub);color:var(--menutx);font-size:12px;white-space:nowrap;pointer-events:none;z-index:80;box-shadow:var(--menushadow)}
+
+/* the app in front and the dock, for context */
+.win{position:absolute;left:150px;top:120px;width:720px;height:470px;border-radius:8px;background:var(--awin);box-shadow:var(--awinshadow);overflow:hidden;color:var(--awintx);z-index:5}
+.win .tb{height:36px;background:var(--awintitle);display:flex;align-items:center;padding:0 0 0 14px;font-size:12px;gap:10px;border-bottom:1px solid var(--awinline)}
+.win .tb .caps{margin-left:auto;display:flex}
+.win .tb .caps span{width:46px;height:36px;display:grid;place-items:center;opacity:.8}
+.win .body{padding:22px 28px;display:flex;flex-direction:column;gap:12px}
+.win .line{height:10px;border-radius:5px;background:var(--awinline)}
+.dockwrap{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;z-index:10;pointer-events:none}
+.dock{height:64px;padding:0 8px 8px;border-radius:18px;background:var(--dock);border:1px solid var(--dockb);box-shadow:var(--dockshadow);backdrop-filter:blur(26px) saturate(1.8);-webkit-backdrop-filter:blur(26px) saturate(1.8);display:flex;align-items:flex-end;gap:6px}
+.di{width:48px;height:48px;flex:none;border-radius:22.5%;display:grid;place-items:center;color:#fff;box-shadow:0 2px 5px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.35)}
+.dsep{width:1px;height:40px;margin:0 4px 4px;background:var(--dockb);flex:none}
+
+/* the notch: black in both themes, the dark island ink always */
+.notch{--ntx:#FFFFFF;--ntx2:#C9C9C9;--ntx3:#9A9A9A;--tile:rgba(255,255,255,.07);--tileh:rgba(255,255,255,.12);--hair:rgba(255,255,255,.09);--nac:#B79CFF;--nacfill:linear-gradient(135deg,#B78FFF,#82AEFF);--nonac:#170F2E;--ntint:rgba(183,156,255,.16)}
+.notch{position:absolute;top:0;left:708px;width:184px;height:28px;border-radius:0 0 10px 10px;z-index:40;background:#000;color:var(--ntx);overflow:hidden;cursor:default;font-size:12px;line-height:16px;
+  transition:left .26s cubic-bezier(.2,.8,.2,1),width .26s cubic-bezier(.2,.8,.2,1),height .26s cubic-bezier(.2,.8,.2,1),border-radius .22s}
+.notch.isopen{left:540px;width:520px;height:360px;border-radius:0 0 14px 14px}
+.ears{position:absolute;left:0;right:0;top:0;height:28px;display:flex;align-items:center;padding:0 11px;transition:opacity .12s}
+.notch.isopen .ears{opacity:0}
+.content{position:absolute;top:0;left:50%;width:520px;margin-left:-260px;height:360px;padding:12px 16px 0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .12s}
+.notch.isopen .content{opacity:1;pointer-events:auto;transition:opacity .16s .08s}
+.ph{height:32px;display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;flex:none}
+.ph .back{width:28px;height:28px;margin-left:-6px;border-radius:4px;display:grid;place-items:center;color:var(--ntx2);border:0;background:transparent;cursor:pointer}
+.ph .back:hover{background:var(--tile)}
+.sfield{flex:1;height:32px;border-radius:4px;border:1px solid var(--hair);border-bottom:2px solid var(--nac);background:var(--tile);display:flex;align-items:center;padding:0 10px;font-size:13px;font-weight:400;color:var(--ntx3)}
+.sfield i{width:1px;height:16px;background:var(--ntx);margin-right:1px}
+.isr{height:34px;display:flex;align-items:center;gap:10px;padding:0 10px;border-radius:4px}
+.isr.sel{background:var(--ntint)}
+.isr .ld{width:20px;display:grid;place-items:center;color:var(--ntx2);flex:none}
+.isr .tx{flex:1;min-width:0}
+.isr .nm{font-size:12px;line-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.isr .dt{font-size:11px;line-height:14px;color:var(--ntx2)}
+.isr .vb{font-size:11px;font-weight:600}
+.pbody{flex:1;margin:8px 0 14px;display:flex;flex-direction:column}
+.pb{flex:1;border-radius:6px;border:1px dashed var(--hair);display:grid;place-items:center;text-align:center;color:var(--ntx3);font-size:12px;line-height:18px}
+.pb b{display:block;color:var(--ntx);font-size:13px;font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.tile{height:64px;border-radius:6px;background:var(--tile);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--ntx2)}
+.tile span{font-size:12px;color:var(--ntx);line-height:15px}
+.nbtn{height:28px;padding:0 12px;border-radius:4px;border:1px solid var(--hair);background:var(--tile);color:var(--ntx);font-size:12px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.nbtn:hover{background:var(--tileh)}
+.nbtn:focus-visible,.ph .back:focus-visible{outline:2px solid var(--ntx);outline-offset:2px}
+
+/* what a click opens */
+.capture{position:absolute;inset:0;z-index:70;cursor:crosshair;overflow:hidden}
+.csel{position:absolute;left:560px;top:300px;width:520px;height:260px;border:1px solid var(--selb);box-shadow:0 0 0 2000px var(--dim)}
+.szp{position:absolute;left:0;top:100%;margin-top:8px;padding:2px 8px;border-radius:4px;background:var(--pill);color:var(--pilltx);font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.loupe{position:absolute;left:770px;top:380px;width:104px;height:104px;border-radius:50%;border:2px solid var(--selb);box-shadow:0 6px 18px rgba(0,0,0,.35);background:linear-gradient(var(--menub) 1px,transparent 1px) 0 0/13px 13px,linear-gradient(90deg,var(--menub) 1px,transparent 1px) 0 0/13px 13px,linear-gradient(135deg,#B78FFF,#82AEFF)}
+.loupe:after{content:"";position:absolute;left:50%;top:50%;width:13px;height:13px;margin:-7px 0 0 -7px;border:2px solid var(--selb)}
+.loupe .szp{left:50%;transform:translateX(-50%)}
+.swn{position:absolute;z-index:30;border-radius:8px;background:var(--swin);color:var(--st1);box-shadow:var(--awinshadow);overflow:hidden;font-size:14px;line-height:20px;display:flex;flex-direction:column}
+.swn .tb{height:40px;display:flex;align-items:center;gap:9px;padding-left:16px;font-size:12px;flex:none}
+.swn .tb .x{margin-left:auto;width:46px;height:40px;display:grid;place-items:center;color:var(--st2);border:0;background:transparent;cursor:pointer}
+.swn .tb .x:hover{background:var(--crit);color:var(--oncrit)}
+.swn .sh2{display:flex;flex:1;min-height:0}
+.swn .side{width:210px;flex:none;padding:6px 12px}
+.swn .gl{font-size:12px;color:var(--st2);padding:8px 12px 2px}
+.swn .nav{position:relative;height:32px;margin:2px 4px;padding:0 12px;border-radius:4px;display:flex;align-items:center;gap:12px;white-space:nowrap}
+.swn .nav.sel{background:var(--ssel);font-weight:600}
+.swn .nav.sel:before{content:"";position:absolute;left:-4px;top:8px;width:3px;height:16px;border-radius:2px;background:var(--sacc)}
+.swn .pg{flex:1;min-width:0;padding:4px 28px 20px}
+.swn .pt{font:600 20px/28px var(--display);margin:0 0 14px}
+.swn .ln{height:10px;border-radius:5px;background:var(--div);margin:14px 0}
+.sl{width:150px;height:4px;border-radius:2px;background:var(--st4);position:relative;flex:none}
+.sl:before{content:"";position:absolute;left:0;top:0;bottom:0;width:62%;border-radius:2px;background:var(--sacc)}
+.sl:after{content:"";position:absolute;left:62%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--sacc);box-shadow:0 0 0 3px var(--surf)}
+.rad{width:16px;height:16px;border-radius:50%;border:1px solid var(--st3);flex:none}
+.rad.on{border:5px solid var(--sacc)}
+.wfly{position:absolute;right:12px;bottom:12px;z-index:30;border-radius:8px;background:var(--menu);border:1px solid var(--menub);box-shadow:var(--menushadow);color:var(--menutx)}
+.wfly.tray{padding:10px;display:grid;grid-template-columns:repeat(4,32px);gap:4px}
+.wfly.tray span{width:32px;height:32px;border-radius:4px;display:grid;place-items:center}
+.wfly.note{width:320px;padding:14px 16px 16px;font-size:13px}
+.wfly.note .nh{font-weight:600;margin-bottom:6px}
+.wfly.note .ne{color:var(--menutx3);padding:28px 0;text-align:center;border-bottom:1px solid var(--menub);margin-bottom:12px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center;font-size:12px;font-variant-numeric:tabular-nums}
+.cal span{height:26px;display:grid;place-items:center;border-radius:50%}
+.cal .dw{color:var(--menutx3)}
+.cal .on{background:var(--ac);color:var(--onac);font-weight:600}
+
+/* ---------- under the desktop ---------- */
+.cols{display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:20px 36px;align-items:start;margin-top:10px}
+@media (max-width:980px){.cols{grid-template-columns:minmax(0,1fr)}}
+.cols h2{font:600 15px/22px var(--display);margin:0 0 8px}
+.spage{position:relative;background:var(--swin);color:var(--st1);border:1px solid var(--line);border-radius:8px;padding:6px 20px 20px}
+.shead{display:flex;align-items:center;gap:12px;margin:10px 0 6px}
+.shead h3{font:600 14px/20px var(--ui);margin:0;flex:1}
+.sbt{height:32px;padding:0 12px;border-radius:4px;border:1px solid var(--sbtnb);background:var(--sbtn);font-size:14px;color:var(--st1);display:inline-flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer}
+.sbt:hover{background:var(--shov)}
+.sbt:disabled{opacity:.45;cursor:default}
+.scard{background:var(--surf);border:1px solid var(--sbord);border-radius:8px}
+.sr{min-height:48px;display:flex;align-items:center;padding:6px 8px 6px 6px;gap:12px;border-top:1px solid var(--div)}
+.sr:first-child{border-top:0}
+.sr.drag{background:var(--ssel)}
+.sr .lead{width:16px;height:16px;color:var(--st1);flex:none}
+.sr .tl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gb{width:28px;height:32px;border:0;border-radius:4px;background:transparent;color:var(--st4);display:grid;place-items:center;flex:none;cursor:grab;touch-action:none}
+.gb:hover{background:var(--shov);color:var(--st2)}
+.gb.none{visibility:hidden}
+.mb{width:32px;height:32px;border:0;border-radius:4px;background:transparent;color:var(--st2);display:grid;place-items:center;flex:none;cursor:pointer}
+.mb:hover,.mb[aria-expanded="true"]{background:var(--shov)}
+.lk{width:32px;height:32px;display:grid;place-items:center;color:var(--st4);flex:none}
+.sbt:focus-visible,.gb:focus-visible,.mb:focus-visible,.pop button:focus-visible{outline:2px solid var(--st1);outline-offset:1px}
+.pop{position:absolute;z-index:5;min-width:180px;padding:4px;border-radius:8px;background:var(--pop);border:1px solid var(--sbtnb);box-shadow:var(--popshadow);display:flex;flex-direction:column}
+.pop button{height:32px;padding:0 12px;border:0;border-radius:4px;background:transparent;color:var(--st1);font-size:14px;display:flex;align-items:center;gap:12px;text-align:left;white-space:nowrap;cursor:pointer}
+.pop button:hover{background:var(--shov)}
+.pop button:disabled{opacity:.45;cursor:default;background:transparent}
+.pop hr{border:0;height:1px;background:var(--div);margin:4px 8px}
+.tblwrap{overflow-x:auto}
+table.ref{border-collapse:collapse;width:100%;min-width:520px;font-size:13px;line-height:18px}
+.ref th,.ref td{text-align:left;padding:7px 12px 7px 0;border-bottom:1px solid var(--line);vertical-align:middle}
+.ref thead th{font-size:12px;font-weight:400;color:var(--muted);padding-bottom:5px}
+.ref .g th{padding-top:16px;font-size:13px;font-weight:600;border-bottom-color:var(--chipb)}
+.ref td.i{width:28px;padding-right:8px}
+.ref td.n{font-weight:600;white-space:nowrap}
+.ref td.s{color:var(--muted);white-space:nowrap}
+.ref td.s .sm{display:inline-flex;align-items:center;gap:6px;vertical-align:middle}
+.foot{margin:10px 0 0;font-size:12px;line-height:18px;color:var(--muted);max-width:72ch}
+@media (prefers-reduced-motion: reduce){.notch,.content,.ears{transition:none!important}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <radialGradient id="petg" cx=".36" cy=".28" r=".85"><stop offset="0" stop-color="#D2BEFF"/><stop offset=".55" stop-color="#9C6CFF"/><stop offset="1" stop-color="#6A3FD9"/></radialGradient>
+</defs>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="scantext" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></symbol>
+<symbol id="cliplist" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+<symbol id="mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+<symbol id="micoff" viewBox="0 0 24 24"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+<symbol id="volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+<symbol id="volumex" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></symbol>
+<symbol id="chevu" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+<symbol id="chevl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
+<symbol id="video" viewBox="0 0 24 24"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></symbol>
+<symbol id="pipette" viewBox="0 0 24 24"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></symbol>
+<symbol id="notepen" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></symbol>
+<symbol id="inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+<symbol id="coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/></symbol>
+<symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+<symbol id="gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+<symbol id="toggle" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="7"/><circle cx="16" cy="12" r="3"/></symbol>
+<symbol id="wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+<symbol id="battery" viewBox="0 0 24 24"><rect x="2" y="6" width="17" height="12" rx="2.5"/><line x1="22" x2="22" y1="10.5" y2="13.5"/><rect x="4.5" y="8.5" width="9" height="7" rx="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+<symbol id="lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="grip" viewBox="0 0 24 24"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></symbol>
+<symbol id="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="square" viewBox="0 0 24 24"><rect width="16" height="16" x="4" y="4" rx="1.5"/></symbol>
+<symbol id="grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/></symbol>
+<symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+<symbol id="folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></symbol>
+<symbol id="code" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol>
+<symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+<symbol id="message" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+<symbol id="cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
+<symbol id="shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+<symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+<symbol id="down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+<symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Chippi menu bar items</h1>
+      <p>The right side of the bar becomes Chippi's own buttons. Click one on the desktop to see what it does. Add, remove and reorder them in the Settings section underneath; the bar follows. Windows' flyouts are no longer moved: the two that remain open where Windows opens them.</p>
+    </div>
+    <div class="ctrls">
+      <div class="seg"><span>Theme</span><div class="opts" id="themeSeg"><button type="button" data-v="light">Light</button><button type="button" data-v="dark">Dark</button></div></div>
+      <div class="seg"><span>Wallpaper</span><div class="opts" id="wallSeg"><button type="button" data-v="auto">Match theme</button><button type="button" data-v="light">Light</button><button type="button" data-v="dark">Dark</button></div></div>
+      <button type="button" class="reset" id="reset">Reset</button>
+    </div>
+  </header>
+
+  <div class="frame" id="frame">
+    <div class="stage" id="stage">
+      <div class="bar">
+        <div class="grp l" id="left"></div>
+        <div class="grp r" id="right"></div>
+      </div>
+      <div class="notch" id="notch"><div class="ears" id="ears"></div><div class="content" id="content"></div></div>
+      <div class="win" aria-hidden="true">
+        <div class="tb"><span>new 1 - Notepad++</span><span class="caps"><span><svg class="ic" width="12" height="12" viewBox="0 0 24 24"><use href="#minus"/></svg></span><span><svg class="ic" width="11" height="11" viewBox="0 0 24 24"><use href="#square"/></svg></span><span><svg class="ic" width="13" height="13" viewBox="0 0 24 24"><use href="#x"/></svg></span></span></div>
+        <div class="body"><div class="line" style="width:62%"></div><div class="line" style="width:84%"></div><div class="line" style="width:48%"></div><div class="line" style="width:76%"></div><div class="line" style="width:30%"></div><div class="line" style="width:68%"></div></div>
+      </div>
+      <div id="layer"></div>
+      <div class="dockwrap" aria-hidden="true"><div class="dock" id="dock"></div></div>
+      <div class="tip" id="tip" hidden></div>
+    </div>
+  </div>
+  <p class="said" id="said" aria-live="polite"></p>
+
+  <div class="cols">
+    <section>
+      <h2>Settings › Mac-style desktop</h2>
+      <div class="spage" id="spage">
+        <div class="shead"><h3>Menu bar</h3><button type="button" class="sbt" id="addBtn" aria-haspopup="menu" aria-expanded="false"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="#plus"/></svg>Add item</button></div>
+        <div class="scard" id="rows"></div>
+      </div>
+      <p class="foot">Top to bottom is left to right on the bar. Drag a row by its grip, or press Up and Down on it. When a bar is too narrow, items leave from the left; the clock stays.</p>
+    </section>
+    <section>
+      <h2>What each one does</h2>
+      <div class="tblwrap"><table class="ref"><thead><tr><th></th><th>Item</th><th>Click</th><th>Shows</th></tr></thead><tbody id="ref"></tbody></table></div>
+      <p class="foot">Only installed features are offered. Battery starts in the bar on a PC that has one, Language with two or more input languages. An item that opens a page opens it in the notch, and a second click closes it.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+const W = 1600;
+const frame = $('#frame'), stage = $('#stage'), layer = $('#layer'), notch = $('#notch'), content = $('#content'), tip = $('#tip'), said = $('#said');
+let scale = 1;
+function fit() { scale = frame.clientWidth / W; stage.style.transform = `scale(${scale})`; }
+new ResizeObserver(fit).observe(frame); fit();
+
+const ic = (id, s = 16) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" aria-hidden="true"><use href="#${id}"/></svg>`;
+function pet(size) {
+  const INK = '#1B1530';
+  const eye = (x) => `<ellipse cx="${x}" cy="66" rx="9" ry="10.5" fill="#fff"/><circle cx="${x + 2}" cy="68" r="5" fill="${INK}"/><circle cx="${x + 3.6}" cy="65.6" r="1.7" fill="#fff"/>`;
+  return `<svg width="${size}" height="${size}" viewBox="14 26 92 84" style="display:block;flex:none" aria-hidden="true"><path d="M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z" fill="url(#petg)"/>${eye(46)}${eye(74)}<path d="M50 82 Q60 94 70 82 Z" fill="${INK}"/></svg>`;
+}
+
+/* Every item: its glyph, what a click does (kind), and the words for the list. */
+const ITEMS = {
+  search:    { name: 'Search',       glyph: 'search',   kind: 'page',    click: 'Opens Search' },
+  capture:   { name: 'Capture',      glyph: 'scan',     kind: 'capture', click: 'Starts a region capture', tip: 'Capture region' },
+  clipboard: { name: 'Clipboard',    glyph: 'cliplist', kind: 'page',    click: 'Opens Clipboard' },
+  mic:       { name: 'Microphone',   glyph: 'mic',      kind: 'mic',     click: 'Mutes, unmutes' },
+  sound:     { name: 'Sound',        glyph: 'volume',   kind: 'sound',   click: 'Opens Settings › Output', tip: 'Volume 62%' },
+  tray:      { name: 'Hidden icons', glyph: 'chevu',    kind: 'tray',    click: 'Opens Windows’ flyout, where Windows opens it' },
+  controls:  { name: 'Controls',     glyph: 'sliders',  kind: 'page',    click: 'Opens the notch’s home' },
+  record:    { name: 'Record',       glyph: 'video',    kind: 'record',  click: 'Opens Screen recording; stops a recording', tip: 'Screen recording' },
+  text:      { name: 'Copy text',    glyph: 'scantext', kind: 'capture', click: 'Starts a text capture' },
+  color:     { name: 'Pick color',   glyph: 'pipette',  kind: 'capture', click: 'Starts the color picker' },
+  scratch:   { name: 'Scratchpad',   glyph: 'notepen',  kind: 'page',    click: 'Opens Scratchpad' },
+  shelf:     { name: 'Shelf',        glyph: 'inbox',    kind: 'page',    click: 'Opens Shelf' },
+  awake:     { name: 'Keep awake',   glyph: 'coffee',   kind: 'awake',   click: 'Turns it on, off' },
+  displays:  { name: 'Displays',     glyph: 'sun',      kind: 'page',    click: 'Opens Displays' },
+  system:    { name: 'System',       glyph: 'activity', kind: 'page',    click: 'Opens System' },
+  agents:    { name: 'Agents',       glyph: 'gauge',    kind: 'page',    click: 'Opens Agents' },
+  actions:   { name: 'Actions',      glyph: 'toggle',   kind: 'page',    click: 'Opens Actions' },
+  network:   { name: 'Network',      glyph: 'wifi',     kind: 'wset',    click: 'Opens Windows Settings › Network & internet' },
+  battery:   { name: 'Battery',      glyph: 'battery',  kind: 'wset',    click: 'Opens Windows Settings › Power & battery', tip: 'Battery 64%' },
+  language:  { name: 'Language',     glyph: null,       kind: 'lang',    click: 'Switches input language', tip: 'Input language' },
+};
+const DEFAULT = ['search', 'capture', 'clipboard', 'mic', 'sound', 'tray', 'controls'];
+const MORE = ['record', 'text', 'color', 'scratch', 'shelf', 'awake', 'displays', 'system', 'agents', 'actions'];
+const WINDOWS = ['network', 'battery', 'language'];
+const LANGS = ['ENG', 'ESP'];
+const KEY = 'chippi-bar-items';
+
+function load() {
+  try {
+    const got = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (Array.isArray(got) && got.every((id) => ITEMS[id]) && new Set(got).size === got.length) return got;
+  } catch (e) {}
+  return null;
+}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S.order)); } catch (e) {} }
+
+const S = { order: load() || DEFAULT.slice(), muted: false, awake: false, rec: false, recT: 0, lang: 0, open: null, wall: 'auto' };
+const time = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+function tipOf(id) {
+  if (id === 'clock') return 'Notifications';
+  if (id === 'mic') return S.muted ? 'Unmute microphone' : 'Mute microphone';
+  if (id === 'awake') return S.awake ? 'Stop keep awake' : 'Keep awake';
+  if (id === 'record') return S.rec ? 'Stop recording' : 'Screen recording';
+  if (id === 'system') return 'System · CPU 12%';
+  return ITEMS[id].tip || ITEMS[id].name;
+}
+
+/* ---------- the bar ---------- */
+$('#left').innerHTML = `<span class="bi">${pet(16)}</span><span class="bi app">Notepad++</span>` +
+  ['File', 'Edit', 'Search', 'View', 'Encoding', 'Language', 'Settings', 'Tools', '»'].map((m) => `<span class="bi">${m}</span>`).join('');
+$('#ears').innerHTML = pet(14);
+$('#dock').innerHTML = [['grid', 'linear-gradient(135deg,#4FA3FF,#2563EB)'], ['globe', '#E8710A'], ['folder', '#E9B33F'], ['terminal', '#2B2B33'], ['code', '#2F7FD6'], ['music', '#1DB954'], ['message', '#5865F2']]
+  .map(([g, c]) => `<span class="di" style="background:${c}">${ic(g, 24)}</span>`).join('') + '<span class="dsep"></span>' +
+  [['down', '#6B7280'], ['trash', '#8E8E99']].map(([g, c]) => `<span class="di" style="background:${c}">${ic(g, 24)}</span>`).join('');
+
+function face(id) {
+  if (id === 'mic') return S.muted ? `<span class="disc mic">${ic('micoff', 12)}</span>` : ic('mic');
+  if (id === 'awake') return S.awake ? `<span class="disc ac">${ic('coffee', 12)}</span>` : ic('coffee');
+  if (id === 'record') return S.rec ? `<i class="recdot"></i><span class="num">${time(S.recT)}</span>` : ic('video');
+  if (id === 'system') return ic('activity') + '<span class="num">12%</span>';
+  if (id === 'language') return `<span class="lang">${LANGS[S.lang]}</span>`;
+  if (id === 'battery') return ic('battery', 18);
+  return ic(ITEMS[id].glyph);
+}
+function renderBar() {
+  $('#right').innerHTML = S.order.map((id) => `<button type="button" class="bi${S.open === id ? ' open' : ''}" data-id="${id}" aria-label="${tipOf(id)}">${face(id)}</button>`).join('') +
+    `<button type="button" class="bi clock${S.open === 'clock' ? ' open' : ''}" data-id="clock" aria-label="Notifications"><span>Wed Nov 25</span><span class="num">10:02 AM</span></button>`;
+}
+function say(html) { said.innerHTML = html; }
+
+/* ---------- what a click opens ---------- */
+function closeAll() { layer.innerHTML = ''; notch.classList.remove('isopen'); S.open = null; tip.hidden = true; }
+const back = `<button type="button" class="back" data-close aria-label="Back">${ic('chevl', 16)}</button>`;
+const row = (g, nm, dt, sel) => `<div class="isr${sel ? ' sel' : ''}"><span class="ld">${ic(g, 16)}</span><span class="tx"><div class="nm">${nm}</div><div class="dt">${dt}</div></span>${sel ? '<span class="vb">Run</span>' : ''}</div>`;
+function pageHtml(id) {
+  if (id === 'search') return `<div class="ph">${back}<div class="sfield"><i></i>Search</div></div><div class="pbody">` +
+    row('scan', 'Capture region', 'Chippi', true) + row('mic', 'Mute microphone', 'Chippi') + row('coffee', 'Keep awake', 'Chippi') + row('cliplist', 'Clipboard', 'Chippi') + row('activity', 'System', 'Chippi') + '</div>';
+  if (id === 'clipboard') return `<div class="ph">${back}Clipboard</div><div class="pbody">` +
+    row('cliplist', 'ffmpeg -i in.mov -crf 23 out.mp4', '2 min', true).replace('Run', 'Paste') + row('cliplist', 'Meeting moved to 3:30', '14 min') + row('cliplist', '#7444F0', '31 min') + row('cliplist', 'C:\\Users\\Public\\Downloads', '1 hr') + '</div>';
+  if (id === 'controls') return `<div class="ph">Chippi</div><div class="pbody"><div class="grid">` +
+    [['search', 'Search'], ['scan', 'Capture'], ['cliplist', 'Clipboard'], ['sliders', 'Volume'], ['mic', 'Microphone'], ['coffee', 'Awake'], ['activity', 'System'], ['sun', 'Displays'], ['notepen', 'Scratchpad'], ['inbox', 'Shelf']]
+      .map(([g, n]) => `<div class="tile">${ic(g, 22)}<span>${n}</span></div>`).join('') + '</div></div>';
+  if (id === 'record') return `<div class="ph">${back}Screen recording</div><div class="pbody"><div class="pb"><div><div style="display:flex;gap:8px;justify-content:center"><button type="button" class="nbtn" data-rec>Record window</button><button type="button" class="nbtn" data-rec>Record screen</button></div></div></div></div>`;
+  return `<div class="ph">${back}${ITEMS[id].name}</div><div class="pbody"><div class="pb"><div><b>${ITEMS[id].name}</b>The page as it is today</div></div></div>`;
+}
+function chippiSettings() {
+  return `<div class="swn" style="left:400px;top:150px;width:800px;height:420px" role="dialog" aria-label="Chippi Settings">
+    <div class="tb">${pet(16)}<span>Chippi Settings</span><button type="button" class="x" data-close aria-label="Close">${ic('x', 14)}</button></div>
+    <div class="sh2"><div class="side"><div class="gl">Sound</div><div class="nav">${ic('music')}Now Playing</div><div class="nav sel">${ic('volume')}Output</div><div class="nav">${ic('mic')}Microphone</div><div class="nav">${ic('sliders')}App volume</div></div>
+    <div class="pg"><div class="pt">Output</div>
+      <div class="scard"><div class="sr" style="padding:6px 16px"><span class="tl">Volume</span><span class="sl"></span><span style="width:40px;text-align:right;color:var(--st2);font-variant-numeric:tabular-nums">62%</span><span class="sbt">Mute</span></div></div>
+      <div class="shead"><h3 style="font:600 14px/20px var(--ui);margin:0">Priority</h3></div>
+      <div class="scard"><div class="sr" style="padding:6px 16px"><span class="rad on"></span><span class="tl">Speakers</span></div><div class="sr" style="padding:6px 16px"><span class="rad"></span><span class="tl">Headphones</span></div></div>
+    </div></div></div>`;
+}
+function windowsSettings(title) {
+  return `<div class="swn" style="left:430px;top:170px;width:740px;height:380px" role="dialog" aria-label="Settings">
+    <div class="tb"><span>Settings</span><button type="button" class="x" data-close aria-label="Close">${ic('x', 14)}</button></div>
+    <div class="sh2"><div class="side"><div class="ln" style="width:70%"></div><div class="ln" style="width:55%"></div><div class="ln" style="width:80%"></div><div class="ln" style="width:60%"></div></div>
+    <div class="pg"><div class="pt">${title}</div><div class="scard" style="padding:2px 16px"><div class="ln" style="width:46%"></div><div class="ln" style="width:70%"></div><div class="ln" style="width:38%"></div></div></div></div></div>`;
+}
+function calendar() {
+  let cells = ['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => `<span class="dw">${d}</span>`).join('');
+  for (let d = 1; d <= 30; d++) cells += `<span${d === 25 ? ' class="on"' : ''}>${d}</span>`; // November 2026 starts on a Sunday
+  return `<div class="wfly note"><div class="nh">Notifications</div><div class="ne">No new notifications</div><div class="nh">November 2026</div><div class="cal">${cells}</div></div>`;
+}
+
+function act(id) {
+  const was = S.open, kind = id === 'clock' ? 'clock' : ITEMS[id].kind, name = id === 'clock' ? 'Clock' : ITEMS[id].name;
+  closeAll();
+  if (was === id) { renderBar(); say(`<b>${name}</b> again: closed.`); return; }
+  switch (kind) {
+    case 'page':
+      content.innerHTML = pageHtml(id); notch.classList.add('isopen'); S.open = id;
+      say(id === 'search' ? '<b>Search</b> opens in the notch with the keyboard in the field.' : id === 'controls' ? '<b>Controls</b> opens the notch’s home.' : `<b>${name}</b> opens its page in the notch.`);
+      break;
+    case 'record':
+      if (S.rec) { S.rec = false; say('<b>Record</b> while recording: stopped.'); }
+      else { content.innerHTML = pageHtml(id); notch.classList.add('isopen'); S.open = id; say('<b>Record</b> opens Screen recording. Pick one to see the item while recording.'); }
+      break;
+    case 'capture':
+      layer.innerHTML = id === 'color'
+        ? `<div class="capture" data-done><div class="loupe"><span class="szp">#9C6CFF</span></div></div>`
+        : `<div class="capture" data-done><div class="csel"><span class="szp">${id === 'text' ? 'Copy text' : '520 × 260'}</span></div></div>`;
+      S.open = id;
+      say(id === 'color' ? '<b>Pick color</b> starts the picker at once.' : id === 'text' ? '<b>Copy text</b> starts the text selector at once.' : '<b>Capture</b> starts the region selector at once, as its shortcut does.');
+      break;
+    case 'mic': S.muted = !S.muted; say(`<b>Microphone</b>: ${S.muted ? 'muted. The item turns red.' : 'unmuted.'}`); break;
+    case 'awake': S.awake = !S.awake; say(`<b>Keep awake</b>: ${S.awake ? 'on, for the last length used.' : 'off.'}`); break;
+    case 'lang': S.lang = (S.lang + 1) % LANGS.length; say('<b>Language</b> switches to the next input language.'); break;
+    case 'sound': layer.innerHTML = chippiSettings(); S.open = id; say('<b>Sound</b> opens Chippi Settings on Output.'); break;
+    case 'wset': layer.innerHTML = windowsSettings(id === 'network' ? 'Network & internet' : 'Power & battery'); S.open = id; say(`<b>${name}</b> opens that page of Windows Settings, a normal window.`); break;
+    case 'tray':
+      layer.innerHTML = `<div class="wfly tray">${['cloud', 'shield', 'message', 'headphones', 'globe', 'music', 'terminal', 'folder'].map((g) => `<span>${ic(g)}</span>`).join('')}</div>`;
+      S.open = id; say('<b>Hidden icons</b> opens Windows’ own flyout where Windows puts it. Chippi no longer moves it.');
+      break;
+    case 'clock': layer.innerHTML = calendar(); S.open = id; say('<b>Clock</b> opens Windows’ notifications where Windows puts them.'); break;
+  }
+  renderBar();
+}
+
+$('#right').addEventListener('click', (e) => { const b = e.target.closest('.bi'); if (b) act(b.dataset.id); });
+$('#right').addEventListener('pointerover', (e) => {
+  const b = e.target.closest('.bi'); if (!b || S.open === b.dataset.id) return;
+  tip.textContent = tipOf(b.dataset.id); tip.hidden = false;
+  const s = stage.getBoundingClientRect(), r = b.getBoundingClientRect();
+  const x = ((r.left + r.right) / 2 - s.left) / scale;
+  tip.style.top = '34px'; tip.style.left = Math.min(W - 8 - tip.offsetWidth, Math.max(8, x - tip.offsetWidth / 2)) + 'px';
+});
+$('#right').addEventListener('pointerout', () => { tip.hidden = true; });
+stage.addEventListener('click', (e) => {
+  if (e.target.closest('[data-rec]')) { closeAll(); S.rec = true; S.recT = 0; renderBar(); say('Recording: <b>Record</b> shows a red dot and the time. Click it to stop.'); return; }
+  if (e.target.closest('[data-close]')) { closeAll(); renderBar(); say(''); return; }
+  if (e.target.closest('[data-done]')) { const id = S.open; closeAll(); renderBar(); say(id === 'color' ? 'Picked.' : id === 'text' ? 'Copied.' : 'Captured.'); return; }
+  if (!S.open || e.target.closest('.bi,.notch,.swn,.wfly')) return;
+  closeAll(); renderBar(); say('');
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { if (closePop()) return; if (S.open) { closeAll(); renderBar(); say(''); } } });
+setInterval(() => { if (!S.rec) return; S.recT++; const n = $('#right .bi[data-id="record"] .num'); if (n) n.textContent = time(S.recT); }, 1000);
+
+/* ---------- Settings › Mac-style desktop › Menu bar ---------- */
+const rows = $('#rows'), spage = $('#spage'), addBtn = $('#addBtn');
+let pop = null, popFor = null;
+function renderRows() {
+  rows.innerHTML = S.order.map((id) => `<div class="sr" data-id="${id}">
+      <button type="button" class="gb" data-grip aria-label="Move ${ITEMS[id].name}">${ic('grip', 16)}</button>
+      <span class="lead">${ITEMS[id].glyph ? ic(ITEMS[id].glyph, 16) : '<span class="lang" style="font-size:10px">EN</span>'}</span><span class="tl">${ITEMS[id].name}</span>
+      <button type="button" class="mb" data-more aria-haspopup="menu" aria-expanded="false" aria-label="${ITEMS[id].name} options">${ic('more', 16)}</button></div>`).join('') +
+    `<div class="sr"><span class="gb none"></span><span class="lead">${ic('clock', 16)}</span><span class="tl">Clock</span><span class="lk" title="Always last">${ic('lock', 14)}</span></div>`;
+  addBtn.disabled = Object.keys(ITEMS).every((id) => S.order.includes(id));
+}
+function changed() { closeAll(); renderRows(); renderBar(); save(); }
+function move(id, to) {
+  const from = S.order.indexOf(id); to = Math.max(0, Math.min(S.order.length - 1, to));
+  if (from < 0 || from === to) return false;
+  S.order.splice(from, 1); S.order.splice(to, 0, id); return true;
+}
+function closePop() {
+  if (!pop) return false;
+  pop.remove(); pop = null;
+  if (popFor && popFor.isConnected) { popFor.setAttribute('aria-expanded', 'false'); popFor.focus(); }
+  popFor = null; return true;
+}
+function openPop(anchor, html) {
+  closePop();
+  pop = document.createElement('div'); pop.className = 'pop'; pop.setAttribute('role', 'menu'); pop.innerHTML = html;
+  spage.appendChild(pop); popFor = anchor; anchor.setAttribute('aria-expanded', 'true');
+  const p = spage.getBoundingClientRect(), a = anchor.getBoundingClientRect();
+  pop.style.top = (a.bottom - p.top + 4) + 'px';
+  pop.style.left = Math.max(8, a.right - p.left - pop.offsetWidth) + 'px';
+  const first = pop.querySelector('button:not(:disabled)'); if (first) first.focus();
+}
+addBtn.addEventListener('click', () => {
+  if (popFor === addBtn) { closePop(); return; }
+  const item = (id) => `<button type="button" role="menuitem" data-add="${id}">${ITEMS[id].glyph ? ic(ITEMS[id].glyph, 16) : '<span class="lang" style="width:16px;font-size:10px">EN</span>'}${ITEMS[id].name}</button>`;
+  const ours = [...DEFAULT, ...MORE].filter((id) => !S.order.includes(id)), theirs = WINDOWS.filter((id) => !S.order.includes(id));
+  openPop(addBtn, ours.map(item).join('') + (ours.length && theirs.length ? '<hr>' : '') + theirs.map(item).join(''));
+});
+rows.addEventListener('click', (e) => {
+  const more = e.target.closest('[data-more]'); if (!more) return;
+  if (popFor === more) { closePop(); return; }
+  const id = more.closest('.sr').dataset.id, i = S.order.indexOf(id);
+  openPop(more, `<button type="button" role="menuitem" data-do="up" data-id="${id}"${i === 0 ? ' disabled' : ''}>Move up</button><button type="button" role="menuitem" data-do="down" data-id="${id}"${i === S.order.length - 1 ? ' disabled' : ''}>Move down</button><hr><button type="button" role="menuitem" data-do="remove" data-id="${id}">Remove</button>`);
+});
+spage.addEventListener('click', (e) => {
+  const b = e.target.closest('.pop button'); if (!b) return;
+  const id = b.dataset.add || b.dataset.id;
+  if (b.dataset.add) { S.order.push(id); say(`<b>${ITEMS[id].name}</b> added at the right of the items.`); }
+  else if (b.dataset.do === 'remove') { S.order = S.order.filter((x) => x !== id); say(`<b>${ITEMS[id].name}</b> removed.`); }
+  else move(id, S.order.indexOf(id) + (b.dataset.do === 'up' ? -1 : 1));
+  pop.remove(); pop = null; popFor = null; changed();
+  const focus = b.dataset.add ? addBtn : rows.querySelector(`.sr[data-id="${id}"] [data-more]`) || addBtn; focus.focus();
+});
+document.addEventListener('pointerdown', (e) => { if (pop && !e.target.closest('.pop') && e.target.closest('button') !== popFor) closePop(); });
+rows.addEventListener('keydown', (e) => {
+  const grip = e.target.closest('[data-grip]'); if (!grip || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+  e.preventDefault();
+  const id = grip.closest('.sr').dataset.id;
+  if (move(id, S.order.indexOf(id) + (e.key === 'ArrowUp' ? -1 : 1))) { changed(); rows.querySelector(`.sr[data-id="${id}"] [data-grip]`).focus(); }
+});
+let dragId = null;
+rows.addEventListener('pointerdown', (e) => {
+  const grip = e.target.closest('[data-grip]'); if (!grip) return;
+  e.preventDefault(); closePop(); dragId = grip.closest('.sr').dataset.id;
+  rows.querySelector(`.sr[data-id="${dragId}"]`).classList.add('drag');
+});
+window.addEventListener('pointermove', (e) => {
+  if (!dragId) return;
+  const r = rows.getBoundingClientRect(), h = rows.firstElementChild.offsetHeight;
+  if (move(dragId, Math.floor((e.clientY - r.top) / h))) { changed(); rows.querySelector(`.sr[data-id="${dragId}"]`).classList.add('drag'); }
+});
+window.addEventListener('pointerup', () => { if (!dragId) return; const row = rows.querySelector('.sr.drag'); if (row) row.classList.remove('drag'); dragId = null; });
+
+/* ---------- the list of what each does ---------- */
+const SHOWS = {
+  mic: `<span class="sm"><span class="disc mic">${ic('micoff', 12)}</span>Muted</span>`,
+  sound: `<span class="sm">${ic('volumex', 16)}Level, mute</span>`,
+  record: `<span class="sm"><i class="recdot"></i>0:42</span>`,
+  awake: `<span class="sm"><span class="disc ac">${ic('coffee', 12)}</span>On</span>`,
+  system: 'CPU 12%',
+  agents: `<span class="sm"><span class="disc agent">${ic('gauge', 12)}</span>Working</span>`,
+  network: 'Signal', battery: 'Level', language: 'ENG', clock: 'Date, time',
+};
+function refRow(id) {
+  const it = id === 'clock' ? { name: 'Clock', glyph: 'clock', click: 'Opens Windows’ notifications, where Windows opens them. Always last' } : ITEMS[id];
+  return `<tr><td class="i">${it.glyph ? ic(it.glyph, 16) : ''}</td><td class="n">${it.name}</td><td>${it.click}</td><td class="s">${SHOWS[id] || ''}</td></tr>`;
+}
+$('#ref').innerHTML = `<tr class="g"><th colspan="4">In the bar to start</th></tr>` + [...DEFAULT, 'clock'].map(refRow).join('') +
+  `<tr class="g"><th colspan="4">More of Chippi’s</th></tr>` + MORE.map(refRow).join('') +
+  `<tr class="g"><th colspan="4">Windows’ own</th></tr>` + WINDOWS.map(refRow).join('');
+
+/* ---------- page controls ---------- */
+function mark(seg, v) { document.querySelectorAll(`#${seg} button`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v))); }
+function sync() {
+  mark('themeSeg', document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  mark('wallSeg', S.wall);
+}
+$('#themeSeg').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; document.documentElement.setAttribute('data-theme', b.dataset.v); sync(); });
+$('#wallSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  S.wall = b.dataset.v; stage.classList.remove('wall-light', 'wall-dark'); if (S.wall !== 'auto') stage.classList.add('wall-' + S.wall); sync();
+});
+$('#reset').addEventListener('click', () => { Object.assign(S, { order: DEFAULT.slice(), muted: false, awake: false, rec: false, recT: 0, lang: 0 }); closePop(); changed(); say(''); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', sync);
+
+renderBar(); renderRows(); sync();
+say('Click an item on the bar.');
+</script>

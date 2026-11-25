@@ -88,9 +88,35 @@ public sealed class MacDesktopModule : IFeatureModule
         }
     }
 
+    /// <summary>A press on a bar item for an island page: whether the page was open and is closed now; set by the shell.</summary>
+    public Func<string?, bool> ClosePage
+    {
+        set
+        {
+            (_pending ??= new()).ClosePage = value;
+            if (_shell is not null) _shell.ClosePage = value;
+        }
+    }
+
+    /// <summary>The menu bar's items as they show now, left to right.</summary>
+    public IReadOnlyList<string> BarItemsShown => _shell is { } shell ? BarItems.Shown(Settings.BarItems, shell.Availability()) : [];
+
+    /// <summary>The items Add item offers now.</summary>
+    public IReadOnlyList<string> BarItemsToAdd
+    {
+        get
+        {
+            if (_shell is not { } shell)
+                return [];
+            var available = shell.Availability();
+            return BarItems.CanAdd(BarItems.Shown(Settings.BarItems, available), available);
+        }
+    }
+
     private sealed class PendingShell
     {
         public Action? OpenNotchHome;
+        public Func<string?, bool>? ClosePage;
         public Func<(nint Monitor, double Left, double Right)?>? Notch;
     }
 
@@ -125,7 +151,9 @@ public sealed class MacDesktopModule : IFeatureModule
         {
             if (pending.OpenNotchHome is { } home) _shell.OpenNotchHome = home;
             if (pending.Notch is { } notch) _shell.Notch = notch;
+            if (pending.ClosePage is { } close) _shell.ClosePage = close;
         }
+        _shell.BarItems = () => Settings.BarItems;
         // A dev profile or a test never touches the real taskbar, not even to give it back.
         _takeover = _canTakeTaskbar() ? new TaskbarTakeover(_taskbars(), new TaskbarJournal(TaskbarJournal.DefaultPath)) : null;
         _events = new ShellEvents();
@@ -189,6 +217,8 @@ public sealed class MacDesktopModule : IFeatureModule
                 _menuBar = new MenuBarController(_shell);
                 _menuBar.Start();
             }
+            else
+                _menuBar.SettingsChanged();
         }
         else
         {

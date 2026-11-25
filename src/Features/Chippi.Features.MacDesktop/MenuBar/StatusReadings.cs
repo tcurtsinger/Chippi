@@ -37,12 +37,24 @@ internal sealed class StatusReadings : IDisposable
 
     public bool Muted { get; private set; }
 
+    /// <summary>How busy the processors are, 0 to 100, read every 2 seconds while <see cref="WantsCpu"/>; null until the second reading.</summary>
+    public int? Cpu { get; private set; }
+
+    /// <summary>The System item is on the bar: the processors' load is read. Off, nothing is.</summary>
+    public bool WantsCpu { get; set; }
+
     public event Action? Changed;
+
+    /// <summary>Whether this PC has a battery.</summary>
+    public static bool HasBattery() => Native.GetSystemPowerStatus(out var power) && (power.BatteryFlag & 128) == 0 && power.BatteryPercent <= 100;
+
+    /// <summary>Whether a second input language is installed.</summary>
+    public static bool HasLanguages() => Native.GetKeyboardLayoutList(0, null) > 1;
 
     public StatusReadings(Dispatcher dispatcher)
     {
         _slow = new DispatcherTimer(TimeSpan.FromSeconds(30), DispatcherPriority.Background, (_, _) => ReadSlow(), dispatcher);
-        _fast = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => { ReadLanguage(); _ = ReadVolumeAsync(); }, dispatcher);
+        _fast = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => { ReadLanguage(); ReadCpu(); _ = ReadVolumeAsync(); }, dispatcher);
         try { Windows.Networking.Connectivity.NetworkInformation.NetworkStatusChanged += OnNetworkChanged; }
         catch (Exception ex) { Chippi.Core.Diagnostics.Log.Warn("Mac-style desktop: watching the network failed", ex); }
         ReadSlow();
@@ -100,6 +112,38 @@ internal sealed class StatusReadings : IDisposable
             return;
         Language = language;
         Changed?.Invoke();
+    }
+
+    private (ulong Idle, ulong Total)? _cpuLast;
+    private int _cpuTicks;
+
+    /// <summary>The processors' load since the last reading, from Windows' own idle, kernel and user times.</summary>
+    private void ReadCpu()
+    {
+        if (!WantsCpu)
+        {
+            _cpuLast = null;
+            if (Cpu is not null) { Cpu = null; Changed?.Invoke(); }
+            return;
+        }
+        if (_cpuTicks++ % 2 != 0 || !Native.GetSystemTimes(out ulong idle, out ulong kernel, out ulong user))
+            return;
+        ulong total = kernel + user; // kernel time includes idle time
+        int? cpu = Load(_cpuLast, (idle, total));
+        _cpuLast = (idle, total);
+        if (cpu == Cpu)
+            return;
+        Cpu = cpu;
+        Changed?.Invoke();
+    }
+
+    /// <summary>The share of the time between two readings that wasn't idle, 0 to 100; null without an earlier reading.</summary>
+    internal static int? Load((ulong Idle, ulong Total)? before, (ulong Idle, ulong Total) now)
+    {
+        if (before is not { } last || now.Total <= last.Total)
+            return null;
+        double busy = 1 - (double)(now.Idle - Math.Min(now.Idle, last.Idle)) / (now.Total - last.Total);
+        return (int)Math.Round(Math.Clamp(busy, 0, 1) * 100);
     }
 
     /// <summary>Reads the default output's volume and mute once a second: only read, never set.</summary>

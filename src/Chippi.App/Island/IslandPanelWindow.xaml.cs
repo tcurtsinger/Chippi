@@ -213,7 +213,7 @@ public partial class IslandPanelWindow : Window
     private static bool PopupOwnsEscape(DependencyObject? source)
     {
         for (var at = source; at is not null; at = LogicalTreeHelper.GetParent(at)
-            ?? (at is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : null))
+            ?? (at is System.Windows.Media.Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : null))
         {
             if (at is System.Windows.Controls.Primitives.Popup { IsOpen: true } or ComboBox { IsDropDownOpen: true }) return true;
             if (at is ComboBoxItem item && ItemsControl.ItemsControlFromItemContainer(item) is ComboBox { IsDropDownOpen: true }) return true;

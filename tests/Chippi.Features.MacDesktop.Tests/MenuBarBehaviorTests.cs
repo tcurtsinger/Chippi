@@ -21,7 +21,7 @@ public sealed class NarrowBarTests
 {
     private static readonly double[] Menus = [40, 40, 40, 40, 40, 40];
 
-    // Controls, the language, the hidden icons, the badges, then network-volume-battery: the order they go.
+    // The right group's items, left to right: the order they go.
     private static readonly double[] CanGo = [33, 44, 33, 90, 82];
 
     private static (double LeftEnd, double RightStart) Ends(BarArrangement a, double fixedLeft, double right)
@@ -209,19 +209,82 @@ public sealed class MenuBarTitleTests
         Assert.Equal("File Explorer", AppNames.Name(AppIdentity.Desktop.Path));
         Assert.Equal("Desktop", AppIdentity.Desktop.Name);
     }
+}
+
+/// <summary>The right side's items: what shows, what can be added, how the list changes and what a press does.</summary>
+public sealed class BarItemsTests
+{
+    private static readonly string[] Installed = ["command-bar", "screen-capture", "clipboard-history", "mic-mute", "keep-awake"];
+
+    private static bool Desktop(string id) => BarItems.Available(id, Installed.Contains, battery: false, languages: false);
+
+    private static bool Laptop(string id) => BarItems.Available(id, _ => true, battery: true, languages: true);
 
     [Fact]
-    public void AFlyoutHangsUnderItsItemInsideTheDisplay()
+    public void TheBarStartsWithChippisButtonsAndOnlyWhatThisPcHas()
     {
-        var bar = new Rect(3440, 0, 1920, 28); // the second display's bar
-        // Quick Settings, 360 × 330, opened from the item at 4800: centered under it, 6 below the bar.
-        Assert.Equal((4620, 34), MenuBarController.FlyoutPlace(new Size(360, 330), 4800, bar, 1080));
-        // From the clock at the far right: kept 6 inside the display's edge, on that display.
-        Assert.Equal((5360 - 6 - 360, 34), MenuBarController.FlyoutPlace(new Size(360, 330), 5340, bar, 1080));
-        // Taller than the room under the bar (notifications over the calendar): as low as it must be, no lower.
-        Assert.Equal((5360 - 6 - 400, 1080 - 1060), MenuBarController.FlyoutPlace(new Size(400, 1060), 5340, bar, 1080));
-        // At 150%, the gap scales with the bar.
-        Assert.Equal(42 + 9, MenuBarController.FlyoutPlace(new Size(540, 495), 900, new Rect(0, 0, 2880, 42), 1620).Top);
+        // A desktop PC with one input language: no Battery, no Language.
+        Assert.Equal([BarItems.Search, BarItems.Capture, BarItems.Clipboard, BarItems.Microphone, BarItems.Sound, BarItems.HiddenIcons, BarItems.Controls],
+            BarItems.Shown(null, Desktop));
+        // A laptop with two: both, before the hidden icons.
+        Assert.Equal(BarItems.Start, BarItems.Shown(null, Laptop));
+        // Without its feature, an item isn't there, saved or not; a feature that comes back brings it back.
+        Assert.Equal([BarItems.Sound], BarItems.Shown([BarItems.Scratchpad, BarItems.Sound, "gone", BarItems.Sound], Desktop));
+        Assert.Equal([BarItems.Scratchpad, BarItems.Sound], BarItems.Shown([BarItems.Scratchpad, BarItems.Sound], Laptop));
+        // An emptied bar stays empty: only the clock.
+        Assert.Empty(BarItems.Shown([], Laptop));
+    }
+
+    [Fact]
+    public void AddItemOffersTheRestChippisFirst()
+    {
+        var shown = BarItems.Shown(null, Desktop);
+        Assert.Equal([BarItems.KeepAwake, BarItems.Network], BarItems.CanAdd(shown, Desktop));
+        var all = BarItems.CanAdd([], Laptop);
+        Assert.Equal(BarItems.All.Count, all.Count);
+        // Windows' own come last, together.
+        Assert.Equal([BarItems.HiddenIcons, BarItems.Network, BarItems.Battery, BarItems.Language], all.Skip(all.Count - 4));
+        Assert.All(BarItems.All.TakeLast(4), item => Assert.True(item.Windows));
+    }
+
+    [Fact]
+    public void TheListMovesAddsAndRemoves()
+    {
+        string[] list = [BarItems.Search, BarItems.Capture, BarItems.Sound];
+        Assert.Equal([BarItems.Capture, BarItems.Sound, BarItems.Search], BarItems.Moved(list, BarItems.Search, 2));
+        Assert.Equal([BarItems.Sound, BarItems.Search, BarItems.Capture], BarItems.Moved(list, BarItems.Sound, -3)); // past the end: the end
+        Assert.Same(list, BarItems.Moved(list, BarItems.Capture, 1)); // nowhere to go
+        Assert.Same(list, BarItems.Moved(list, BarItems.Shelf, 0)); // not on the bar
+        Assert.Equal([.. list, BarItems.Shelf], BarItems.Added(list, BarItems.Shelf)); // next to the clock
+        Assert.Same(list, BarItems.Added(list, BarItems.Sound));
+        Assert.Same(list, BarItems.Added(list, "gone"));
+        Assert.Equal([BarItems.Search, BarItems.Sound], BarItems.Removed(list, BarItems.Capture));
+    }
+
+    [Fact]
+    public void EveryItemDoesOneThing()
+    {
+        foreach (var item in BarItems.All)
+        {
+            var press = BarItems.Press(item.Id);
+            bool needsTarget = press.Kind is not (BarPressKind.Sound or BarPressKind.HiddenIcons or BarPressKind.Home);
+            Assert.Equal(needsTarget, press.Target.Length > 0);
+            Assert.NotEqual(LucideIcons.LayoutGrid, Glyphs.Of(item.Id)); // its own glyph
+        }
+        Assert.Equal(BarItems.All.Count, BarItems.All.Select(item => item.Id).Distinct().Count());
+        Assert.All(BarItems.Start, id => Assert.NotNull(BarItems.Find(id)));
+        Assert.Equal(new BarPress(BarPressKind.Command, "screen-capture/region"), BarItems.Press(BarItems.Capture)); // the region selector, at once
+        Assert.Throws<ArgumentOutOfRangeException>(() => BarItems.Press("gone"));
+    }
+
+    [Fact]
+    public void TheProcessorsLoadIsTheTimeThatWasntIdle()
+    {
+        Assert.Null(StatusReadings.Load(null, (100, 1000)));
+        Assert.Equal(25, StatusReadings.Load((100, 1000), (400, 1400))); // 300 of 400 idle
+        Assert.Equal(100, StatusReadings.Load((100, 1000), (100, 1400)));
+        Assert.Equal(0, StatusReadings.Load((100, 1000), (600, 1400)));
+        Assert.Null(StatusReadings.Load((100, 1000), (100, 1000))); // no time passed
     }
 }
 
@@ -330,7 +393,7 @@ public sealed class MenuBarOffscreenTests
             throw new InvalidOperationException(error.ToString(), error);
     }
 
-    private static StatusReadings Status(bool laptop, bool muted = false, int? bars = null)
+    private static StatusReadings Status(bool laptop, bool muted = false, int? bars = null, int? cpu = null)
     {
         var status = new StatusReadings(Dispatcher.CurrentDispatcher);
         status.Dispose(); // no timers: what it shows is set here
@@ -342,22 +405,23 @@ public sealed class MenuBarOffscreenTests
         Set(nameof(StatusReadings.Language), laptop ? "ENG" : null);
         Set(nameof(StatusReadings.Volume), 45);
         Set(nameof(StatusReadings.Muted), muted);
+        Set(nameof(StatusReadings.Cpu), cpu);
         return status;
     }
 
-    private static MenuBarWindow Bar(MenuBarController controller, InkStrip ink, string app, string[] menus, int badges, StatusReadings status)
+    /// <summary>The bar as it starts on a desktop PC, and every item there is.</summary>
+    private static readonly string[] StartItems = [BarItems.Search, BarItems.Capture, BarItems.Clipboard, BarItems.Microphone, BarItems.Sound, BarItems.HiddenIcons, BarItems.Controls];
+    private static readonly string[] EveryItem = [.. BarItems.All.Select(item => item.Id)];
+    private static readonly BarStates Busy = new(MicMuted: true, Awake: true, AgentWorking: true, Recording: "0:42");
+
+    private static MenuBarWindow Bar(MenuBarController controller, InkStrip ink, string app, string[] menus, string[] items, StatusReadings status, BarStates states = default)
     {
         var bar = new MenuBarWindow(controller, 0, ink);
         bar.SetApp(app, menus);
         bar.SetStatus(status);
         bar.SetClock(MenuBarController.ClockText(new DateTime(2026, 11, 25, 10, 2, 0)));
-        var all = new List<(string, Geometry, Brush, Brush, Action)>
-        {
-            ("Microphone muted", LucideIcons.MicOff, new SolidColorBrush(Color.FromRgb(0xC4, 0x2B, 0x1C)), Brushes.White, () => { }),
-            ("Keep awake", LucideIcons.Coffee, new LinearGradientBrush(Color.FromRgb(0xB7, 0x8F, 0xFF), Color.FromRgb(0x82, 0xAE, 0xFF), new Point(0, 0), new Point(1, 1)), new SolidColorBrush(Color.FromRgb(0x17, 0x0F, 0x2E)), () => { }),
-            ("Agents", Glyphs.Sparkle, new SolidColorBrush(Color.FromRgb(0xE8, 0x87, 0x5B)), Brushes.White, () => { }),
-        };
-        bar.SetBadges(all.Take(badges).ToList());
+        bar.SetStates(states);
+        bar.SetItems(items);
         return bar;
     }
 
@@ -373,7 +437,7 @@ public sealed class MenuBarOffscreenTests
     [Fact]
     public void TheEdgesAndCornersOfTheBarTakeAPress() => OnBar((_, controller) =>
     {
-        var bar = Bar(controller, InkStrip.Flat(1), "Notepad", ["File", "Edit"], 0, Status(laptop: false));
+        var bar = Bar(controller, InkStrip.Flat(1), "Notepad", ["File", "Edit"], StartItems, Status(laptop: false));
         var root = bar.LayOut(1920);
         Assert.Equal("Chippi", System.Windows.Automation.AutomationProperties.GetName(ItemAt(root, 0.5, 0.5)!)); // the corner
         Assert.Equal("Notifications", System.Windows.Automation.AutomationProperties.GetName(ItemAt(root, 1919.5, 0.5)!));
@@ -388,19 +452,44 @@ public sealed class MenuBarOffscreenTests
     public void ANarrowBarWithTheNotchKeepsItsGroupsApart() => OnBar((shell, controller) =>
     {
         shell.Notch = () => (0, 388, 572);
-        var bar = Bar(controller, InkStrip.Flat(0), "Notepad++", Menus, 3, Status(laptop: true));
+        var bar = Bar(controller, InkStrip.Flat(0), "Notepad++", Menus, EveryItem, Status(laptop: true), Busy);
         bar.LayOut(960);
         var (left, right) = bar.Groups;
         Assert.True(left.Right <= 388 - MenuBarLayout.NotchClearance + 0.5, $"left ends at {left.Right}");
         Assert.True(right.Left >= 572 + MenuBarLayout.NotchClearance - 0.5, $"right starts at {right.Left}");
         Assert.Contains("Notifications", bar.Showing); // the clock never goes
-        Assert.DoesNotContain("Controls", bar.Showing); // the first to go
+        // The items go from the left: what's left is the end of the list, next to the clock.
+        var kept = bar.ItemsShowing;
+        Assert.InRange(kept.Count, 1, EveryItem.Length - 1);
+        Assert.Equal(EveryItem.Skip(EveryItem.Length - kept.Count), kept);
+    });
+
+    [Fact]
+    public void TheItemsShowInTheirOrderAndFollowTheirState() => OnBar((_, controller) =>
+    {
+        string[] items = [BarItems.Sound, BarItems.Microphone, BarItems.Record, BarItems.KeepAwake, BarItems.Search];
+        var bar = Bar(controller, InkStrip.Flat(0), "Notepad", ["File"], items, Status(laptop: false));
+        bar.LayOut(1920);
+        Assert.Equal(items, bar.ItemsShowing);
+        // Each is named for what a press does now; the clock comes after them.
+        Assert.Equal(["Volume 45%", "Mute microphone", "Screen recording", "Keep awake", "Search", "Notifications"], bar.Showing.TakeLast(6));
+        bar.SetStates(Busy);
+        bar.LayOut(1920);
+        Assert.Equal(["Volume 45%", "Unmute microphone", "Stop recording", "Stop keep awake", "Search", "Notifications"], bar.Showing.TakeLast(6));
+        // A new list replaces the old one.
+        bar.SetItems([BarItems.Controls]);
+        bar.LayOut(1920);
+        Assert.Equal(["Controls", "Notifications"], bar.Showing.TakeLast(2));
+        bar.SetItems([]);
+        bar.LayOut(1920);
+        Assert.Empty(bar.ItemsShowing);
+        Assert.Equal("Notifications", bar.Showing[^1]);
     });
 
     [Fact]
     public void AnAppsOwnWindowMenuTakesTheBarsPlace() => OnBar((_, controller) =>
     {
-        var bar = Bar(controller, InkStrip.Flat(0), "Notepad++", Menus, 0, Status(laptop: false));
+        var bar = Bar(controller, InkStrip.Flat(0), "Notepad++", Menus, StartItems, Status(laptop: false));
         bar.LayOut(1920);
         Assert.Single(bar.Showing, name => name == "Window");
         // Without one, the bar's Window goes before the app's Help.
@@ -413,7 +502,7 @@ public sealed class MenuBarOffscreenTests
     public void EachGroupWearsTheInkOfItsSideOfTheWallpaper() => OnBar((_, controller) =>
     {
         var columns = Enumerable.Range(0, 96).Select(i => i < 53 ? 0.07 : 0.95).ToArray(); // dark left, light right
-        var bar = Bar(controller, new InkStrip(columns), "Notepad", ["File", "Edit"], 0, Status(laptop: false));
+        var bar = Bar(controller, new InkStrip(columns), "Notepad", ["File", "Edit"], StartItems, Status(laptop: false));
         bar.LayOut(1920);
         Assert.Equal((BarInk.Light, BarInk.Dark), bar.Inks);
     });
@@ -421,8 +510,16 @@ public sealed class MenuBarOffscreenTests
     [Fact]
     public void TheGlyphsSayWhatTheyStandFor() => OnBar((_, _) =>
     {
-        Assert.Equal("Ethernet · Volume 45%", MenuBarWindow.StatusText(Status(laptop: false)));
-        Assert.Equal("Wi-Fi · Muted · Battery 64%", MenuBarWindow.StatusText(Status(laptop: true, muted: true, bars: 2)));
+        var desktop = Status(laptop: false);
+        var laptop = Status(laptop: true, muted: true, bars: 2);
+        Assert.Equal("Volume 45%", MenuBarWindow.Tip(BarItems.Sound, default, desktop));
+        Assert.Equal("Muted", MenuBarWindow.Tip(BarItems.Sound, default, laptop));
+        Assert.Equal("Ethernet", MenuBarWindow.Tip(BarItems.Network, default, desktop));
+        Assert.Equal("Wi-Fi", MenuBarWindow.Tip(BarItems.Network, default, laptop));
+        Assert.Equal("Battery 64%", MenuBarWindow.Tip(BarItems.Battery, default, laptop));
+        Assert.Equal("Capture region", MenuBarWindow.Tip(BarItems.Capture, default, null));
+        Assert.Equal("System", MenuBarWindow.Tip(BarItems.System, default, desktop)); // no reading yet
+        Assert.Equal("Hidden icons", MenuBarWindow.Tip(BarItems.HiddenIcons, default, null));
     });
 
     [Fact]
@@ -441,15 +538,20 @@ public sealed class MenuBarOffscreenTests
             new(Color.FromRgb(0xF4, 0xF2, 0xEE), 0.56), new(Color.FromRgb(0xF4, 0xF2, 0xEE), 1),
         }, 0);
         var splitStrip = new InkStrip(Enumerable.Range(0, 96).Select(i => i < 53 ? 0.07 : 0.95).ToArray());
-        var rows = new List<(string Name, double Width, InkStrip Ink, Brush Back, double? Notch, int Badges, bool Laptop, bool Muted, string App, string[] Menus)>
+        string[] laptopStart = [.. BarItems.Start];
+        var rows = new List<(string Name, double Width, InkStrip Ink, Brush Back, double? Notch, string[] Items, BarStates States, bool Laptop, bool Muted, string App, string[] Menus)>
         {
-            ("white wallpaper", 1920, InkStrip.Flat(0.99), white, 184, 0, false, false, "Notepad++", Menus),
-            ("dark wallpaper, every status item", 1920, InkStrip.Flat(0.1), dark, 184, 3, true, false, "Notepad++", Menus),
-            ("grey 0.49, muted, Wi-Fi 2 of 4", 1920, InkStrip.Flat(0.49), grey, null, 1, true, true, "Google Chrome", []),
-            ("dark left, light right", 1920, splitStrip, split, null, 0, true, false, "Paint", ["File", "Edit", "View", "Help"]),
-            ("960 wide, notch, 3 badges", 960, InkStrip.Flat(0.1), dark, 184, 3, true, false, "Notepad++", Menus),
-            ("960 wide, notch 280, 1 badge", 960, InkStrip.Flat(0.1), dark, 280, 1, true, false, "Notepad++", Menus),
-            ("640 wide, long name", 640, InkStrip.Flat(0.99), white, null, 3, true, false, "Steam Client WebHelper", ["File", "Edit"]),
+            ("white wallpaper, the start set", 1920, InkStrip.Flat(0.99), white, 184, StartItems, default, false, false, "Notepad++", Menus),
+            ("dark wallpaper, the start set on a laptop", 1920, InkStrip.Flat(0.1), dark, 184, laptopStart, default, true, false, "Notepad++", Menus),
+            ("dark wallpaper, every item at rest", 1920, InkStrip.Flat(0.1), dark, null, EveryItem, default, true, false, "Google Chrome", []),
+            ("dark wallpaper, every item, all on", 1920, InkStrip.Flat(0.1), dark, null, EveryItem, Busy, true, true, "Google Chrome", []),
+            ("white wallpaper, every item, all on", 1920, InkStrip.Flat(0.99), white, null, EveryItem, Busy, true, true, "Google Chrome", []),
+            ("grey 0.49, muted, Wi-Fi 2 of 4", 1920, InkStrip.Flat(0.49), grey, null, [BarItems.Network, BarItems.Sound, BarItems.Microphone], new BarStates(true, false, false, null), true, true, "Google Chrome", []),
+            ("dark left, light right", 1920, splitStrip, split, null, StartItems, default, false, false, "Paint", ["File", "Edit", "View", "Help"]),
+            ("960 wide, notch, every item", 960, InkStrip.Flat(0.1), dark, 184, EveryItem, Busy, true, false, "Notepad++", Menus),
+            ("960 wide, notch 280, the start set", 960, InkStrip.Flat(0.1), dark, 280, StartItems, default, false, false, "Notepad++", Menus),
+            ("640 wide, long name", 640, InkStrip.Flat(0.99), white, null, StartItems, default, false, false, "Steam Client WebHelper", ["File", "Edit"]),
+            ("only the clock", 640, InkStrip.Flat(0.1), dark, null, [], default, false, false, "Notepad", ["File", "Edit"]),
         };
         var report = new StringBuilder();
         foreach (double scale in new[] { 1.0, 2.0 })
@@ -466,7 +568,7 @@ public sealed class MenuBarOffscreenTests
                 double top = 8 + i * 40;
                 (double Left, double Right)? notch = row.Notch is { } n ? ((row.Width - n) / 2, (row.Width + n) / 2) : null;
                 shell.Notch = () => notch is { } at ? (0, at.Left, at.Right) : null;
-                var bar = Bar(controller, row.Ink, row.App, row.Menus, row.Badges, Status(row.Laptop, row.Muted, row.Muted ? 2 : null));
+                var bar = Bar(controller, row.Ink, row.App, row.Menus, row.Items, Status(row.Laptop, row.Muted, row.Muted ? 2 : null, cpu: 12), row.States);
                 var root = bar.LayOut(row.Width);
                 var layer = new DrawingVisual();
                 using (var dc = layer.RenderOpen())
