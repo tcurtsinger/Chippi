@@ -119,6 +119,8 @@ internal static class WindowsAppIcons
         bool alpha = false;
         for (int i = 3; i < pixels.Length && !alpha; i += 4) alpha = pixels[i] != 0;
         if (!alpha) for (int i = 3; i < pixels.Length; i += 4) pixels[i] = 255;
+        // Windows hands icons over with straight alpha; WPF draws premultiplied.
+        else if (IconPixels.IsStraight(pixels)) IconPixels.Premultiply(pixels);
         var image = BitmapSource.Create(width, height, 96, 96, PixelFormats.Pbgra32, null, pixels, width * 4);
         image.Freeze();
         return image;

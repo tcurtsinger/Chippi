@@ -136,13 +136,119 @@ public sealed class DockLayoutTests
     public void PinsComeFirstThenRunningAppsInZOrder()
     {
         var apps = DockApps.Compose(
-            [(@"C:\pins\Edge.lnk", @"C:\Edge\msedge.exe", "Edge"), (@"C:\pins\Notes.lnk", null, "Notes")],
+            [new DockPin(@"C:\pins\Edge.lnk", @"C:\Edge\msedge.exe", "Edge"), new DockPin(@"C:\pins\Notes.lnk", null, "Notes")],
             [Window(@"C:\Code\code.exe", "Code", 1), Window(@"C:\Edge\MSEDGE.exe", "Edge", 2), Window(@"C:\Code\code.exe", "Code", 3)]);
         Assert.Equal(["Edge", "Notes", "Code"], apps.Select(a => a.Name));
         Assert.True(apps[0].Running);
         Assert.False(apps[1].Running);
         Assert.False(apps[2].Pinned);
         Assert.Equal(2, apps[2].Windows.Count);
+    }
+
+    [Fact]
+    public void StoreAppPinsClaimTheirWindowsByAppId()
+    {
+        // Terminal's taskbar shortcut has no file target, only its ID: its window goes under the pin, not after it.
+        var terminal = Window(@"C:\Program Files\WindowsApps\Microsoft.WindowsTerminal\WindowsTerminal.exe", "Terminal", 1);
+        var apps = DockApps.Compose([new DockPin(@"C:\pins\Terminal.lnk", null, "Terminal", "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App")], [terminal],
+            w => w.Handle == 1 ? "Microsoft.WindowsTerminal_8wekyb3d8bbwe!App" : null);
+        Assert.Single(apps);
+        Assert.True(apps[0].Running);
+    }
+
+    [Fact]
+    public void AWebAppKeepsItsWindowsFromItsBrowsersPin()
+    {
+        const string edge = @"C:\Edge\msedge.exe";
+        var apps = DockApps.Compose(
+            [new DockPin(@"C:\pins\Edge.lnk", edge, "Edge", "MSEdge"), new DockPin(@"C:\pins\Outlook.lnk", edge, "Outlook", "MSEdge._crx_outlook")],
+            [Window(edge, "Edge", 1), Window(edge, "Outlook", 2), Window(edge, "Edge", 3)],
+            w => w.Handle == 2 ? "MSEdge._crx_outlook" : "MSEdge");
+        Assert.Equal(2, apps.Count);
+        Assert.Equal([1, 3], apps[0].Windows.Select(w => (int)w.Handle));
+        Assert.Equal([2], apps[1].Windows.Select(w => (int)w.Handle));
+    }
+
+    [Fact]
+    public void AWindowWithoutAnIdFallsBackToThePinsProgram()
+    {
+        const string chrome = @"C:\Chrome\chrome.exe";
+        var apps = DockApps.Compose([new DockPin(@"C:\pins\Chrome.lnk", chrome, "Chrome", "Chrome")], [Window(chrome, "Chrome", 1)], _ => null);
+        Assert.Single(apps);
+        Assert.True(apps[0].Running);
+    }
+
+    [Fact]
+    public void ASquirrelAppsWindowsGoToItsLaunchersPin()
+    {
+        // Claude's and Discord's shortcuts run App\x.exe; their windows run App\app-1.2.3\x.exe and carry no ID.
+        const string stub = @"C:\Users\T\AppData\Local\AnthropicClaude\claude.exe";
+        var apps = DockApps.Compose([new DockPin(@"C:\pins\Claude.lnk", stub, "Claude", "com.squirrel.AnthropicClaude.claude")],
+            [Window(@"C:\Users\T\AppData\Local\AnthropicClaude\app-7.37095.0\claude.exe", "Claude", 1)], _ => null);
+        Assert.Single(apps);
+        Assert.True(apps[0].Running);
+        Assert.False(DockApps.SameProgram(stub, @"C:\Users\T\AppData\Local\Other\app-1.0\claude.exe"));
+        Assert.False(DockApps.SameProgram(stub, @"C:\Users\T\AppData\Local\AnthropicClaude\tools\claude.exe"));
+    }
+
+    [Fact]
+    public void RunningAppsKeepTheirPlaceWhenBroughtToTheFront()
+    {
+        var order = new List<string>();
+        var first = DockApps.Arrange(DockApps.Compose([], [Window(@"C:\a.exe", "A", 1), Window(@"C:\b.exe", "B", 2)]), order);
+        var later = DockApps.Arrange(DockApps.Compose([], [Window(@"C:\b.exe", "B", 2), Window(@"C:\a.exe", "A", 1)]), order);
+        Assert.Equal(first.Select(a => a.Name), later.Select(a => a.Name));
+        var closed = DockApps.Arrange(DockApps.Compose([], [Window(@"C:\b.exe", "B", 2)]), order);
+        Assert.Equal(["B"], closed.Select(a => a.Name));
+    }
+
+    [Fact]
+    public void UnpinnedStoreAppsOpenAgainThroughTheirId()
+    {
+        var apps = DockApps.Compose([], [Window(@"C:\Program Files\WindowsApps\Calc\CalculatorApp.exe", "Calculator", 1)], _ => "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App");
+        Assert.Equal(@"shell:AppsFolder\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", apps[0].Launch);
+        Assert.False(apps[0].Pinned);
+    }
+
+    [Fact]
+    public void DraggingAPinRightLandsWhereItIsLetGo()
+    {
+        // Pins A, B, C at 24, 78, 132: A let go between B and C lands second, not last.
+        double[] centers = [24, 78, 132];
+        Assert.Equal(1, DockApps.InsertIndex(centers, 0, 100));
+        Assert.Equal(["b", "a", "c"], DockApps.Move(["a", "b", "c"], "a", DockApps.InsertIndex(centers, 0, 100)));
+        Assert.Equal(2, DockApps.InsertIndex(centers, 0, 150));
+        Assert.Equal(1, DockApps.InsertIndex(centers, 2, 50));
+        Assert.Equal(0, DockApps.InsertIndex(centers, -1, 10));
+        Assert.Equal(3, DockApps.InsertIndex(centers, -1, 150));
+    }
+
+    [Fact]
+    public void ATakenNameGetsANumberAsExplorerGivesIt()
+    {
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "report.pdf", "report (2).pdf" };
+        Assert.Equal("report (3).pdf", DockApps.FreeName("report.pdf", taken.Contains));
+        Assert.Equal("notes.txt", DockApps.FreeName("notes.txt", taken.Contains));
+    }
+
+    [Fact]
+    public void TaskbarPinsKeepTheTaskbarsOrder()
+    {
+        string[] links = [@"C:\t\Chrome.lnk", @"C:\t\File Explorer.lnk", @"C:\t\Terminal.lnk", @"C:\t\Spotify.lnk"];
+        byte[] favorites = [0, 0x14, .. System.Text.Encoding.Unicode.GetBytes("\0Terminal.lnk\0\0x"), 3, .. System.Text.Encoding.Unicode.GetBytes("File Explorer.lnk"), 9, 9,
+            .. System.Text.Encoding.Unicode.GetBytes("Chrome.lnk")];
+        Assert.Equal([@"C:\t\Terminal.lnk", @"C:\t\File Explorer.lnk", @"C:\t\Chrome.lnk", @"C:\t\Spotify.lnk"], DockApps.TaskbarOrder(links, favorites));
+        Assert.Equal([@"C:\t\File Explorer.lnk", @"C:\t\Chrome.lnk", @"C:\t\Spotify.lnk", @"C:\t\Terminal.lnk"], DockApps.TaskbarOrder(links, null));
+    }
+
+    [Fact]
+    public void WinAndADigitAloneOpenTheDocksApps()
+    {
+        Assert.True(DockKeys.Matches(0x31, win: true, shift: false, control: false, alt: false));
+        Assert.True(DockKeys.Matches(0x39, win: true, shift: false, control: false, alt: false));
+        Assert.False(DockKeys.Matches(0x30, win: true, shift: false, control: false, alt: false));
+        Assert.False(DockKeys.Matches(0x31, win: false, shift: false, control: false, alt: false));
+        Assert.False(DockKeys.Matches(0x31, win: true, shift: true, control: false, alt: false));
     }
 
     [Fact]

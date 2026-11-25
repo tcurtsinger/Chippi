@@ -143,16 +143,16 @@ internal sealed class MenuBarController : IDisposable
 
     public IReadOnlyList<BarMenuItem> ChippiMenu() => Opening(
     [
-        new BarMenuItem("About This PC") { Run = () => Open("ms-settings:about") },
-        new BarMenuItem("Chippi Settings…") { Run = () => Shell.Context.OpenSettings(null) },
+        new BarMenuItem("About this PC") { Run = () => Open("ms-settings:about") },
+        new BarMenuItem("Chippi settings") { Run = () => Shell.Context.OpenSettings(null) },
         new BarMenuItem("Task Manager") { Hint = "Ctrl+Shift+Esc", Run = () => _ = Shell.PressAsync("Ctrl+Shift+Esc") },
         BarMenuItem.Separator,
-        new BarMenuItem("Lock Screen") { Hint = "Win+L", Run = PowerActions.Lock },
+        new BarMenuItem("Lock screen") { Hint = "Win+L", Run = PowerActions.Lock },
         new BarMenuItem("Sleep") { Run = () => PowerActions.Power(PowerActions.Choice.Sleep) },
         new BarMenuItem("Restart…") { Run = () => Confirm("Restart?", PowerActions.Choice.Restart) },
-        new BarMenuItem("Shut Down…") { Run = () => Confirm("Shut down?", PowerActions.Choice.ShutDown) },
+        new BarMenuItem("Shut down…") { Run = () => Confirm("Shut down?", PowerActions.Choice.ShutDown) },
         BarMenuItem.Separator,
-        new BarMenuItem("Sign Out…") { Run = () => Confirm("Sign out?", PowerActions.Choice.SignOut) },
+        new BarMenuItem("Sign out…") { Run = () => Confirm("Sign out?", PowerActions.Choice.SignOut) },
     ]);
 
     private static void Confirm(string question, PowerActions.Choice choice)
@@ -171,7 +171,7 @@ internal sealed class MenuBarController : IDisposable
             [
                 new BarMenuItem("About File Explorer") { Run = () => Properties(app.Path) },
                 BarMenuItem.Separator,
-                new BarMenuItem("New Window") { Hint = "Win+E", Run = () => _ = Shell.PressAsync("Win+E") },
+                new BarMenuItem("New window") { Hint = "Win+E", Run = () => _ = Shell.PressAsync("Win+E") },
             ]);
         return Opening(
         [
@@ -181,7 +181,7 @@ internal sealed class MenuBarController : IDisposable
             new BarMenuItem($"Hide {app.Name}") { Run = () => ForWindowsOf(pid, w => Shell.Window(w, WindowAction.Minimize)) },
             new BarMenuItem($"Quit {app.Name}") { Hint = "Alt+F4", Run = () => ForWindowsOf(pid, w => Shell.Window(w, WindowAction.Close)) },
             BarMenuItem.Separator,
-            new BarMenuItem("End Task") { Run = () => EndTask(pid, app) },
+            new BarMenuItem("End task") { Run = () => EndTask(pid, app) },
         ]);
     }
 
@@ -228,10 +228,10 @@ internal sealed class MenuBarController : IDisposable
         var items = new List<BarMenuItem>
         {
             new("Minimize") { Hint = "Win+↓", Enabled = has, Run = () => Shell.Window(window, WindowAction.Minimize) },
-            new(maximized ? "Restore" : "Maximize") { Hint = "Win+↑", Enabled = has, Run = () => Shell.Window(window, maximized ? WindowAction.Restore : WindowAction.Maximize) },
+            new(maximized ? "Restore" : "Maximize") { Hint = "Win+↑", Enabled = has, Run = () => Shell.Window(window, WindowAction.Maximize) },
             BarMenuItem.Separator,
-            new("Snap Left") { Hint = "Win+←", Enabled = has, Run = () => Shell.Window(window, WindowAction.SnapLeft) },
-            new("Snap Right") { Hint = "Win+→", Enabled = has, Run = () => Shell.Window(window, WindowAction.SnapRight) },
+            new("Snap left") { Hint = "Win+←", Enabled = has, Run = () => Shell.Window(window, WindowAction.SnapLeft) },
+            new("Snap right") { Hint = "Win+→", Enabled = has, Run = () => Shell.Window(window, WindowAction.SnapRight) },
         };
         if (zones.Length > 0)
             items.Add(new BarMenuItem("Snap to Layout")
@@ -246,8 +246,8 @@ internal sealed class MenuBarController : IDisposable
                 items.Add(new BarMenuItem($"Move to {(display.Friendly.Length > 0 ? display.Friendly : display.Name)}") { Enabled = has, Run = () => MoveTo(window, display.Handle) });
         }
         items.Add(BarMenuItem.Separator);
-        items.Add(new BarMenuItem("Bring All to Front") { Enabled = has, Run = () => BringAllToFront(_front.ProcessId) });
-        items.Add(new BarMenuItem("Close Window") { Hint = "Alt+F4", Enabled = has, Run = () => Shell.Window(window, WindowAction.Close) });
+        items.Add(new BarMenuItem("Bring all to front") { Enabled = has, Run = () => BringAllToFront(_front.ProcessId) });
+        items.Add(new BarMenuItem("Close window") { Hint = "Alt+F4", Enabled = has, Run = () => Shell.Window(window, WindowAction.Close) });
         return Opening(items);
     }
 
@@ -278,8 +278,7 @@ internal sealed class MenuBarController : IDisposable
         var windows = new Chippi.UI.Actions.WindowsWindowList().Read().Where(w => w.ProcessId == pid || w.AppProcessId == pid).Reverse().ToArray();
         foreach (var window in windows)
         {
-            if (window.Minimized)
-                Shell.Window(window.Handle, WindowAction.Restore);
+            Chippi.UI.Actions.ForegroundRight.Unminimize(window.Handle);
             Native.SetWindowPos(window.Handle, 0, 0, 0, 0, 0, Native.SwpNoMove | Native.SwpNoSize | Native.SwpNoActivate | Native.SwpNoOwnerZOrder);
         }
     }
