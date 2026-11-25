@@ -419,7 +419,7 @@ function geom() {
   let w, h, top, rad;
   const cx = S.pill && S.cx != null ? S.cx : W / 2;
   if (S.open) { w = 520; h = 360; top = S.pill ? 3 : 0; rad = S.pill ? '16px' : '0 0 18px 18px'; }
-  else if (S.pill) { w = act ? 196 : 120; h = 22; top = 3; rad = '11px'; }
+  else if (S.pill) { w = pillW(); h = 22; top = 3; rad = '11px'; }
   else { w = act ? 280 : 184; h = 28; top = 0; rad = '0 0 10px 10px'; }
   const m = S.open ? 8 : 0;
   const left = Math.max(m, Math.min(W - w - m, cx - w / 2));
@@ -431,7 +431,8 @@ function renderNotch() {
   notch.style.borderTopWidth = (S.pill || S.open && S.pill) ? '1px' : '0';
   notch.classList.toggle('isopen', S.open);
   ears.style.height = g.h + 'px';
-  ears.style.padding = S.pill ? '0 9px' : '0 11px';
+  ears.style.padding = S.pill ? (S.activity === 'none' ? '0 10px' : '0 9px') : '0 11px';
+  ears.style.justifyContent = S.pill && S.activity === 'none' ? 'center' : 'space-between';
   ears.innerHTML = earsHtml();
   notch.setAttribute('aria-expanded', S.open ? 'true' : 'false');
 }
@@ -510,7 +511,8 @@ notch.addEventListener('pointerdown', (e) => {
   notch.setPointerCapture(e.pointerId);
 });
 let guide = null;
-const pillW = () => (S.activity !== 'none' ? 196 : 120);
+// The pill hugs what it shows: no camera to leave room for, so no empty middle.
+function pillW() { return { none: 38, agent: 82, song: 62, awake: 74 }[S.activity]; }
 notch.addEventListener('pointermove', (e) => {
   if (!press) return;
   const x = stageX(e), y = stageY(e);
@@ -528,7 +530,7 @@ notch.addEventListener('pointermove', (e) => {
     const pw = pillW(), ph = 22;
     Object.assign(notch.style, { width: pw + 'px', height: ph + 'px', borderRadius: '11px', left: (x - pw / 2) + 'px', top: Math.max(3, Math.min(H - 120, y - ph / 2)) + 'px' });
     notch.style.borderTopWidth = '1px';
-    ears.style.height = ph + 'px'; ears.style.padding = '0 9px';
+    ears.style.height = ph + 'px'; ears.style.padding = '0 9px'; ears.style.justifyContent = S.activity === 'none' ? 'center' : 'space-between';
     if (!S.pill) renderEarsPill();
     if (!guide) { guide = document.createElement('div'); guide.className = 'guide'; stage.appendChild(guide); }
     guide.style.left = g.left + 'px'; guide.style.width = g.w + 'px';
