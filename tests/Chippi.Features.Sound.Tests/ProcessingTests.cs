@@ -330,6 +330,56 @@ public sealed class VbCableRequirementTests : IDisposable
     }
 
     [Fact]
+    public async Task A_scan_begun_before_install_never_overwrites_installing()
+    {
+        var limit = TimeSpan.FromSeconds(5); // fails a broken run instead of hanging it; nothing waits this long
+        // A marker from before a restart that can't be cleared, so every scan reads it.
+        using var kept = new FileStream(WriteMarker(), FileMode.Open, FileAccess.Read, FileShare.Read);
+        var held = new AsyncLocal<bool>(); // true only in the one scan that stops mid-compute
+        var scanning = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var installing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        using var requirement = new VbCableRequirement(_audio, _data,
+            () => { installing.TrySetResult(); return @"C:\fake\VBCABLE_Setup_x64.exe"; }, _setup, () => { },
+            _ =>
+            {
+                if (held.Value)
+                {
+                    scanning.TrySetResult();
+                    release.Wait();
+                }
+                return "";
+            });
+        var states = new List<RequirementState>();
+        requirement.StateChanged += (_, _) => { lock (states) states.Add(requirement.State); };
+        try
+        {
+            // Install's own first scan stops in the marker read, after it read that nothing is installing.
+            held.Value = true;
+            var scan = requirement.InstallAsync(CancellationToken.None);
+            held.Value = false;
+            await scanning.Task.WaitAsync(limit);
+
+            var install = requirement.InstallAsync(CancellationToken.None);
+            await installing.Task.WaitAsync(limit); // Installing is set and setup is starting
+            release.Set(); // the old scan finishes with its Missing
+            await scan.WaitAsync(limit);
+
+            Assert.Equal(RequirementState.Installing, requirement.State);
+            lock (states)
+                Assert.Equal([RequirementState.Installing], states);
+
+            _setup.Result.SetResult(null);
+            await install.WaitAsync(limit);
+            Assert.Single(_setup.Runs);
+        }
+        finally
+        {
+            release.Set();
+        }
+    }
+
+    [Fact]
     public async Task A_cancelled_admin_prompt_goes_back_to_install_driver()
     {
         using var requirement = Create();

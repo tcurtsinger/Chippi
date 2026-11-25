@@ -27,7 +27,10 @@ public sealed class VbCableRequirement : IFeatureRequirement
     private readonly Action _openSoundSettings;
     private readonly IAsyncDisposable _lease;
     private readonly Func<string, string> _readMarker;
-    private bool _installing;
+    private readonly Lock _gate = new();
+    private long _begun;   // Update calls begun
+    private long _applied; // the latest of them whose state stands
+    private volatile bool _installing;
     private bool _disposed;
 
     /// <param name="prepare">Checks and extracts the package, returning the setup's path (<see cref="VbCablePackage.Prepare"/>).</param>
@@ -50,7 +53,7 @@ public sealed class VbCableRequirement : IFeatureRequirement
         try
         {
             audio.SnapshotChanged += OnSnapshot;
-            State = Compute();
+            Update(); // a snapshot can already be computing on the audio thread
         }
         catch
         {
@@ -122,12 +125,26 @@ public sealed class VbCableRequirement : IFeatureRequirement
 
     private void OnSnapshot(object? sender, AudioSnapshot snapshot) => Update();
 
+    /// <summary>
+    /// Update runs on several threads at once: the caller's, the audio thread's snapshots and the scans'
+    /// continuations. A state computed before a later call began is stale (it can have read
+    /// <see cref="_installing"/> before Install set it), so only the latest call to begin may set
+    /// <see cref="State"/>. Every change to what Compute reads is followed by an Update, so the last one stands.
+    /// Compute's file reads and the event stay outside the lock; a handler reads the current State.
+    /// </summary>
     private void Update()
     {
+        var call = Interlocked.Increment(ref _begun);
         var state = Compute();
-        if (state == State)
-            return;
-        State = state;
+        lock (_gate)
+        {
+            if (call < _applied)
+                return;
+            _applied = call;
+            if (state == State)
+                return;
+            State = state;
+        }
         StateChanged?.Invoke(this, EventArgs.Empty);
     }
 
