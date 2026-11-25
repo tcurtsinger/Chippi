@@ -54,6 +54,10 @@ internal sealed class DockWindow : Window
     private DispatcherTimer? _statusTimer;
     private Action? _undo;
     private DockTile? _labelTile;
+    private readonly TranslateTransform _labelGlide = new();
+    private readonly DispatcherTimer _settle;
+    private bool _still = true;
+    private double _grown;
     private DockBackdrop? _backdrop;
     private bool _framing;
     private TimeSpan _lastFrame;
@@ -119,6 +123,7 @@ internal sealed class DockWindow : Window
         _shelf.DragOver += (_, e) => { e.Effects = Files(e) is { } f && f.All(IsProgram) ? DragDropEffects.Link : DragDropEffects.None; e.Handled = true; };
         _root.Children.Add(_shelf);
         _label.Child = _labelText;
+        _label.RenderTransform = _labelGlide;
         _label.Effect = new DropShadowEffect { BlurRadius = 16, ShadowDepth = 4, Direction = 270, Opacity = 0.28 };
         _overlay.Children.Add(_label);
         _root.Children.Add(_overlay);
@@ -151,6 +156,16 @@ internal sealed class DockWindow : Window
         _root.Drop += (_, _) => Magnify(null);
 
         _watch = new DispatcherTimer(TimeSpan.FromMilliseconds(100), DispatcherPriority.Background, (_, _) => Watch(), Dispatcher);
+        // The icons and the name follow the pointer by fractions of a pixel; once they've been still this long, the ones
+        // at rest and the name settle onto whole pixels, where they're sharp.
+        _settle = new DispatcherTimer(TimeSpan.FromMilliseconds(150), DispatcherPriority.Background, (_, _) =>
+        {
+            _settle!.Stop();
+            _still = true;
+            Seat();
+            PlaceLabel();
+        }, Dispatcher);
+        _settle.Stop();
         SourceInitialized += (_, _) =>
         {
             _hwnd = Native.MakeNoActivate(this, Hook);
@@ -165,6 +180,7 @@ internal sealed class DockWindow : Window
         {
             _watch.Stop();
             _statusTimer?.Stop();
+            _settle.Stop();
             StopFrames();
             ThemeManager.ThemeChanged -= OnThemeChanged;
             _appBar?.Dispose();
@@ -300,12 +316,6 @@ internal sealed class DockWindow : Window
         _shelf.VerticalAlignment = _shadow.VerticalAlignment = Horizontal ? VerticalAlignment.Bottom : VerticalAlignment.Center;
         _band.HorizontalAlignment = _shelf.HorizontalAlignment;
         _band.VerticalAlignment = _shelf.VerticalAlignment;
-        _shelf.Margin = _shadow.Margin = Edge switch
-        {
-            DockEdge.Left => new Thickness(DockLayout.EdgeGap, 0, 0, 0),
-            DockEdge.Right => new Thickness(0, 0, DockLayout.EdgeGap, 0),
-            _ => new Thickness(0, 0, 0, DockLayout.EdgeGap),
-        };
         _status.HorizontalAlignment = Horizontal ? HorizontalAlignment.Center : _shelf.HorizontalAlignment;
         _status.VerticalAlignment = Horizontal ? VerticalAlignment.Bottom : VerticalAlignment.Center;
         _status.Margin = Edge switch
@@ -323,6 +333,7 @@ internal sealed class DockWindow : Window
             tile.Refresh(); // the display's scale or the magnified size may have changed
         }
         UpdateFit();
+        Seat();
         SizeBand();
         if (!reserve && _shown && !PointerNear())
             SetShown(false, animate: false);
@@ -374,6 +385,7 @@ internal sealed class DockWindow : Window
             _row.Children.Add(tile);
         ApplyTheme();
         UpdateFit();
+        Seat();
     }
 
     // ----- Magnification -----
@@ -389,9 +401,8 @@ internal sealed class DockWindow : Window
         double offset = 0;
         foreach (var tile in _tiles)
         {
-            double extent = tile.IsDivider ? 9 : DockLayout.Icon;
-            double center = offset + extent / 2;
-            offset += extent + DockLayout.Gap;
+            double center = offset + tile.Rest / 2;
+            offset += tile.Rest + DockLayout.Gap;
             if (tile.IsDivider)
                 continue;
             tile.Target = on ? DockLayout.Magnified((along - RestToNow(center)) / (DockLayout.Icon + DockLayout.Gap), _dock.Settings.MagnifiedSize) : DockLayout.Icon;
@@ -399,7 +410,12 @@ internal sealed class DockWindow : Window
         if (Motion.IsReduced)
         {
             foreach (var tile in _tiles.Where(t => !t.IsDivider))
+            {
+                if (tile.Size != tile.Target)
+                    Moving();
                 tile.SetSize(tile.Target);
+            }
+            Seat();
             _root.UpdateLayout();
             PlaceLabel();
             SyncBackdrop();
@@ -416,6 +432,49 @@ internal sealed class DockWindow : Window
             tile.Target = DockLayout.Icon;
             tile.SetSize(DockLayout.Icon);
         }
+        Seat();
+    }
+
+    /// <summary>An icon has changed size: the row glides until it has been still a moment.</summary>
+    private void Moving()
+    {
+        _still = false;
+        _settle.Stop();
+        _settle.Start();
+    }
+
+    /// <summary>Device pixels per DIP, as layout rounds to them.</summary>
+    private double Pixels => VisualTreeHelper.GetDpi(this).DpiScaleX;
+
+    /// <summary>
+    /// Puts every tile in its slot for its size now (DockLayout.Slots): slots on whole pixels, the icons in them drawn at
+    /// their exact sizes and places.
+    /// </summary>
+    private void Seat()
+    {
+        var sizes = new double[_tiles.Count];
+        var rests = new double[_tiles.Count];
+        for (int i = 0; i < _tiles.Count; i++)
+        {
+            rests[i] = _tiles[i].Rest;
+            sizes[i] = _tiles[i].IsDivider ? rests[i] : _tiles[i].Size;
+        }
+        double pixels = Pixels;
+        var slots = DockLayout.Slots(sizes, rests, pixels, _still, out _grown);
+        for (int i = 0; i < _tiles.Count; i++)
+            _tiles[i].Place(slots[i]);
+        // The shelf is centered with its room to grow counted in, so the middle it's centered on never moves: centered on
+        // its own length, a middle that falls on a half pixel is rounded to the even one, and the shelf would grow 0 then 2
+        // pixels to a side in turn.
+        double room = (DockLayout.Room(_dock.Settings.Magnify ? _dock.Settings.MagnifiedSize : DockLayout.Icon, pixels) - _grown / 2) * _fit;
+        var margin = Edge switch
+        {
+            DockEdge.Left => new Thickness(DockLayout.EdgeGap, room, 0, room),
+            DockEdge.Right => new Thickness(0, room, DockLayout.EdgeGap, room),
+            _ => new Thickness(room, 0, room, DockLayout.EdgeGap),
+        };
+        if (_shelf.Margin != margin)
+            _shelf.Margin = _shadow.Margin = margin;
     }
 
     // ----- Frames: icons easing to their size, the name following its icon, the blur following the shelf -----
@@ -447,11 +506,12 @@ internal sealed class DockWindow : Window
         double dt = _lastFrame == TimeSpan.Zero ? 16 : Math.Clamp((now - _lastFrame).TotalMilliseconds, 1, 50);
         _lastFrame = now;
         double k = 1 - Math.Exp(-dt / 30);
-        bool moving = false;
+        bool moving = false, changed = false;
         foreach (var tile in _tiles)
         {
             if (tile.IsDivider || tile.Size == tile.Target)
                 continue;
+            changed = true;
             double next = tile.Size + (tile.Target - tile.Size) * k;
             if (Math.Abs(tile.Target - next) < 0.25)
                 next = tile.Target;
@@ -460,19 +520,14 @@ internal sealed class DockWindow : Window
             tile.SetSize(next);
         }
         bool sliding = DateTime.UtcNow < _slideUntil;
-        if (moving || sliding)
-        {
-            _root.UpdateLayout();
-            PlaceLabel();
-            SyncBackdrop();
-        }
         if (!moving && !sliding)
-        {
             StopFrames();
-            _root.UpdateLayout();
-            PlaceLabel();
-            SyncBackdrop();
-        }
+        if (changed)
+            Moving();
+        Seat();
+        _root.UpdateLayout();
+        PlaceLabel();
+        SyncBackdrop();
     }
 
     /// <summary>Puts the blur under the shelf where it is now, inside its 1px edge; hidden while the dock is.</summary>
@@ -492,17 +547,7 @@ internal sealed class DockWindow : Window
 
     // Icons are measured against where they sit at rest, so the row doesn't chase the pointer: rest centers are offsets from
     // the row's start at rest, and the row's start moves as the shelf grows about its middle.
-    private double RestToNow(double restCenter)
-    {
-        double rest = 0, now = 0;
-        foreach (var tile in _tiles)
-        {
-            double extent = tile.IsDivider ? 9 : DockLayout.Icon;
-            rest += extent + DockLayout.Gap;
-            now += (tile.IsDivider ? 9 : tile.Size) + DockLayout.Gap;
-        }
-        return restCenter + (now - rest) / 2;
-    }
+    private double RestToNow(double restCenter) => restCenter + _grown / 2;
 
     private bool OverShelf(Point inRow)
     {
@@ -536,25 +581,36 @@ internal sealed class DockWindow : Window
             case DockEdge.Left:
             {
                 var at = art.TranslatePoint(new Point(art.ActualWidth, art.ActualHeight / 2), _overlay);
-                Canvas.SetLeft(_label, at.X + 10);
-                Canvas.SetTop(_label, at.Y - size.Height / 2);
+                MoveLabel(at.X + 10, at.Y - size.Height / 2);
                 break;
             }
             case DockEdge.Right:
             {
                 var at = art.TranslatePoint(new Point(0, art.ActualHeight / 2), _overlay);
-                Canvas.SetLeft(_label, at.X - size.Width - 10);
-                Canvas.SetTop(_label, at.Y - size.Height / 2);
+                MoveLabel(at.X - size.Width - 10, at.Y - size.Height / 2);
                 break;
             }
             default:
             {
                 var at = art.TranslatePoint(new Point(art.ActualWidth / 2, 0), _overlay);
-                Canvas.SetLeft(_label, at.X - size.Width / 2);
-                Canvas.SetTop(_label, at.Y - size.Height - 10);
+                MoveLabel(at.X - size.Width / 2, at.Y - size.Height - 10);
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// The name follows its icon by fractions of a pixel while the icon moves, and sits on whole pixels once it's still,
+    /// so its text is sharp at rest.
+    /// </summary>
+    private void MoveLabel(double left, double top)
+    {
+        double pixels = Pixels;
+        double x = Math.Round(left * pixels) / pixels, y = Math.Round(top * pixels) / pixels;
+        Canvas.SetLeft(_label, x);
+        Canvas.SetTop(_label, y);
+        _labelGlide.X = _still ? 0 : left - x;
+        _labelGlide.Y = _still ? 0 : top - y;
     }
 
     internal void HideLabel()

@@ -24,6 +24,10 @@ internal sealed class DockTile : Grid
     private readonly Image _image = new();
     private readonly TranslateTransform _lift = new();
     private readonly TranslateTransform _shift = new();
+    // Magnification is drawn, not laid out: the icon keeps its 48 box and is scaled and moved by fractions of a pixel.
+    private readonly ScaleTransform _grow = new();
+    private readonly TranslateTransform _glide = new();
+    private readonly TranslateTransform _dotGlide = new();
     private readonly Action? _click;
     private readonly Func<IReadOnlyList<MenuBar.BarMenuItem>>? _menu;
     private string _name = "";
@@ -32,6 +36,9 @@ internal sealed class DockTile : Grid
     public DockApp? App { get; private set; }
     public bool IsDivider { get; private init; }
     public double Size { get; private set; } = DockLayout.Icon;
+
+    /// <summary>The tile's length along the shelf at rest.</summary>
+    public double Rest => IsDivider ? DockLayout.Divider : DockLayout.Icon;
 
     /// <summary>The size magnification is easing the icon toward.</summary>
     public double Target { get; set; } = DockLayout.Icon;
@@ -50,7 +57,9 @@ internal sealed class DockTile : Grid
         // plain filtering does well and at no cost per frame.
         RenderOptions.SetBitmapScalingMode(_image, BitmapScalingMode.Linear);
         _art.Children.Add(_image);
-        _art.RenderTransform = _lift;
+        _art.Width = _art.Height = DockLayout.Icon;
+        _art.RenderTransform = new TransformGroup { Children = { _grow, _glide, _lift } };
+        Dot.RenderTransform = _dotGlide;
         Children.Add(_art);
         Children.Add(Dot);
         RenderTransform = _shift;
@@ -147,9 +156,18 @@ internal sealed class DockTile : Grid
 
     public static DockTile Divider()
     {
-        var tile = new DockTile(null, "|", "", null, null) { IsDivider = true, IsHitTestVisible = false };
+        var tile = new DockTile(null, "|", "", null, null) { IsDivider = true, IsHitTestVisible = false, _slot = new(DockLayout.Divider, 0, 1) };
         tile.Children.Clear();
         tile.Children.Add(new Border { Width = 1, Margin = new Thickness(4, 0, 4, 0) });
+        return tile;
+    }
+
+    /// <summary>A tile that only shows <paramref name="picture"/>: the row drawn without a dock, for tests and shots.</summary>
+    internal static DockTile Still(string key, BitmapSource picture)
+    {
+        var tile = new DockTile(null, key, key, null, null);
+        tile._rest = tile._large = picture;
+        tile._image.Source = picture;
         return tile;
     }
 
@@ -273,6 +291,7 @@ internal sealed class DockTile : Grid
     /// <summary>The slot's size along and across the shelf for its edge; the icon sits against the edge, its dot under it.</summary>
     public void Orient(MacDesktop.DockEdge edge)
     {
+        _edge = edge;
         if (IsDivider)
         {
             var line = (Border)Children[0];
@@ -280,50 +299,69 @@ internal sealed class DockTile : Grid
             line.Width = across ? 1 : double.NaN;
             line.Height = across ? double.NaN : 1;
             line.Margin = across ? new Thickness(4, 12, 4, 12) : new Thickness(12, 4, 12, 4);
-            Width = across ? 9 : DockLayout.Slot;
-            Height = across ? DockLayout.Slot : 9;
+            Width = across ? DockLayout.Divider : DockLayout.Slot;
+            Height = across ? DockLayout.Slot : DockLayout.Divider;
             Margin = across ? new Thickness(0, 0, DockLayout.Gap, 0) : new Thickness(0, 0, 0, DockLayout.Gap);
             return;
         }
-        _edge = edge;
-        SetSize(Size);
+        bool bottom = edge == MacDesktop.DockEdge.Bottom;
+        // The slot is the shelf's depth inside its edge line, so the row never clips it; a grown icon overflows it outward,
+        // past the shelf (GetLayoutClip lets it). The icon keeps the shelf's padding from the outer edge, the dot under it.
+        // Both sit at the slot's start along the shelf, where Place moves them from; the icon grows from its outer edge.
+        double pad = DockLayout.Padding - DockLayout.Edge;
+        double inner = DockLayout.Slot - pad;
+        double dot = (DockLayout.Icon - Dot.Width) / 2;
+        ClipToBounds = false;
+        if (bottom) Height = DockLayout.Slot;
+        else Width = DockLayout.Slot;
+        Margin = bottom ? new Thickness(0, 0, DockLayout.Gap, 0) : new Thickness(0, 0, 0, DockLayout.Gap);
+        _art.HorizontalAlignment = edge == MacDesktop.DockEdge.Right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        _art.VerticalAlignment = bottom ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+        _art.RenderTransformOrigin = edge switch { MacDesktop.DockEdge.Left => new Point(0, 0.5), MacDesktop.DockEdge.Right => new Point(1, 0.5), _ => new Point(0.5, 1) };
+        _art.Margin = edge switch
+        {
+            MacDesktop.DockEdge.Left => new Thickness(pad, 0, inner - DockLayout.Icon, 0),
+            MacDesktop.DockEdge.Right => new Thickness(inner - DockLayout.Icon, 0, pad, 0),
+            _ => new Thickness(0, inner - DockLayout.Icon, 0, pad),
+        };
+        Dot.HorizontalAlignment = edge == MacDesktop.DockEdge.Right ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        Dot.VerticalAlignment = bottom ? VerticalAlignment.Bottom : VerticalAlignment.Top;
+        Dot.Margin = edge switch
+        {
+            MacDesktop.DockEdge.Left => new Thickness(2, dot, 0, 0),
+            MacDesktop.DockEdge.Right => new Thickness(0, dot, 2, 0),
+            _ => new Thickness(dot, 0, 0, 2),
+        };
+        Place(_slot);
     }
 
     private MacDesktop.DockEdge _edge = MacDesktop.DockEdge.Bottom;
+    private DockSlot _slot = new(DockLayout.Icon, 0, 1);
 
-    /// <summary>The icon at <paramref name="size"/> DIPs (48 at rest), grown out of the shelf away from the edge.</summary>
+    /// <summary>The icon's size in DIPs (48 at rest). It's drawn at it once the dock places the tile (<see cref="Place"/>).</summary>
     public void SetSize(double size)
     {
         if (IsDivider)
             return;
         Size = size;
-        _art.Width = _art.Height = size;
         ShowFrame();
+    }
+
+    /// <summary>
+    /// Puts the tile in its slot for this frame (DockLayout.Slots): the slot is whole pixels along the shelf, and the icon
+    /// in it is drawn at its exact size and place, grown out of the shelf away from the edge, its dot under its middle.
+    /// </summary>
+    public void Place(DockSlot slot)
+    {
+        _slot = slot;
         bool bottom = _edge == MacDesktop.DockEdge.Bottom;
-        // The slot is the shelf's depth inside its edge line, so the row never clips it; a grown icon overflows it outward,
-        // past the shelf (GetLayoutClip lets it). The icon keeps the shelf's padding from the outer edge, the dot under it.
-        double pad = DockLayout.Padding - DockLayout.Edge;
-        double inner = DockLayout.Slot - pad;
-        ClipToBounds = false;
-        Width = bottom ? size : DockLayout.Slot;
-        Height = bottom ? DockLayout.Slot : size;
-        Margin = bottom ? new Thickness(0, 0, DockLayout.Gap, 0) : new Thickness(0, 0, 0, DockLayout.Gap);
-        _art.HorizontalAlignment = _edge switch { MacDesktop.DockEdge.Left => HorizontalAlignment.Left, MacDesktop.DockEdge.Right => HorizontalAlignment.Right, _ => HorizontalAlignment.Center };
-        _art.VerticalAlignment = bottom ? VerticalAlignment.Bottom : VerticalAlignment.Center;
-        _art.Margin = _edge switch
-        {
-            MacDesktop.DockEdge.Left => new Thickness(pad, 0, inner - size, 0),
-            MacDesktop.DockEdge.Right => new Thickness(inner - size, 0, pad, 0),
-            _ => new Thickness(0, inner - size, 0, pad),
-        };
-        Dot.HorizontalAlignment = _edge switch { MacDesktop.DockEdge.Left => HorizontalAlignment.Left, MacDesktop.DockEdge.Right => HorizontalAlignment.Right, _ => HorizontalAlignment.Center };
-        Dot.VerticalAlignment = bottom ? VerticalAlignment.Bottom : VerticalAlignment.Center;
-        Dot.Margin = _edge switch
-        {
-            MacDesktop.DockEdge.Left => new Thickness(2, 0, 0, 0),
-            MacDesktop.DockEdge.Right => new Thickness(0, 0, 2, 0),
-            _ => new Thickness(0, 0, 0, 2),
-        };
+        if (bottom) Width = slot.Extent;
+        else Height = slot.Extent;
+        if (IsDivider)
+            return;
+        _grow.ScaleX = _grow.ScaleY = slot.Scale;
+        _glide.X = _dotGlide.X = bottom ? slot.Shift : 0;
+        _glide.Y = _dotGlide.Y = bottom ? 0 : slot.Shift;
     }
 
     /// <summary>Moves the tile <paramref name="offset"/> along the shelf, out of the way of a dragged icon's landing place.</summary>
