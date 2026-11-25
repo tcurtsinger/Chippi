@@ -193,7 +193,7 @@ Text and glyphs on an accent fill are black in dark and white in light (**On-acc
 ### Named rules
 **The Accent Rule.** The accent marks what is on, selected or primary: a switch that is on, a checked box, the selected nav item's pill, the selected tab's bar, the selected duration chip, the one primary button per view, and the glyph of an installed or watched feature. It is never decoration, a background wash, a divider or body text.
 
-**The Gradient Rule** (revised 2026-10-29). Two gradients exist: the island's accent fill, on what's on or primary in the island, and the pet's soft shading (with his ground shadow's falloff, revised 2026-11-01). Nothing else is a gradient.
+**The Gradient Rule** (revised 2026-10-29). Two gradients exist: the island's accent fill, on what's on or primary in the island, and the pet's soft shading (with his ground shadow's falloff, revised 2026-11-01). The Mac-style dock's Start tile is the one exception (§5). Nothing else is a gradient.
 
 **The Muted Floor Rule.** `#9D9D9D` (dark) or `#616161` (light) is the quietest text allowed. Both clear 4.5:1 on their surfaces. On the island's own fill the quietest text (`IslandTextTertiaryBrush`) is `#9A9A9A` dark and `#707070` light, both 4.5:1 or more (light revised 2026-10-30 from `#8A8A8A`, which was 3.2:1).
 
@@ -501,7 +501,7 @@ Behavior approved 2026-10-22 (`docs/phase-2/design/notifications/`); visuals res
 Approved by Travis, 2026-11-25 ([brief](docs/mac-style/brief.md), [mockup](docs/mac-style/design/mockup.html)).
 
 - **Menu bar:** 28 tall across the top of every display, reserved like a taskbar. No fill and no blur: the wallpaper shows through, as on macOS 26. Its ink follows the wallpaper under it, not the theme: white below an average luminance of 0.5, dark above. Left: Chippi's mark, the app in front (bold), its classic menus, Window; menus that don't fit fold into ». Right: Chippi's badges, the hidden-icons chevron, input language, Wi-Fi, volume, battery, Controls and the clock.
-- **Dock:** a glass shelf 64 deep, 48 icons, 16 corners, centered on the bottom edge (or a side). Magnification to 72 by default over three icons each side. A 4 dot under a running app. Pins, then running apps, a divider, Downloads and the Recycle Bin.
+- **Dock:** a glass shelf 64 deep, 48 icons, 16 corners, centered on the bottom edge (or a side). The glass is Windows' acrylic blur under a 45% tint of `#28282E` (light `#F6F6F8`) with the mockup's shadow; with transparency effects off it's a 77% tint without blur. Magnification to 72 by default over three icons each side, easing in and out (instant with reduced motion). A 4 dot under a running app. Pins (brought over from the taskbar in its order), then running apps, a divider, Downloads and the Recycle Bin. A window belongs to the pin with its AppUserModelID, else to the pin running its program. The Start tile keeps its blue gradient (Travis, 2026-11-25: "use glass / modern / gradient where needed"). The name over an icon and the window previews hang off the icon's grown edge, never over it. A drag opens a gap where the icon will land; dragged off, a pin shows "Removed" with Undo. Drops and actions that fail say so over the dock ("Move failed", "Open failed"). Win+1 to Win+9 open the dock's apps in its order. Dock and menu bar menus are sentence case like the rest of Chippi; confirms are Chippi's own (Empty Recycle Bin? · Cancel · Empty), never a system dialog.
 - **Notch:** the widget's form while on. Pure black in both themes, at rest, carried and open, with no edge, shadow or blur; the dark island ink always. 28 tall, 184 wide (280 with an activity), square top and 10 bottom corners. It opens down into the 520 × 360 panel, centered on it and kept 8 inside the work area, in the same black. Carried, it is a 22-tall round pill; pulled 12 below the bar it lifts (1.06, −3°) with a 3px accent-fill landing line on the top edge where it will land. It snaps to the center within 40.
 - The taskbar is hidden while the menu bar or the dock stands in for it, and given back on every way out: switching the mode off, quitting, a crash and the next start, uninstall, and `Chippi.exe --restore`.
 
@@ -618,7 +618,7 @@ Where text beside it carries the state (the puck, the home, Now Playing, About),
 
 ### Don't
 - **Don't** use gradients beyond the Gradient Rule's two, and never gradient text.
-- **Don't** use Bold, colored glows, glassmorphism or hero metrics. The Mac-style desktop's dock shelf is the one glass surface, and the menu bar's front app is the one bold label (§5).
+- **Don't** use Bold, colored glows, glassmorphism or hero metrics. The Mac-style desktop's dock shelf is the one glass surface (acrylic blur), and the menu bar's front app is the one bold label (§5).
 - **Don't** put a description under a page title, or a sentence where a label will do.
 - **Don't** nest cards, or give each row its own card.
 - **Don't** ship stock WPF chrome: no default checkboxes, group boxes or gray dialogs.

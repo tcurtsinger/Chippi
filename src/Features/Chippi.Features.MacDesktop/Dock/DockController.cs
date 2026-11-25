@@ -3,10 +3,10 @@
 
 using System.IO;
 using System.Runtime.InteropServices;
-using System.Windows;
 using System.Windows.Threading;
 using Chippi.Core.Actions;
 using Chippi.Core.Diagnostics;
+using Chippi.Core.Input;
 using Chippi.Features.MacDesktop.MenuBar;
 using Chippi.Features.MacDesktop.Shell;
 using Chippi.UI.Actions;
@@ -28,7 +28,9 @@ internal sealed class DockController : IDisposable
     private readonly DispatcherTimer _settle;
     private readonly Native.WinEventProc _proc;
     private readonly List<nint> _hooks = [];
+    private readonly Dictionary<nint, string> _appIds = [];
     private DockWindow? _window;
+    private IInputRegistration? _keys;
     private bool _disposed;
 
     public IReadOnlyList<DockApp> Apps { get; private set; } = [];
@@ -75,6 +77,24 @@ internal sealed class DockController : IDisposable
         _window = new DockWindow(this);
         _window.Show();
         ReadWindows();
+        if (_shell.Context.Input is { } input)
+        {
+            var keys = new DockKeys(index => _dispatcher.BeginInvoke(() => OpenNumber(index)));
+            try { _keys = keys.Registration = input.Add(keys); }
+            catch (Exception ex)
+            {
+                // Windows refused the hook: the dock works, only its keys don't.
+                Log.Warn("Mac-style desktop: Win+number for the dock failed", ex);
+            }
+        }
+    }
+
+    /// <summary>Win+1 to Win+9: the dock's apps in order, as a click opens them.</summary>
+    private void OpenNumber(int index)
+    {
+        if (_disposed || index < 0 || index >= Apps.Count)
+            return;
+        Click(Apps[index]);
     }
 
     public void SettingsChanged()
@@ -90,9 +110,22 @@ internal sealed class DockController : IDisposable
         if (_disposed)
             return;
         var windows = _list.Read();
-        var pins = (Settings.Pins ?? []).Select(p => (p, DockPins.Program(p), DockPins.Name(p))).ToArray();
-        Apps = DockApps.Compose(pins, windows);
+        var pins = (Settings.Pins ?? []).Select(DockPins.Read).ToArray();
+        foreach (var gone in _appIds.Keys.Where(h => windows.All(w => w.Handle != h)).ToArray())
+            _appIds.Remove(gone);
+        Apps = DockApps.Compose(pins, windows, AppId);
         _window?.SetApps(Apps);
+    }
+
+    /// <summary>A window's AppUserModelID, kept once read; one that has none yet is read again next time (apps set it late).</summary>
+    private string? AppId(ListedWindow window)
+    {
+        if (_appIds.TryGetValue(window.Handle, out var known))
+            return known;
+        var id = ShellProperties.AppId(window);
+        if (id is not null)
+            _appIds[window.Handle] = id;
+        return id;
     }
 
     private void Save(MacDesktopSettings settings)
@@ -106,7 +139,7 @@ internal sealed class DockController : IDisposable
 
     // ----- Clicks -----
 
-    /// <summary>Not running, it opens; running, it comes to the front; already in front, it minimizes.</summary>
+    /// <summary>Not running, it opens; running, it comes to the front; its window in front minimizes, as on the taskbar.</summary>
     public void Click(DockApp app)
     {
         if (!app.Running)
@@ -115,10 +148,9 @@ internal sealed class DockController : IDisposable
             return;
         }
         nint front = Native.GetForegroundWindow();
-        if (app.Windows.Any(w => w.Handle == front))
+        if (app.Windows.FirstOrDefault(w => w.Handle == front) is { } inFront)
         {
-            foreach (var window in app.Windows)
-                _shell.Window(window.Handle, WindowAction.Minimize);
+            _shell.Window(inFront.Handle, WindowAction.Minimize);
             return;
         }
         Activate(app.Windows[0].Handle);
@@ -148,6 +180,7 @@ internal sealed class DockController : IDisposable
         catch (ActionFailure ex)
         {
             Log.Warn($"Mac-style desktop: opening {Path.GetFileName(target)} failed", ex);
+            _window?.ShowStatus("Open failed");
         }
     }
 
@@ -165,17 +198,17 @@ internal sealed class DockController : IDisposable
             items.Add(BarMenuItem.Separator);
         }
         items.Add(app.Running
-            ? new BarMenuItem("New Window") { Run = () => Launch(app.Launch) }
+            ? new BarMenuItem("New window") { Run = () => Launch(app.Launch) }
             : new BarMenuItem("Open") { Run = () => Launch(app.Launch) });
         items.Add(app.Pinned
-            ? new BarMenuItem("Remove from Dock") { Run = () => Unpin(app.Launch) }
+            ? new BarMenuItem("Remove from Dock") { Run = () => Unpin(app.Launch, offerUndo: true) }
             : new BarMenuItem("Keep in Dock") { Run = () => Pin(app.Launch, null) });
         if (File.Exists(app.Path))
             items.Add(new BarMenuItem("Show in Explorer") { Run = () => ShowInExplorer(app.Path) });
         if (app.Running)
         {
             items.Add(BarMenuItem.Separator);
-            items.Add(new BarMenuItem(app.Windows.Count == 1 ? "Close Window" : "Close Windows") { Run = () => CloseAll(app) });
+            items.Add(new BarMenuItem(app.Windows.Count == 1 ? "Close window" : "Close windows") { Run = () => CloseAll(app) });
             items.Add(new BarMenuItem("Quit") { Run = () => Quit(app) });
         }
         return items;
@@ -195,20 +228,24 @@ internal sealed class DockController : IDisposable
     public IReadOnlyList<BarMenuItem> RecycleBinMenu() =>
     [
         new BarMenuItem("Open") { Run = () => Open("shell:RecycleBinFolder") },
-        new BarMenuItem("Empty Recycle Bin") { Run = EmptyRecycleBin },
+        new BarMenuItem("Empty Recycle Bin") { Run = () => _window?.ConfirmEmptyRecycleBin() },
     ];
 
     public IReadOnlyList<BarMenuItem> StartMenu() =>
     [
         new BarMenuItem("Start") { Run = OpenStart },
         new BarMenuItem("Settings") { Run = () => Open("ms-settings:") },
-        new BarMenuItem("Chippi Settings…") { Run = () => _shell.Context.OpenSettings($"module:{MacDesktopModule.Id}") },
+        new BarMenuItem("Chippi settings") { Run = () => _shell.Context.OpenSettings($"module:{MacDesktopModule.Id}") },
     ];
 
     public void Open(string target)
     {
         try { _shell.Pc?.Open(target); }
-        catch (ActionFailure ex) { Log.Warn("Mac-style desktop: opening failed", ex); }
+        catch (ActionFailure ex)
+        {
+            Log.Warn("Mac-style desktop: opening failed", ex);
+            _window?.ShowStatus("Open failed");
+        }
     }
 
     private void ShowInExplorer(string path)
@@ -230,13 +267,16 @@ internal sealed class DockController : IDisposable
             _shell.Window(window.Handle, WindowAction.Close);
     }
 
-    private static void EmptyRecycleBin()
+    /// <summary>Empties the Recycle Bin once its confirm said Empty (DockWindow.ConfirmEmptyRecycleBin).</summary>
+    public async void EmptyRecycleBin()
     {
-        if (MessageBox.Show("Empty Recycle Bin?", "Chippi", MessageBoxButton.OKCancel, MessageBoxImage.None, MessageBoxResult.Cancel) != MessageBoxResult.OK)
-            return;
-        int result = SHEmptyRecycleBin(0, null, 0x1 | 0x2 | 0x4); // no confirm, no progress, no sound
-        if (result < 0)
+        // An empty bin answers 0x8000FFFF (E_UNEXPECTED): there was nothing to do, not a failure.
+        int result = await Task.Run(() => SHEmptyRecycleBin(0, null, 0x1 | 0x2 | 0x4)); // no confirm, no progress, no sound
+        if (result < 0 && result != unchecked((int)0x8000FFFF))
+        {
             Log.Warn($"Mac-style desktop: emptying the Recycle Bin failed (0x{result:X8})");
+            _window?.ShowStatus("Empty failed");
+        }
     }
 
     // ----- Pins -----
@@ -247,8 +287,17 @@ internal sealed class DockController : IDisposable
         Save(Settings with { Pins = DockApps.Move(pins, launch, at ?? pins.Count) });
     }
 
-    public void Unpin(string launch) =>
-        Save(Settings with { Pins = (Settings.Pins ?? []).Where(p => !string.Equals(p, launch, StringComparison.OrdinalIgnoreCase)).ToArray() });
+    /// <summary>Takes the pin off; <paramref name="offerUndo"/> shows "Removed" with Undo, which puts it back where it was.</summary>
+    public void Unpin(string launch, bool offerUndo = false)
+    {
+        var pins = Settings.Pins ?? [];
+        int was = pins.ToList().FindIndex(p => string.Equals(p, launch, StringComparison.OrdinalIgnoreCase));
+        if (was < 0)
+            return;
+        Save(Settings with { Pins = pins.Where((_, i) => i != was).ToArray() });
+        if (offerUndo)
+            _window?.ShowStatus("Removed", () => Pin(launch, was));
+    }
 
     // ----- Drops -----
 
@@ -261,17 +310,19 @@ internal sealed class DockController : IDisposable
         Launch(program, string.Join(' ', files.Select(f => $"\"{f}\"")));
     }
 
-    /// <summary>Files dropped on Downloads move there.</summary>
+    /// <summary>Files dropped on Downloads move there; a name already taken gets " (2)", as Explorer does.</summary>
     public void MoveToDownloads(IReadOnlyList<string> paths)
     {
         string folder = Downloads;
+        bool failed = false;
         foreach (var path in paths)
         {
             try
             {
-                string target = Path.Combine(folder, Path.GetFileName(path));
-                if (string.Equals(Path.GetDirectoryName(path), folder, StringComparison.OrdinalIgnoreCase) || File.Exists(target) || Directory.Exists(target))
+                if (string.Equals(Path.GetDirectoryName(path.TrimEnd('\\')), folder.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
                     continue;
+                string target = Path.Combine(folder, DockApps.FreeName(Path.GetFileName(path.TrimEnd('\\')),
+                    name => File.Exists(Path.Combine(folder, name)) || Directory.Exists(Path.Combine(folder, name))));
                 if (Directory.Exists(path))
                     Directory.Move(path, target);
                 else
@@ -280,12 +331,15 @@ internal sealed class DockController : IDisposable
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
             {
                 Log.Warn("Mac-style desktop: moving to Downloads failed", ex);
+                failed = true;
             }
         }
+        if (failed)
+            _window?.ShowStatus("Move failed");
     }
 
     /// <summary>Files dropped on the Recycle Bin go to it, as Explorer's Delete does.</summary>
-    public static void Recycle(IReadOnlyList<string> paths)
+    public void Recycle(IReadOnlyList<string> paths)
     {
         if (paths.Count == 0)
             return;
@@ -296,8 +350,11 @@ internal sealed class DockController : IDisposable
             Flags = 0x40 | 0x400 | 0x10, // FOF_ALLOWUNDO | FOF_NOERRORUI | FOF_NOCONFIRMATION
         };
         int result = SHFileOperation(ref operation);
-        if (result != 0)
+        if (result != 0 || operation.Aborted)
+        {
             Log.Warn($"Mac-style desktop: recycling failed ({result})");
+            _window?.ShowStatus("Delete failed");
+        }
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -332,6 +389,8 @@ internal sealed class DockController : IDisposable
             return;
         _disposed = true;
         _settle.Stop();
+        _keys?.Dispose();
+        _keys = null;
         foreach (var hook in _hooks)
             Native.UnhookWinEvent(hook);
         _hooks.Clear();

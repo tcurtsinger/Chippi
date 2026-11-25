@@ -56,35 +56,83 @@ public sealed record DockApp(string Key, string Launch, string Path, string Name
     public bool Running => Windows.Count > 0;
 }
 
+/// <summary>
+/// A pin as the dock matches windows to it: what launches it, the program it runs (null when a shortcut has no file target,
+/// as a Store app's or a web app's doesn't), its name and its AppUserModelID (null when it sets none).
+/// </summary>
+public sealed record DockPin(string Launch, string? Program, string Name, string? AppId = null);
+
 /// <summary>Builds the dock's apps from its pins and the windows open now.</summary>
 public static class DockApps
 {
     /// <summary>
     /// The pins in their order, each with its windows, then every other app with a window, in the order it first appears in
-    /// <paramref name="windows"/> (front to back). <paramref name="pins"/> are (what launches it, the program it runs).
+    /// <paramref name="windows"/> (front to back). A window goes to the pin with its AppUserModelID first (<paramref
+    /// name="appIdOf"/>; Store apps, web apps and apps that set one), else to a pin that runs its program, unless both have
+    /// an ID and they differ (an Edge web app's windows aren't Edge's). Windows no pin claims are grouped by ID, else program.
     /// </summary>
-    public static IReadOnlyList<DockApp> Compose(IReadOnlyList<(string Launch, string? Program, string Name)> pins, IReadOnlyList<ListedWindow> windows)
+    public static IReadOnlyList<DockApp> Compose(IReadOnlyList<DockPin> pins, IReadOnlyList<ListedWindow> windows, Func<ListedWindow, string?>? appIdOf = null)
     {
-        var byProgram = windows.Where(w => w.Executable.Length > 0)
-            .GroupBy(w => w.Executable, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key, g => (IReadOnlyList<ListedWindow>)g.ToArray(), StringComparer.OrdinalIgnoreCase);
-        var apps = new List<DockApp>();
-        var claimed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (launch, program, name) in pins)
+        var ids = windows.Select(w => appIdOf?.Invoke(w) is { Length: > 0 } id ? id : null).ToArray();
+        var owner = new int[windows.Count];
+        Array.Fill(owner, -1);
+        for (int i = 0; i < windows.Count; i++)
         {
-            var own = program is not null && byProgram.TryGetValue(program, out var found) ? found : [];
-            if (program is not null)
-                claimed.Add(program);
-            apps.Add(new DockApp(Key(launch), launch, program ?? launch, name, true, own));
-        }
-        foreach (var window in windows)
-        {
-            if (window.Executable.Length == 0 || !claimed.Add(window.Executable))
+            if (ids[i] is not { } id)
                 continue;
-            apps.Add(new DockApp(Key(window.Executable), window.Executable, window.Executable, window.App, false, byProgram[window.Executable]));
+            owner[i] = IndexOf(pins, p => string.Equals(p.AppId, id, StringComparison.OrdinalIgnoreCase));
+        }
+        for (int i = 0; i < windows.Count; i++)
+        {
+            if (owner[i] >= 0 || windows[i].Executable.Length == 0)
+                continue;
+            owner[i] = IndexOf(pins, p => p.Program is not null && string.Equals(p.Program, windows[i].Executable, StringComparison.OrdinalIgnoreCase)
+                && (p.AppId is null || ids[i] is null));
+        }
+
+        var apps = new List<DockApp>();
+        for (int p = 0; p < pins.Count; p++)
+        {
+            var pin = pins[p];
+            var own = windows.Where((_, i) => owner[i] == p).ToArray();
+            apps.Add(new DockApp(Key(pin.Launch), pin.Launch, pin.Program ?? pin.Launch, pin.Name, true, own));
+        }
+        var groups = new List<(string Key, List<ListedWindow> Windows, string? Id)>();
+        for (int i = 0; i < windows.Count; i++)
+        {
+            var window = windows[i];
+            if (owner[i] >= 0 || window.Executable.Length == 0)
+                continue;
+            string key = ids[i] is { } id ? "AUMID:" + id.ToUpperInvariant() : Key(window.Executable);
+            int at = groups.FindIndex(g => g.Key == key);
+            if (at < 0)
+                groups.Add((key, [window], ids[i]));
+            else
+                groups[at].Windows.Add(window);
+        }
+        foreach (var (key, own, id) in groups)
+        {
+            var front = own[0];
+            // A Store app opens again through its ID; a desktop app through its program.
+            string launch = id is not null && IsPackaged(front.Executable) ? @"shell:AppsFolder\" + id : front.Executable;
+            apps.Add(new DockApp(key, launch, front.Executable, front.App, false, own));
         }
         return apps;
     }
+
+    private static int IndexOf(IReadOnlyList<DockPin> pins, Func<DockPin, bool> match)
+    {
+        for (int i = 0; i < pins.Count; i++)
+            if (match(pins[i]))
+                return i;
+        return -1;
+    }
+
+    /// <summary>A Store (packaged) app's program, or the frame Windows hosts them in.</summary>
+    public static bool IsPackaged(string executable) =>
+        executable.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase)
+        || executable.EndsWith(@"\ApplicationFrameHost.exe", StringComparison.OrdinalIgnoreCase)
+        || executable.Contains(@"\SystemApps\", StringComparison.OrdinalIgnoreCase);
 
     public static string Key(string path) => path.ToUpperInvariant();
 
@@ -94,6 +142,53 @@ public static class DockApps
         var list = pins.Where(p => !string.Equals(p, moved, StringComparison.OrdinalIgnoreCase)).ToList();
         list.Insert(Math.Clamp(index, 0, list.Count), moved);
         return list;
+    }
+
+    /// <summary>
+    /// Where among the pins a tile dropped at <paramref name="at"/> goes, given each pin's center along the shelf in order.
+    /// <paramref name="dragged"/> is the dragged pin's own index among them, or -1 for an app that isn't pinned: it isn't
+    /// counted, so the index is in the list without it, as <see cref="Move"/> takes it.
+    /// </summary>
+    public static int InsertIndex(IReadOnlyList<double> centers, int dragged, double at)
+    {
+        int index = 0;
+        for (int i = 0; i < centers.Count; i++)
+            if (i != dragged && at > centers[i])
+                index++;
+        return index;
+    }
+
+    /// <summary>A name for <paramref name="name"/> that's free in <paramref name="exists"/>: "name (2).ext", as Explorer does.</summary>
+    public static string FreeName(string name, Func<string, bool> exists)
+    {
+        if (!exists(name))
+            return name;
+        string stem = System.IO.Path.GetFileNameWithoutExtension(name), extension = System.IO.Path.GetExtension(name);
+        for (int n = 2; ; n++)
+        {
+            string candidate = $"{stem} ({n}){extension}";
+            if (!exists(candidate))
+                return candidate;
+        }
+    }
+
+    /// <summary>
+    /// The taskbar's pinned shortcuts in the taskbar's own order: as their names appear in its Taskband Favorites value
+    /// (UTF-16), then any it doesn't name, File Explorer first and the rest by name.
+    /// </summary>
+    public static IReadOnlyList<string> TaskbarOrder(IReadOnlyList<string> links, byte[]? favorites)
+    {
+        string text = favorites is { Length: > 1 } ? System.Text.Encoding.Unicode.GetString(favorites) : "";
+        string shifted = favorites is { Length: > 2 } ? System.Text.Encoding.Unicode.GetString(favorites, 1, favorites.Length - 1) : "";
+        int Place(string link)
+        {
+            string file = System.IO.Path.GetFileName(link);
+            int a = text.IndexOf(file, StringComparison.OrdinalIgnoreCase), b = shifted.IndexOf(file, StringComparison.OrdinalIgnoreCase);
+            return a >= 0 && (b < 0 || a <= b) ? a : b >= 0 ? b : int.MaxValue;
+        }
+        return links.OrderBy(Place)
+            .ThenBy(p => System.IO.Path.GetFileNameWithoutExtension(p).Contains("Explorer", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(p => System.IO.Path.GetFileNameWithoutExtension(p), StringComparer.CurrentCultureIgnoreCase).ToArray();
     }
 
     /// <summary>The newest files in a folder, newest first; folders and hidden files left out.</summary>

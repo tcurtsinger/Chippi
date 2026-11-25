@@ -11,26 +11,42 @@ using Chippi.Features.MacDesktop.Shell;
 namespace Chippi.Features.MacDesktop.Dock;
 
 /// <summary>
-/// The dock's pins: a program's path or a shortcut's. The first start brings the taskbar's pins over (its shortcuts in
-/// User Pinned\TaskBar). A shortcut is read for the program it runs, so its running windows show under it.
+/// The dock's pins: a program's path, a shortcut's, or a Store app's <c>shell:AppsFolder\ID</c>. The first start brings the
+/// taskbar's pins over (its shortcuts in User Pinned\TaskBar), in the taskbar's order. A shortcut is read for the program it
+/// runs and its AppUserModelID, so its running windows show under it.
 /// </summary>
 internal static class DockPins
 {
-    private static readonly ConcurrentDictionary<string, string?> Targets = new(StringComparer.OrdinalIgnoreCase);
+    private const string AppsFolder = @"shell:AppsFolder\";
+
+    private static readonly ConcurrentDictionary<string, (string? Program, string? AppId)> Links = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, string> AppNamesById = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>The pin as the dock matches windows to it.</summary>
+    public static DockPin Read(string pin) => new(pin, Program(pin), Name(pin), AppId(pin));
 
     public static string TaskbarFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "Microsoft", "Internet Explorer", "Quick Launch", "User Pinned", "TaskBar");
 
-    /// <summary>The taskbar's pinned shortcuts, by name. Windows keeps their order elsewhere; File Explorer goes first.</summary>
+    /// <summary>The taskbar's pinned shortcuts, in the order the taskbar shows them (its Taskband Favorites value).</summary>
     public static IReadOnlyList<string> FromTaskbar()
     {
         try
         {
             if (!Directory.Exists(TaskbarFolder))
                 return [];
-            return Directory.EnumerateFiles(TaskbarFolder, "*.lnk")
-                .OrderBy(p => Path.GetFileNameWithoutExtension(p).Contains("Explorer", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                .ThenBy(p => Path.GetFileNameWithoutExtension(p), StringComparer.CurrentCultureIgnoreCase).ToArray();
+            var links = Directory.EnumerateFiles(TaskbarFolder, "*.lnk").ToArray();
+            byte[]? favorites = null;
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband");
+                favorites = key?.GetValue("Favorites") as byte[];
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+            {
+                Log.Warn("Mac-style desktop: reading the taskbar's order failed", ex);
+            }
+            return DockApps.TaskbarOrder(links, favorites);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -43,16 +59,29 @@ internal static class DockPins
     public static string? Program(string pin)
     {
         if (!pin.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
-            return Path.IsPathFullyQualified(pin) ? pin : null;
-        return Targets.GetOrAdd(pin, static link => ReadShortcut(link));
+            return !pin.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) && Path.IsPathFullyQualified(pin) ? pin : null;
+        return Links.GetOrAdd(pin, static link => ReadShortcut(link)).Program;
+    }
+
+    /// <summary>The AppUserModelID a pin's windows carry: a Store app's ID, or the one its shortcut sets; null for none.</summary>
+    public static string? AppId(string pin)
+    {
+        if (pin.StartsWith(AppsFolder, StringComparison.OrdinalIgnoreCase))
+            return pin[AppsFolder.Length..];
+        return pin.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) ? Links.GetOrAdd(pin, static link => ReadShortcut(link)).AppId : null;
     }
 
     /// <summary>What the dock calls a pin: a shortcut's own name, or the program's.</summary>
-    public static string Name(string pin) => pin.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)
-        ? Path.GetFileNameWithoutExtension(pin)
-        : AppNames.Name(pin);
+    public static string Name(string pin)
+    {
+        if (pin.StartsWith(AppsFolder, StringComparison.OrdinalIgnoreCase))
+            return AppNamesById.GetOrAdd(pin, static p => ShellNames.DisplayName(p) ?? p[AppsFolder.Length..]);
+        return pin.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)
+            ? Path.GetFileNameWithoutExtension(pin)
+            : AppNames.Name(pin);
+    }
 
-    private static string? ReadShortcut(string link)
+    private static (string? Program, string? AppId) ReadShortcut(string link)
     {
         object? created = null;
         try
@@ -62,11 +91,12 @@ internal static class DockPins
             var buffer = new StringBuilder(1024);
             ((IShellLinkW)created).GetPath(buffer, buffer.Capacity, 0, 0);
             string target = Environment.ExpandEnvironmentVariables(buffer.ToString());
-            return target.Length > 0 && Path.IsPathFullyQualified(target) ? target : null;
+            string? appId = created is ShellProperties.IPropertyStore store ? ShellProperties.AppId(store) : null;
+            return (target.Length > 0 && Path.IsPathFullyQualified(target) ? target : null, appId);
         }
         catch (Exception ex) when (ex is COMException or IOException or UnauthorizedAccessException or InvalidCastException or ArgumentException)
         {
-            return null;
+            return (null, null);
         }
         finally
         {

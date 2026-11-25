@@ -20,9 +20,10 @@ using Chippi.UI.Themes;
 namespace Chippi.Features.MacDesktop.Dock;
 
 /// <summary>
-/// The dock's window on the main display: a glass shelf of 48-DIP icons, 16 corners, a dot under each running app. Icons
-/// near the pointer grow (DockLayout.Magnified). An AppBar while it's always shown, so maximized windows stop above it.
-/// Never takes the keyboard. Its clear margin around the shelf passes clicks through (a layered window's clear pixels do).
+/// The dock's window on the main display: a glass shelf of 48-DIP icons, 16 corners, a dot under each running app, with
+/// Windows' acrylic blurring what's behind it (DockBackdrop). Icons near the pointer grow (DockLayout.Magnified), easing in
+/// and out. An AppBar while it's always shown, so maximized windows stop above it. Never takes the keyboard. Its clear
+/// margin around the shelf passes clicks through (a layered window's clear pixels do).
 /// </summary>
 internal sealed class DockWindow : Window
 {
@@ -32,9 +33,22 @@ internal sealed class DockWindow : Window
     private readonly DockController _dock;
     private readonly Grid _root = new();
     private readonly Border _shelf = new();
+    private readonly Border _shadow = new() { IsHitTestVisible = false };
     private readonly StackPanel _row = new() { Orientation = Orientation.Horizontal };
     private readonly Canvas _overlay = new() { IsHitTestVisible = false };
-    private readonly Border _label = new() { Visibility = Visibility.Collapsed, CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 3, 10, 4) };
+    private readonly Border _label = new() { Visibility = Visibility.Collapsed, CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 3, 10, 4), BorderThickness = new Thickness(1) };
+    private readonly Border _status = new() { Visibility = Visibility.Collapsed, CornerRadius = new CornerRadius(6), Padding = new Thickness(10, 3, 4, 3), BorderThickness = new Thickness(1) };
+    private readonly TextBlock _statusText = new() { FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    private readonly Button _statusUndo = new() { Content = "Undo", Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(8, 1, 8, 2), FontSize = 12 };
+    private DispatcherTimer? _statusTimer;
+    private Action? _undo;
+    private DockTile? _labelTile;
+    private DockBackdrop? _backdrop;
+    private bool _framing;
+    private TimeSpan _lastFrame;
+    private DateTime _edgeSince = DateTime.MaxValue;
+    private DateTime _slideUntil = DateTime.MinValue;
+    private Popup? _confirm;
     private readonly TextBlock _labelText = new() { FontSize = 12 };
     private readonly TranslateTransform _slide = new();
     private readonly DispatcherTimer _watch;
@@ -74,34 +88,57 @@ internal sealed class DockWindow : Window
         _shelf.BorderThickness = new Thickness(1);
         _shelf.Child = _row;
         _shelf.RenderTransform = _slide;
-        _shelf.Effect = new DropShadowEffect { BlurRadius = 30, ShadowDepth = 10, Direction = 270, Opacity = 0.3, Color = Colors.Black };
+        // The tint and shadow are their own layer behind the shelf, so the icons growing don't redraw through an effect.
+        _shadow.CornerRadius = new CornerRadius(DockLayout.Corner);
+        _shadow.RenderTransform = _slide;
+        _shadow.SetBinding(WidthProperty, new System.Windows.Data.Binding(nameof(ActualWidth)) { Source = _shelf });
+        _shadow.SetBinding(HeightProperty, new System.Windows.Data.Binding(nameof(ActualHeight)) { Source = _shelf });
+        _shelf.SizeChanged += (_, _) => SyncBackdrop();
+        _root.Children.Add(_shadow);
         _shelf.AllowDrop = true;
         _shelf.Drop += OnShelfDrop;
         _shelf.DragOver += (_, e) => { e.Effects = Files(e) is { } f && f.All(IsProgram) ? DragDropEffects.Link : DragDropEffects.None; e.Handled = true; };
         _root.Children.Add(_shelf);
         _label.Child = _labelText;
+        _label.Effect = new DropShadowEffect { BlurRadius = 16, ShadowDepth = 4, Direction = 270, Opacity = 0.28 };
         _overlay.Children.Add(_label);
         _root.Children.Add(_overlay);
+        _statusUndo.SetResourceReference(StyleProperty, "SubtleButtonStyle");
+        _statusUndo.Click += (_, _) => { var undo = _undo; HideStatus(); undo?.Invoke(); };
+        _status.Child = new StackPanel { Orientation = Orientation.Horizontal, Children = { _statusText, _statusUndo } };
+        _status.Effect = new DropShadowEffect { BlurRadius = 16, ShadowDepth = 4, Direction = 270, Opacity = 0.28 };
+        _status.MouseEnter += (_, _) => _statusTimer?.Stop();
+        _status.MouseLeave += (_, _) => _statusTimer?.Start();
+        _root.Children.Add(_status);
         ApplyTheme();
         ThemeManager.ThemeChanged += OnThemeChanged;
 
         _root.MouseMove += (_, e) => Magnify(e.GetPosition(_row));
-        _root.MouseLeave += (_, _) => { Magnify(null); _leftAt = DateTime.UtcNow; HideLabel(); };
+        _root.MouseLeave += (_, _) => { if (!_dragging) Magnify(null); _leftAt = DateTime.UtcNow; HideLabel(); };
         _root.MouseEnter += (_, _) => _leftAt = DateTime.MaxValue;
 
         _watch = new DispatcherTimer(TimeSpan.FromMilliseconds(100), DispatcherPriority.Background, (_, _) => Watch(), Dispatcher);
         SourceInitialized += (_, _) =>
         {
             _hwnd = Native.MakeNoActivate(this, Hook);
+            _backdrop = DockBackdrop.Create(ThemeManager.IsLight);
+            ApplyTheme();
             Place();
             _watch.Start();
         };
+        IsVisibleChanged += (_, _) => SyncBackdrop();
         Closed += (_, _) =>
         {
             _watch.Stop();
+            _statusTimer?.Stop();
+            StopFrames();
             ThemeManager.ThemeChanged -= OnThemeChanged;
             _appBar?.Dispose();
             ClosePreview();
+            if (_confirm is not null)
+                _confirm.IsOpen = false;
+            _backdrop?.Dispose();
+            _backdrop = null;
         };
     }
 
@@ -112,16 +149,30 @@ internal sealed class DockWindow : Window
     private bool Horizontal => Edge == DockEdge.Bottom;
 
     /// <summary>
-    /// The glass in the app theme. No blur behind a layered window in WPF, so the fill is a little denser than the mockup's to
-    /// read the same.
+    /// The glass in the app theme: the mockup's tint over Windows' acrylic, or a denser tint to read the same where there's
+    /// no acrylic (transparency effects off). The shadow is the mockup's, deeper in dark.
     /// </summary>
     private void ApplyTheme()
     {
         bool light = ThemeManager.IsLight;
-        _shelf.Background = Frozen(light ? Color.FromArgb(0xC4, 0xF6, 0xF6, 0xF8) : Color.FromArgb(0xC4, 0x28, 0x28, 0x2E));
+        bool blurred = _backdrop is not null && _backdrop.SetTint(light);
+        byte fill = blurred ? (byte)0x73 : (byte)0xC4;
+        // The tint is drawn by the shadow layer under the shelf, which casts the shadow from it: a drop shadow takes the
+        // caster's alpha, so its opacity is the mockup's divided by the tint's. The shelf draws only its edge and the icons.
+        _shadow.Background = Frozen(light ? Color.FromArgb(fill, 0xF6, 0xF6, 0xF8) : Color.FromArgb(fill, 0x28, 0x28, 0x2E));
+        _shelf.Background = Brushes.Transparent;
         _shelf.BorderBrush = Frozen(light ? Color.FromArgb(0xB3, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x21, 0xFF, 0xFF, 0xFF));
-        _label.Background = Frozen(light ? Color.FromArgb(0xF0, 0xF6, 0xF6, 0xF8) : Color.FromArgb(0xF0, 0x28, 0x28, 0x2C));
-        _labelText.Foreground = Frozen(light ? Color.FromRgb(0x1A, 0x1A, 0x1A) : Colors.White);
+        _shadow.Effect = new DropShadowEffect { BlurRadius = 30, ShadowDepth = 10, Direction = 270, Opacity = Math.Min(1, (light ? 0.18 : 0.45) / (fill / 255.0)), Color = Colors.Black };
+        var tip = Frozen(light ? Color.FromArgb(0xF0, 0xF6, 0xF6, 0xF8) : Color.FromArgb(0xF0, 0x28, 0x28, 0x2C));
+        var tipEdge = Frozen(light ? Color.FromArgb(0x14, 0x00, 0x00, 0x00) : Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF));
+        var ink = Frozen(light ? Color.FromRgb(0x1A, 0x1A, 0x1A) : Colors.White);
+        _label.Background = _status.Background = tip;
+        _label.BorderBrush = _status.BorderBrush = tipEdge;
+        _labelText.Foreground = _statusText.Foreground = ink;
+        if (_label.Effect is DropShadowEffect labelShadow)
+            labelShadow.Opacity = light ? 0.14 : 0.28;
+        if (_status.Effect is DropShadowEffect statusShadow)
+            statusShadow.Opacity = light ? 0.14 : 0.28;
         var dot = Frozen(light ? Color.FromRgb(0x3A, 0x3A, 0x3A) : Color.FromRgb(0xE6, 0xE6, 0xE6));
         foreach (var tile in _tiles)
             tile.Dot.Fill = dot;
@@ -177,13 +228,21 @@ internal sealed class DockWindow : Window
         _root.Width = bounds.Width / _scale;
         _root.Height = bounds.Height / _scale;
         _row.Orientation = Horizontal ? Orientation.Horizontal : Orientation.Vertical;
-        _shelf.HorizontalAlignment = Edge switch { DockEdge.Left => HorizontalAlignment.Left, DockEdge.Right => HorizontalAlignment.Right, _ => HorizontalAlignment.Center };
-        _shelf.VerticalAlignment = Horizontal ? VerticalAlignment.Bottom : VerticalAlignment.Center;
-        _shelf.Margin = Edge switch
+        _shelf.HorizontalAlignment = _shadow.HorizontalAlignment = Edge switch { DockEdge.Left => HorizontalAlignment.Left, DockEdge.Right => HorizontalAlignment.Right, _ => HorizontalAlignment.Center };
+        _shelf.VerticalAlignment = _shadow.VerticalAlignment = Horizontal ? VerticalAlignment.Bottom : VerticalAlignment.Center;
+        _shelf.Margin = _shadow.Margin = Edge switch
         {
             DockEdge.Left => new Thickness(DockLayout.EdgeGap, 0, 0, 0),
             DockEdge.Right => new Thickness(0, 0, DockLayout.EdgeGap, 0),
             _ => new Thickness(0, 0, 0, DockLayout.EdgeGap),
+        };
+        _status.HorizontalAlignment = Horizontal ? HorizontalAlignment.Center : _shelf.HorizontalAlignment;
+        _status.VerticalAlignment = Horizontal ? VerticalAlignment.Bottom : VerticalAlignment.Center;
+        _status.Margin = Edge switch
+        {
+            DockEdge.Left => new Thickness(DockLayout.Reserved + 16, 0, 0, 0),
+            DockEdge.Right => new Thickness(0, 0, DockLayout.Reserved + 16, 0),
+            _ => new Thickness(0, 0, 0, DockLayout.Reserved + 34),
         };
         _shelf.Padding = Horizontal ? new Thickness(DockLayout.Padding, 0, DockLayout.Padding, 0) : new Thickness(0, DockLayout.Padding, 0, DockLayout.Padding);
         if (Horizontal) { _shelf.Height = DockLayout.Shelf; _shelf.Width = double.NaN; }
@@ -194,6 +253,7 @@ internal sealed class DockWindow : Window
             SetShown(false, animate: false);
         else if (reserve && !_shown)
             SetShown(true, animate: false);
+        SyncBackdrop();
     }
 
     // ----- Tiles -----
@@ -233,6 +293,7 @@ internal sealed class DockWindow : Window
 
     // ----- Magnification -----
 
+    /// <summary>Sets each icon's size for the pointer (null: all at rest); the frames ease them there.</summary>
     private void Magnify(Point? pointer)
     {
         if (_dragging)
@@ -247,8 +308,100 @@ internal sealed class DockWindow : Window
             offset += extent + DockLayout.Gap;
             if (tile.IsDivider)
                 continue;
-            tile.SetSize(on ? DockLayout.Magnified((along - RestToNow(center)) / (DockLayout.Icon + DockLayout.Gap), _dock.Settings.MagnifiedSize) : DockLayout.Icon);
+            tile.Target = on ? DockLayout.Magnified((along - RestToNow(center)) / (DockLayout.Icon + DockLayout.Gap), _dock.Settings.MagnifiedSize) : DockLayout.Icon;
         }
+        if (Motion.IsReduced)
+        {
+            foreach (var tile in _tiles.Where(t => !t.IsDivider))
+                tile.SetSize(tile.Target);
+            _root.UpdateLayout();
+            PlaceLabel();
+            SyncBackdrop();
+        }
+        else
+            StartFrames();
+    }
+
+    /// <summary>Puts every icon at rest at once (a drag starting).</summary>
+    private void Rest()
+    {
+        foreach (var tile in _tiles.Where(t => !t.IsDivider))
+        {
+            tile.Target = DockLayout.Icon;
+            tile.SetSize(DockLayout.Icon);
+        }
+    }
+
+    // ----- Frames: icons easing to their size, the name following its icon, the blur following the shelf -----
+
+    private void StartFrames()
+    {
+        if (_framing)
+            return;
+        _framing = true;
+        _lastFrame = TimeSpan.Zero;
+        CompositionTarget.Rendering += OnFrame;
+    }
+
+    private void StopFrames()
+    {
+        if (!_framing)
+            return;
+        _framing = false;
+        CompositionTarget.Rendering -= OnFrame;
+    }
+
+    /// <summary>
+    /// Each frame: icons ease toward their size (about 60 ms to most of the way, so they keep up with the pointer and settle
+    /// softly when it leaves), the name stays over its icon, and the blur follows the shelf while it slides.
+    /// </summary>
+    private void OnFrame(object? sender, EventArgs e)
+    {
+        var now = e is RenderingEventArgs r ? r.RenderingTime : TimeSpan.Zero;
+        double dt = _lastFrame == TimeSpan.Zero ? 16 : Math.Clamp((now - _lastFrame).TotalMilliseconds, 1, 50);
+        _lastFrame = now;
+        double k = 1 - Math.Exp(-dt / 30);
+        bool moving = false;
+        foreach (var tile in _tiles)
+        {
+            if (tile.IsDivider || tile.Size == tile.Target)
+                continue;
+            double next = tile.Size + (tile.Target - tile.Size) * k;
+            if (Math.Abs(tile.Target - next) < 0.25)
+                next = tile.Target;
+            else
+                moving = true;
+            tile.SetSize(next);
+        }
+        bool sliding = DateTime.UtcNow < _slideUntil;
+        if (moving || sliding)
+        {
+            _root.UpdateLayout();
+            PlaceLabel();
+            SyncBackdrop();
+        }
+        if (!moving && !sliding)
+        {
+            StopFrames();
+            _root.UpdateLayout();
+            PlaceLabel();
+            SyncBackdrop();
+        }
+    }
+
+    /// <summary>Puts the blur under the shelf where it is now, inside its 1px edge; hidden while the dock is.</summary>
+    private void SyncBackdrop()
+    {
+        if (_backdrop is null || _hwnd == 0)
+            return;
+        if (!IsVisible || _fullscreen || (!_shown && DateTime.UtcNow >= _slideUntil) || PresentationSource.FromVisual(_shelf) is null || _shelf.ActualWidth <= 0)
+        {
+            _backdrop.Hide();
+            return;
+        }
+        var topLeft = _shelf.PointToScreen(new Point(1, 1));
+        var bottomRight = _shelf.PointToScreen(new Point(_shelf.ActualWidth - 1, _shelf.ActualHeight - 1));
+        _backdrop.Place(_hwnd, new Rect(topLeft, bottomRight), (DockLayout.Corner - 1) * _scale);
     }
 
     // Icons are measured against where they sit at rest, so the row doesn't chase the pointer: rest centers are offsets from
@@ -280,29 +433,120 @@ internal sealed class DockWindow : Window
     {
         _labelText.Text = name;
         _label.Visibility = Visibility.Visible;
+        _labelTile = tile;
+        PlaceLabel();
+    }
+
+    /// <summary>Keeps the name 10 off the icon's grown edge, centered on it, as the icons ease.</summary>
+    private void PlaceLabel()
+    {
+        if (_labelTile is not { } tile || _label.Visibility != Visibility.Visible || PresentationSource.FromVisual(tile) is null)
+            return;
         _label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var at = tile.TranslatePoint(new Point(tile.ActualWidth / 2, 0), _overlay);
         var size = _label.DesiredSize;
+        var art = tile.Art;
         switch (Edge)
         {
             case DockEdge.Left:
-                at = tile.TranslatePoint(new Point(tile.ActualWidth, tile.ActualHeight / 2), _overlay);
+            {
+                var at = art.TranslatePoint(new Point(art.ActualWidth, art.ActualHeight / 2), _overlay);
                 Canvas.SetLeft(_label, at.X + 10);
                 Canvas.SetTop(_label, at.Y - size.Height / 2);
                 break;
+            }
             case DockEdge.Right:
-                at = tile.TranslatePoint(new Point(0, tile.ActualHeight / 2), _overlay);
+            {
+                var at = art.TranslatePoint(new Point(0, art.ActualHeight / 2), _overlay);
                 Canvas.SetLeft(_label, at.X - size.Width - 10);
                 Canvas.SetTop(_label, at.Y - size.Height / 2);
                 break;
+            }
             default:
+            {
+                var at = art.TranslatePoint(new Point(art.ActualWidth / 2, 0), _overlay);
                 Canvas.SetLeft(_label, at.X - size.Width / 2);
                 Canvas.SetTop(_label, at.Y - size.Height - 10);
                 break;
+            }
         }
     }
 
-    internal void HideLabel() => _label.Visibility = Visibility.Collapsed;
+    internal void HideLabel()
+    {
+        _label.Visibility = Visibility.Collapsed;
+        _labelTile = null;
+    }
+
+    // ----- Status: what a drop or action did, and Undo for a removed pin -----
+
+    /// <summary>A one- or two-word status over the dock for 5 seconds, with Undo when <paramref name="undo"/> is given.</summary>
+    internal void ShowStatus(string text, Action? undo = null)
+    {
+        _statusText.Text = text;
+        _undo = undo;
+        _statusUndo.Visibility = undo is null ? Visibility.Collapsed : Visibility.Visible;
+        _status.Padding = undo is null ? new Thickness(10, 3, 10, 4) : new Thickness(10, 3, 4, 3);
+        _status.Visibility = Visibility.Visible;
+        _statusTimer ??= new DispatcherTimer(TimeSpan.FromSeconds(5), DispatcherPriority.Normal, (_, _) => HideStatus(), Dispatcher);
+        _statusTimer.Stop();
+        _statusTimer.Start();
+        if (!_shown)
+            SetShown(true, animate: true);
+    }
+
+    private void HideStatus()
+    {
+        _statusTimer?.Stop();
+        _status.Visibility = Visibility.Collapsed;
+        _undo = null;
+    }
+
+    // ----- Empty Recycle Bin: the question, Cancel and Empty -----
+
+    internal void ConfirmEmptyRecycleBin()
+    {
+        if (_tiles.FirstOrDefault(t => t.IsBin) is not { } bin)
+            return;
+        if (_confirm is not null)
+            _confirm.IsOpen = false;
+        var cancel = new Button { Content = "Cancel" };
+        cancel.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
+        var empty = new Button { Content = "Empty", Margin = new Thickness(8, 0, 0, 0) };
+        empty.SetResourceReference(StyleProperty, "CriticalButtonStyle");
+        var question = new TextBlock { Text = "Empty Recycle Bin?", FontSize = 13 };
+        question.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+        var card = new Border
+        {
+            Width = 260, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Margin = new Thickness(16),
+            Effect = new DropShadowEffect { BlurRadius = 32, ShadowDepth = 8, Direction = 270, Opacity = ThemeManager.IsLight ? 0.14 : 0.28 },
+            Child = new StackPanel
+            {
+                Margin = new Thickness(16),
+                Children =
+                {
+                    question,
+                    new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 16, 0, 0), Children = { cancel, empty } },
+                },
+            },
+        };
+        card.SetResourceReference(Border.BackgroundProperty, "FlyoutBrush");
+        card.SetResourceReference(Border.BorderBrushProperty, "BorderStrongBrush");
+        var popup = new Popup
+        {
+            PlacementTarget = bin,
+            Placement = Edge switch { DockEdge.Left => PlacementMode.Right, DockEdge.Right => PlacementMode.Left, _ => PlacementMode.Top },
+            StaysOpen = false, AllowsTransparency = true, PopupAnimation = PopupAnimation.None, Child = card,
+        };
+        cancel.Click += (_, _) => popup.IsOpen = false;
+        empty.Click += (_, _) =>
+        {
+            popup.IsOpen = false;
+            _dock.EmptyRecycleBin();
+        };
+        popup.Closed += (_, _) => { if (_confirm == popup) _confirm = null; };
+        _confirm = popup;
+        popup.IsOpen = true;
+    }
 
     // ----- Clicks, menus and drags -----
 
@@ -323,10 +567,59 @@ internal sealed class DockWindow : Window
             return;
         if (tile.App is null)
             return; // Start, Downloads and the Recycle Bin stay put
-        _dragging = true;
-        HideLabel();
+        if (!_dragging)
+        {
+            // The icons settle at rest for the drag, so the gaps it opens are one slot wide; the press point follows.
+            StopFrames();
+            Rest();
+            _root.UpdateLayout();
+            _dragging = true;
+            HideLabel();
+            ClosePreview();
+        }
         var delta = at - _pressAt;
-        tile.Lift(Horizontal ? new Vector(delta.X, Math.Min(0, delta.Y)) : new Vector(Edge == DockEdge.Left ? Math.Max(0, delta.X) : Math.Min(0, delta.X), delta.Y), Away(at));
+        bool away = Away(at);
+        tile.Lift(Horizontal ? new Vector(delta.X, Math.Min(0, delta.Y)) : new Vector(Edge == DockEdge.Left ? Math.Max(0, delta.X) : Math.Min(0, delta.X), delta.Y), away);
+        OpenGap(tile, away ? null : Landing(tile, at));
+    }
+
+    /// <summary>
+    /// Where a dragged app would land among the pins (an index for DockApps.Move), or null where it wouldn't: an app that
+    /// isn't pinned is pinned only when let go among the pins, so a small nudge doesn't pin it.
+    /// </summary>
+    private int? Landing(DockTile dragged, Point at)
+    {
+        var pins = _tiles.Where(t => t.App is { Pinned: true }).ToList();
+        var centers = pins.Select(t => Along(t.TranslatePoint(new Point(t.ActualWidth / 2, t.ActualHeight / 2), _root))).ToArray();
+        double along = Along(at);
+        if (dragged.App is { Pinned: false })
+        {
+            double end = pins.Count > 0
+                ? Along(pins[^1].TranslatePoint(new Point(pins[^1].ActualWidth, pins[^1].ActualHeight), _root)) + DockLayout.Gap
+                : Along(_tiles[0].TranslatePoint(new Point(_tiles[0].ActualWidth, _tiles[0].ActualHeight), _root)) + DockLayout.Icon / 2;
+            if (along > end)
+                return null;
+        }
+        return DockApps.InsertIndex(centers, pins.IndexOf(dragged), along);
+    }
+
+    private double Along(Point p) => Horizontal ? p.X : p.Y;
+
+    /// <summary>Moves the tiles between the dragged one and where it would land by one slot, opening its place there.</summary>
+    private void OpenGap(DockTile dragged, int? landing)
+    {
+        int from = _tiles.IndexOf(dragged);
+        // Tiles' places once it lands: Start, then the pins with it at its index.
+        int to = landing is { } index ? 1 + index : from;
+        double slot = DockLayout.Icon + DockLayout.Gap;
+        for (int i = 0; i < _tiles.Count; i++)
+        {
+            var tile = _tiles[i];
+            if (tile == dragged)
+                continue;
+            double move = to > from && i > from && i <= to ? -slot : to < from && i >= to && i < from ? slot : 0;
+            tile.Shift(Horizontal ? new Vector(move, 0) : new Vector(0, move));
+        }
     }
 
     /// <summary>Dragged this far from the shelf, a pin comes off it when let go.</summary>
@@ -353,33 +646,30 @@ internal sealed class DockWindow : Window
             tile.Click();
             return;
         }
-        _dragging = false;
         var at = e.GetPosition(_root);
+        int? landing = Away(at) ? null : Landing(tile, at);
+        _dragging = false;
         tile.Lift(default, false);
+        foreach (var other in _tiles)
+            other.Unshift();
         if (tile.App is { } app)
         {
             if (Away(at))
             {
                 if (app.Pinned)
-                    _dock.Unpin(app.Launch);
+                    _dock.Unpin(app.Launch, offerUndo: true);
             }
-            else
-                _dock.Pin(app.Launch, PinIndexAt(at));
+            else if (landing is { } index)
+                _dock.Pin(app.Launch, index);
         }
         _dock.SettingsChanged();
     }
 
-    /// <summary>Where among the pins a tile dropped at <paramref name="at"/> goes.</summary>
+    /// <summary>Where among the pins a program dropped from Explorer at <paramref name="at"/> goes.</summary>
     private int PinIndexAt(Point at)
     {
-        int index = 0;
-        foreach (var tile in _tiles.Where(t => t.App is { Pinned: true }))
-        {
-            var center = tile.TranslatePoint(new Point(tile.ActualWidth / 2, tile.ActualHeight / 2), _root);
-            if (Horizontal ? at.X > center.X : at.Y > center.Y)
-                index++;
-        }
-        return index;
+        var centers = _tiles.Where(t => t.App is { Pinned: true }).Select(t => Along(t.TranslatePoint(new Point(t.ActualWidth / 2, t.ActualHeight / 2), _root))).ToArray();
+        return DockApps.InsertIndex(centers, -1, Along(at));
     }
 
     internal void OpenMenu(DockTile tile, IReadOnlyList<BarMenuItem> items)
@@ -416,9 +706,11 @@ internal sealed class DockWindow : Window
     {
         ClosePreview();
         HideLabel();
-        var anchor = tile.PointToScreen(new Point(tile.ActualWidth / 2, 0));
+        // Hung off the icon's edge at its largest, so the previews never cover it while it's magnified.
+        double grown = _dock.Settings.Magnify ? Math.Max(0, _dock.Settings.MagnifiedSize - (DockLayout.Shelf - DockLayout.Padding)) : 0;
+        var anchor = tile.PointToScreen(new Point(tile.ActualWidth / 2, -grown));
         if (Edge != DockEdge.Bottom)
-            anchor = tile.PointToScreen(new Point(Edge == DockEdge.Left ? tile.ActualWidth : 0, tile.ActualHeight / 2));
+            anchor = tile.PointToScreen(new Point(Edge == DockEdge.Left ? tile.ActualWidth + grown : -grown, tile.ActualHeight / 2));
         _preview = new DockPreview(app, anchor, Edge, _scale, window => { ClosePreview(); _dock.Activate(window); });
         _previewTile = tile;
         _preview.Show();
@@ -460,6 +752,8 @@ internal sealed class DockWindow : Window
     {
         if (_hwnd == 0)
             return;
+        if (_tick % 10 == 0 && _backdrop is not null)
+            _backdrop.Restack(_hwnd); // another topmost window may have come between them
         if (++_tick % 5 == 0)
         {
             nint front = Native.GetForegroundWindow();
@@ -468,16 +762,25 @@ internal sealed class DockWindow : Window
             {
                 _fullscreen = fullscreen;
                 Visibility = fullscreen ? Visibility.Hidden : Visibility.Visible;
+                SyncBackdrop();
             }
         }
         var hide = _dock.Settings.DockHide;
         if (hide == DockHiding.AlwaysShown || _fullscreen)
             return;
-        bool busy = _dragging || _menu is { IsOpen: true } || _preview is not null || IsMouseOver;
+        bool busy = _dragging || _menu is { IsOpen: true } || _preview is not null || _confirm is { IsOpen: true } || _status.IsVisible || IsMouseOver;
         if (!_shown)
         {
-            if (PointerAtEdge())
+            // The pointer rests at the edge a moment first, so reaching for a scrollbar or a window's edge doesn't show it.
+            if (!PointerAtEdge())
+                _edgeSince = DateTime.MaxValue;
+            else if (_edgeSince == DateTime.MaxValue)
+                _edgeSince = DateTime.UtcNow;
+            else if (DateTime.UtcNow - _edgeSince >= TimeSpan.FromMilliseconds(150))
+            {
+                _edgeSince = DateTime.MaxValue;
                 SetShown(true, animate: true);
+            }
             return;
         }
         if (busy)
@@ -538,6 +841,11 @@ internal sealed class DockWindow : Window
             HideLabel();
             ClosePreview();
         }
+        _slideUntil = DateTime.UtcNow + duration + TimeSpan.FromMilliseconds(34);
+        if (duration > TimeSpan.Zero)
+            StartFrames(); // the blur follows the shelf as it slides
+        else
+            SyncBackdrop();
     }
 
     internal void PreviewLeft()

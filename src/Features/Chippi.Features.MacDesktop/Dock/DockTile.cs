@@ -3,11 +3,15 @@
 
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Shapes;
 using Chippi.UI.Controls;
+using Chippi.UI.Themes;
 
 namespace Chippi.Features.MacDesktop.Dock;
 
@@ -18,6 +22,7 @@ internal sealed class DockTile : Grid
     private readonly Grid _art = new();
     private readonly Image _image = new();
     private readonly TranslateTransform _lift = new();
+    private readonly TranslateTransform _shift = new();
     private readonly Action? _click;
     private readonly Func<IReadOnlyList<MenuBar.BarMenuItem>>? _menu;
     private string _name = "";
@@ -26,6 +31,9 @@ internal sealed class DockTile : Grid
     public DockApp? App { get; private set; }
     public bool IsDivider { get; private init; }
     public double Size { get; private set; } = DockLayout.Icon;
+
+    /// <summary>The size magnification is easing the icon toward.</summary>
+    public double Target { get; set; } = DockLayout.Icon;
     public Ellipse Dot { get; } = new() { Width = 4, Height = 4, Visibility = Visibility.Hidden, IsHitTestVisible = false };
 
     private DockTile(DockWindow? dock, string key, string name, Action? click, Func<IReadOnlyList<MenuBar.BarMenuItem>>? menu)
@@ -41,6 +49,7 @@ internal sealed class DockTile : Grid
         _art.RenderTransform = _lift;
         Children.Add(_art);
         Children.Add(Dot);
+        RenderTransform = _shift;
         AutomationProperties.SetName(this, name);
         if (dock is null)
             return;
@@ -101,7 +110,7 @@ internal sealed class DockTile : Grid
             if (DockWindow.Files(e) is not { } files)
                 return;
             e.Handled = true;
-            if (bin) DockController.Recycle(files);
+            if (bin) controller.Recycle(files);
             else controller.MoveToDownloads(files);
         };
         tile.Load(path);
@@ -109,6 +118,12 @@ internal sealed class DockTile : Grid
     }
 
     private bool _clickMenu;
+
+    /// <summary>The Recycle Bin's tile, which anchors its Empty confirm.</summary>
+    public bool IsBin => Key == "bin";
+
+    /// <summary>The icon itself, for placing the name and previews against its grown edge.</summary>
+    public FrameworkElement Art => _art;
 
     public static DockTile Divider()
     {
@@ -211,12 +226,54 @@ internal sealed class DockTile : Grid
     }
 
     /// <summary>Follows a drag by <paramref name="offset"/>; faded while it's far enough off the shelf to come off it.</summary>
+    /// <summary>Moves the tile <paramref name="offset"/> along the shelf, out of the way of a dragged icon's landing place.</summary>
+    public void Shift(Vector offset)
+    {
+        if (_shift.X == offset.X && _shift.Y == offset.Y && !_shifting)
+            return;
+        _shifting = offset != default;
+        var duration = TimeSpan.FromMilliseconds(Motion.IsReduced ? 0 : 120);
+        var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+        _shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(offset.X, duration) { EasingFunction = ease });
+        _shift.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(offset.Y, duration) { EasingFunction = ease });
+    }
+
+    private bool _shifting;
+
+    /// <summary>Back in place at once, as the drag that shifted it ends.</summary>
+    public void Unshift()
+    {
+        _shifting = false;
+        _shift.BeginAnimation(TranslateTransform.XProperty, null);
+        _shift.BeginAnimation(TranslateTransform.YProperty, null);
+        _shift.X = _shift.Y = 0;
+    }
+
     public void Lift(Vector offset, bool away)
     {
         _lift.X = offset.X;
         _lift.Y = offset.Y;
         _art.Opacity = away ? 0.4 : 1;
         Panel.SetZIndex(this, offset == default ? 0 : 1);
+    }
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new TilePeer(this);
+
+    /// <summary>Screen readers and UI Automation see each tile as a button with its name that a click invokes.</summary>
+    private sealed class TilePeer(DockTile tile) : FrameworkElementAutomationPeer(tile), IInvokeProvider
+    {
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Button;
+
+        protected override string GetClassNameCore() => "DockTile";
+
+        protected override bool IsContentElementCore() => !tile.IsDivider;
+
+        protected override bool IsControlElementCore() => !tile.IsDivider;
+
+        public override object? GetPattern(PatternInterface pattern) =>
+            pattern == PatternInterface.Invoke && !tile.IsDivider ? this : base.GetPattern(pattern);
+
+        public void Invoke() => tile.Click();
     }
 
     public void Click()
