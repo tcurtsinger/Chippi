@@ -25,7 +25,7 @@ An optional mode that gives Windows a top menu bar, a bottom dock and turns the 
 ## Menu bar
 
 - 28 DIPs, on top of every display, registered as an AppBar so maximized windows start below it. Hidden while a fullscreen app is in front on its display.
-- **Surface:** frosted blur (DWM host backdrop) with the island's text colors, following the app theme. Solid island fill when Windows transparency effects are off.
+- **Surface** (Travis, 2026-11-25): the same glass in both themes, white at 18% over a strong blur (DWM host backdrop), so the wallpaper's color comes through as on a Mac. Only the text and glyph color changes with the app theme: the island's text colors, dark in light and white in dark. When Windows transparency effects are off, it uses the island fill instead.
 - **Left, from the left:**
   - **Chippi mark** (the pet's face at 16): About this PC, Chippi settings, Task Manager, then Lock, Sleep, Restart, Shut down, Sign out.
   - **App name** of the foreground window, 13 / 600. Its menu: About, Show in Explorer, Hide, Quit (closes the app's windows), End task.
