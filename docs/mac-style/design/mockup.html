@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chippi Mac-style Desktop</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+body{margin:0;font-size:14px}
+/* Layout: one 1600×900 desktop stage, scaled to fit, under a slim control strip. Tokens follow DESIGN.md's island brushes. */
+:root{
+  --bg:#ECEBF0;--fg:#1A1A1A;--muted:#5D5D5D;--chip:#FFFFFF;--chipb:rgba(0,0,0,.10);--chipon:#7444F0;--chiponTx:#FFFFFF;
+  --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(190,160,255,.75),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(150,200,255,.7),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(245,170,230,.55),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(150,215,245,.6),transparent 70%),linear-gradient(160deg,#F1EDFB,#E9F0FB);
+  --bar:rgba(246,246,248,.66);--bartx:#1A1A1A;--bartx2:#3A3A3A;--barhov:rgba(0,0,0,.07);
+  --menu:rgba(246,246,248,.94);--menub:rgba(0,0,0,.09);--menutx:#1A1A1A;--menutx3:#707070;--menusel:linear-gradient(135deg,#8F5CFF,#5B86FF);--menuselTx:#FFFFFF;--menushadow:0 12px 32px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.08);
+  --notch:rgba(245,245,246,.97);--notchb:rgba(0,0,0,.08);--notchshadow:0 6px 18px rgba(0,0,0,.13),0 1px 3px rgba(0,0,0,.08);
+  --ntx:#1A1A1A;--ntx2:#4A4A4A;--ntx3:#707070;--tile:rgba(0,0,0,.035);--tileh:rgba(0,0,0,.075);--hair:rgba(0,0,0,.08);
+  --ac:#7444F0;--acfill:linear-gradient(135deg,#8F5CFF,#5B86FF);--onac:#FFFFFF;--actint:rgba(116,68,240,.11);--agent:#C8613A;--track:rgba(0,0,0,.25);--knob:#FFFFFF;
+  --dock:rgba(255,255,255,.42);--dockb:rgba(255,255,255,.7);--dockshadow:0 10px 30px rgba(60,40,120,.18);--dot:#3A3A3A;--tip:rgba(246,246,248,.94);
+  --win:#FBFBFB;--wintitle:#F0F0F3;--wintx:#1A1A1A;--winline:rgba(0,0,0,.09);--winshadow:0 24px 60px rgba(40,30,90,.22),0 2px 10px rgba(0,0,0,.1);
+  --ui:'Segoe UI Variable Text','Segoe UI',system-ui,-apple-system,sans-serif;--display:'Segoe UI Variable Display','Segoe UI',system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141418;--fg:#F2F2F2;--muted:#ABABAB;--chip:#2B2B2F;--chipb:rgba(255,255,255,.09);--chipon:#B79CFF;--chiponTx:#170F2E;
+  --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);
+  --bar:rgba(30,30,34,.55);--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.10);
+  --menu:rgba(40,40,44,.94);--menub:rgba(255,255,255,.09);--menutx:#FFFFFF;--menutx3:#9A9A9A;--menusel:linear-gradient(135deg,#B78FFF,#82AEFF);--menuselTx:#170F2E;--menushadow:0 12px 32px rgba(0,0,0,.5),0 1px 4px rgba(0,0,0,.3);
+  --notch:#000000;--notchb:transparent;--notchshadow:none;
+  --ntx:#FFFFFF;--ntx2:#C9C9C9;--ntx3:#9A9A9A;--tile:rgba(255,255,255,.07);--tileh:rgba(255,255,255,.12);--hair:rgba(255,255,255,.09);
+  --ac:#B79CFF;--acfill:linear-gradient(135deg,#B78FFF,#82AEFF);--onac:#170F2E;--actint:rgba(183,156,255,.16);--agent:#E8875B;--track:rgba(255,255,255,.3);--knob:#454545;
+  --dock:rgba(40,40,46,.45);--dockb:rgba(255,255,255,.13);--dockshadow:0 10px 30px rgba(0,0,0,.45);--dot:#E6E6E6;--tip:rgba(40,40,44,.94);
+  --win:#202020;--wintitle:#2B2B2B;--wintx:#FFFFFF;--winline:rgba(255,255,255,.08);--winshadow:0 24px 60px rgba(0,0,0,.55),0 2px 10px rgba(0,0,0,.3);
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141418;--fg:#F2F2F2;--muted:#ABABAB;--chip:#2B2B2F;--chipb:rgba(255,255,255,.09);--chipon:#B79CFF;--chiponTx:#170F2E;
+  --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);
+  --bar:rgba(30,30,34,.55);--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.10);
+  --menu:rgba(40,40,44,.94);--menub:rgba(255,255,255,.09);--menutx:#FFFFFF;--menutx3:#9A9A9A;--menusel:linear-gradient(135deg,#B78FFF,#82AEFF);--menuselTx:#170F2E;--menushadow:0 12px 32px rgba(0,0,0,.5),0 1px 4px rgba(0,0,0,.3);
+  --notch:#000000;--notchb:transparent;--notchshadow:none;
+  --ntx:#FFFFFF;--ntx2:#C9C9C9;--ntx3:#9A9A9A;--tile:rgba(255,255,255,.07);--tileh:rgba(255,255,255,.12);--hair:rgba(255,255,255,.09);
+  --ac:#B79CFF;--acfill:linear-gradient(135deg,#B78FFF,#82AEFF);--onac:#170F2E;--actint:rgba(183,156,255,.16);--agent:#E8875B;--track:rgba(255,255,255,.3);--knob:#454545;
+  --dock:rgba(40,40,46,.45);--dockb:rgba(255,255,255,.13);--dockshadow:0 10px 30px rgba(0,0,0,.45);--dot:#E6E6E6;--tip:rgba(40,40,44,.94);
+  --win:#202020;--wintitle:#2B2B2B;--wintx:#FFFFFF;--winline:rgba(255,255,255,.08);--winshadow:0 24px 60px rgba(0,0,0,.55),0 2px 10px rgba(0,0,0,.3);
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 28px}
+.wrap{max-width:1600px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 24px}
+header.top h1{font:600 22px/28px var(--display);margin:0;text-wrap:balance}
+header.top p{margin:2px 0 0;color:var(--muted);font-size:13px;line-height:18px;max-width:70ch}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px 16px;margin-left:auto}
+.seg{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.seg .opts{display:flex;background:var(--chip);border:1px solid var(--chipb);border-radius:6px;padding:2px}
+.seg button{font:inherit;font-size:12px;border:0;background:transparent;color:var(--fg);padding:4px 10px;border-radius:4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--chipon);color:var(--chiponTx);font-weight:600}
+.seg button:focus-visible,.reset:focus-visible{outline:2px solid var(--chipon);outline-offset:1px}
+.reset{font:inherit;font-size:12px;border:1px solid var(--chipb);background:var(--chip);color:var(--fg);padding:5px 10px;border-radius:6px;cursor:pointer}
+.frame{position:relative;width:100%;aspect-ratio:16/9;border-radius:10px;overflow:hidden;box-shadow:0 1px 0 var(--chipb),0 20px 50px rgba(0,0,0,.18);max-width:100%;touch-action:none}
+.notes{font-size:12px;color:var(--muted);line-height:18px;display:flex;flex-wrap:wrap;gap:4px 22px}
+
+/* ---------- stage ---------- */
+.stage{position:absolute;left:0;top:0;width:1600px;height:900px;transform-origin:0 0;background:var(--wall);font-family:var(--ui);user-select:none;-webkit-user-select:none;overflow:hidden}
+.ic{fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block;flex:none}
+.fl{fill:currentColor;stroke:none;display:block;flex:none}
+
+/* menu bar */
+.bar{position:absolute;left:0;top:0;width:1600px;height:28px;background:var(--bar);backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7);color:var(--bartx);font-size:13px;z-index:20}
+.grp{position:absolute;top:0;height:28px;display:flex;align-items:center;gap:2px;white-space:nowrap}
+.grp.l{left:8px}.grp.r{right:8px}
+.bi{height:22px;padding:0 8px;border-radius:5px;display:flex;align-items:center;gap:6px;cursor:default;color:var(--bartx)}
+.bi:hover,.bi.open{background:var(--barhov)}
+.bi.app{font-weight:700}
+.bi .num{font-variant-numeric:tabular-nums}
+.bi.badge{padding:0 5px}
+.disc{width:18px;height:18px;border-radius:50%;display:grid;place-items:center}
+.disc.ac{background:var(--acfill);color:var(--onac)}
+.disc.mic{background:#C42B1C;color:#fff}
+.disc.agent{background:var(--agent);color:#fff}
+.lang{font-size:12px;font-weight:600;letter-spacing:.02em}
+
+/* menus */
+.menu{position:absolute;min-width:220px;padding:5px;border-radius:8px;background:var(--menu);border:1px solid var(--menub);box-shadow:var(--menushadow);backdrop-filter:blur(30px) saturate(1.6);-webkit-backdrop-filter:blur(30px) saturate(1.6);color:var(--menutx);font-size:13px;z-index:60}
+.menu .mi{height:26px;padding:0 10px;border-radius:4px;display:flex;align-items:center;gap:24px;white-space:nowrap}
+.menu .mi .k{margin-left:auto;color:var(--menutx3);font-size:12px}
+.menu .mi:hover{background:var(--menusel);color:var(--menuselTx)}
+.menu .mi:hover .k{color:inherit;opacity:.85}
+.menu .mi.dis{color:var(--menutx3)}.menu .mi.dis:hover{background:none;color:var(--menutx3)}
+.menu .sep{height:1px;margin:5px 8px;background:var(--menub)}
+.menu .hd{padding:6px 10px 4px;font-size:12px;color:var(--menutx3)}
+
+/* window */
+.win{position:absolute;left:330px;top:96px;width:940px;height:560px;border-radius:8px;background:var(--win);box-shadow:var(--winshadow);overflow:hidden;color:var(--wintx);transition:opacity .18s,transform .18s;z-index:5}
+.win.min{opacity:0;transform:translateY(40px) scale(.96);pointer-events:none}
+.win .tb{height:36px;background:var(--wintitle);display:flex;align-items:center;padding:0 0 0 14px;font-size:12px;gap:10px;border-bottom:1px solid var(--winline)}
+.win .tb .caps{margin-left:auto;display:flex}
+.win .tb .caps span{width:46px;height:36px;display:grid;place-items:center;opacity:.8}
+.win .body{padding:22px 28px;display:flex;flex-direction:column;gap:12px}
+.win .line{height:10px;border-radius:5px;background:var(--winline)}
+
+/* notch */
+.notch{position:absolute;z-index:40;background:var(--notch);border:1px solid var(--notchb);box-shadow:var(--notchshadow);color:var(--ntx);overflow:hidden;cursor:default;
+  transition:left .26s cubic-bezier(.2,.8,.2,1),top .2s,width .26s cubic-bezier(.2,.8,.2,1),height .26s cubic-bezier(.2,.8,.2,1),border-radius .22s}
+.notch.dragging{transition:width .18s,height .18s,top .18s,border-radius .18s;cursor:grabbing}
+.notch.lift{box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.ears{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;justify-content:space-between;padding:0 11px;transition:opacity .12s}
+.ear{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.eq{display:flex;align-items:flex-end;gap:2px;height:12px}
+.eq i{width:3px;border-radius:1.5px;background:var(--acfill);animation:eq 0.9s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:-.3s}.eq i:nth-child(3){animation-delay:-.6s}
+@keyframes eq{0%,100%{height:5px}50%{height:12px}}
+.cov{width:18px;height:18px;border-radius:50%;background:linear-gradient(180deg,#0B2236,#3F86AC 58%,#9FC6D6 60%,#1E2226 62%);flex:none}
+.content{position:absolute;top:0;left:50%;width:520px;margin-left:-260px;height:360px;padding:12px 16px 0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .12s}
+.notch.isopen .content{opacity:1;pointer-events:auto;transition:opacity .16s .08s}
+.notch.isopen .ears{opacity:0}
+.hdr{height:44px;display:flex;align-items:center;gap:8px;flex:none}
+.hdr .t{font:600 18px var(--display)}
+.find{margin-left:auto;height:28px;padding:0 10px;border-radius:4px;background:var(--tile);display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ntx2)}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;flex:none}
+.tile{height:64px;border-radius:6px;background:var(--tile);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--ntx2);transition:background .083s;cursor:pointer}
+.tile:hover{background:var(--tileh)}
+.tile .n{font-size:12px;color:var(--ntx);line-height:15px}
+.tile .k{font-size:10px;color:var(--ntx3);line-height:12px;height:12px}
+.tile.on{color:var(--ac)}
+.quick{height:42px;margin-top:8px;display:flex;align-items:center;gap:16px;font-size:12px;flex:none;border-top:1px solid var(--hair)}
+.sw{display:flex;align-items:center;gap:8px;cursor:pointer}
+.sw .t{width:30px;height:16px;border-radius:8px;border:1px solid var(--ntx3);position:relative;transition:background .083s}
+.sw .t:after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--ntx2);transition:left .12s}
+.sw.on .t{background:var(--acfill);border-color:transparent}.sw.on .t:after{left:16px;background:var(--onac)}
+.vol{margin-left:auto;display:flex;align-items:center;gap:8px;color:var(--ntx2)}
+.sl{width:96px;height:4px;border-radius:2px;background:var(--track);position:relative}
+.sl .f{position:absolute;left:0;top:0;bottom:0;width:62%;border-radius:2px;background:var(--acfill)}
+.sl .k{position:absolute;left:62%;top:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;background:var(--knob);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sl .k:after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--ac)}
+.foot{height:45px;margin:0 -16px;padding:0 10px 0 16px;border-top:1px solid var(--hair);display:flex;align-items:center;gap:10px;font-size:12px;flex:none}
+.foot .np{flex:1;min-width:0;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foot .np .s{color:var(--ntx3)}
+.ib{width:30px;height:30px;border-radius:4px;display:grid;place-items:center;color:var(--ntx2)}
+.ib:hover{background:var(--tile)}
+.page{display:flex;flex-direction:column;height:100%}
+.page .ph{height:32px;display:flex;align-items:center;gap:4px;font-size:13px;font-weight:600}
+.page .back{width:28px;height:28px;margin-left:-6px;border-radius:4px;display:grid;place-items:center;color:var(--ntx2);cursor:pointer}
+.page .back:hover{background:var(--tile)}
+.page .pb{flex:1;margin:8px 0 14px;border-radius:6px;border:1px dashed var(--hair);display:grid;place-items:center;text-align:center;color:var(--ntx3);font-size:12px;line-height:18px}
+.page .pb b{display:block;color:var(--ntx);font-size:13px;font-weight:600}
+
+/* dock */
+.dockwrap{position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;z-index:30;pointer-events:none}
+.dock{pointer-events:auto;height:64px;padding:0 8px;border-radius:18px;background:var(--dock);border:1px solid var(--dockb);box-shadow:var(--dockshadow);backdrop-filter:blur(26px) saturate(1.8);-webkit-backdrop-filter:blur(26px) saturate(1.8);display:flex;align-items:flex-end;gap:6px;padding-bottom:8px;position:relative}
+.di{position:relative;width:48px;height:48px;flex:none;display:flex;justify-content:center;cursor:pointer}
+.di .ico{width:100%;height:100%;border-radius:22.5%;display:grid;place-items:center;color:#fff;box-shadow:0 2px 5px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.35)}
+.di .ico svg{width:50%;height:50%}
+.di .run{position:absolute;bottom:-6px;left:50%;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--dot);opacity:0;transition:opacity .15s}
+.di.running .run{opacity:1}
+.di.bounce .ico{animation:bounce .5s ease-out 2}
+@keyframes bounce{0%,100%{transform:translateY(0)}40%{transform:translateY(-14px)}}
+.dsep{width:1px;height:40px;margin:0 4px 4px;background:var(--dockb);flex:none;align-self:flex-end}
+.tip{position:absolute;padding:3px 10px;border-radius:6px;background:var(--tip);border:1px solid var(--menub);color:var(--menutx);font-size:12px;white-space:nowrap;pointer-events:none;z-index:50;box-shadow:var(--menushadow)}
+.prev{position:absolute;display:flex;gap:10px;padding:10px;border-radius:12px;background:var(--menu);border:1px solid var(--menub);box-shadow:var(--menushadow);z-index:55}
+.prev .pv{width:200px;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--menutx);border-radius:6px;padding:4px;cursor:pointer}
+.prev .pv:hover{background:var(--tile)}
+.prev .pv .im{height:112px;border-radius:5px;background:var(--win);border:1px solid var(--winline);display:flex;flex-direction:column;gap:7px;padding:24px 14px}
+.prev .pv .im i{display:block;height:6px;border-radius:3px;background:var(--winline)}
+.flyout{position:absolute;padding:10px;border-radius:8px;background:var(--menu);border:1px solid var(--menub);box-shadow:var(--menushadow);display:grid;grid-template-columns:repeat(4,32px);gap:4px;z-index:60}
+.flyout span{width:32px;height:32px;border-radius:4px;display:grid;place-items:center;color:var(--menutx)}
+.flyout span:hover{background:var(--barhov)}
+@media (prefers-reduced-motion: reduce){.notch,.notch.dragging,.win,.content,.ears{transition:none!important}.eq i{animation:none;height:8px}.di.bounce .ico{animation:none}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <radialGradient id="petg" cx=".36" cy=".28" r=".85"><stop offset="0" stop-color="#D2BEFF"/><stop offset=".55" stop-color="#9C6CFF"/><stop offset="1" stop-color="#6A3FD9"/></radialGradient>
+</defs>
+<symbol id="sparkle" viewBox="0 0 24 24"><path d="M12 1.8c.5 4.9 2.2 7.6 7 8.6l3.2.6-3.2.6c-4.8 1-6.5 3.7-7 8.6-.5-4.9-2.2-7.6-7-8.6L1.8 11l3.2-.6c4.8-1 6.5-3.7 7-8.6z"/></symbol>
+<symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+<symbol id="volume" viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></symbol>
+<symbol id="sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
+<symbol id="coffee" viewBox="0 0 24 24"><path d="M10 2v2"/><path d="M14 2v2"/><path d="M6 2v2"/><path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1"/></symbol>
+<symbol id="folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+<symbol id="cliplist" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+<symbol id="notepen" viewBox="0 0 24 24"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"/><path d="M2 6h4"/><path d="M2 10h4"/><path d="M2 14h4"/><path d="M2 18h4"/><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"/></symbol>
+<symbol id="inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+<symbol id="mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+<symbol id="micoff" viewBox="0 0 24 24"><line x1="2" x2="22" y1="2" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+<symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+<symbol id="chevl" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+<symbol id="chevr" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="chevu" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol>
+<symbol id="trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></symbol>
+<symbol id="down" viewBox="0 0 24 24"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></symbol>
+<symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+<symbol id="terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></symbol>
+<symbol id="filecode" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m10 13-2 2 2 2"/><path d="m14 17 2-2-2-2"/></symbol>
+<symbol id="code" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></symbol>
+<symbol id="grid" viewBox="0 0 24 24"><rect width="7" height="7" x="3" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="3" rx="1.5"/><rect width="7" height="7" x="14" y="14" rx="1.5"/><rect width="7" height="7" x="3" y="14" rx="1.5"/></symbol>
+<symbol id="wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+<symbol id="battery" viewBox="0 0 24 24"><rect x="2" y="6" width="17" height="12" rx="2.5"/><line x1="22" x2="22" y1="10.5" y2="13.5"/><rect x="4.5" y="8.5" width="9" height="7" rx="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="scantext" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/></symbol>
+<symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+<symbol id="pipette" viewBox="0 0 24 24"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></symbol>
+<symbol id="toggle" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="7"/><circle cx="16" cy="12" r="3"/></symbol>
+<symbol id="cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
+<symbol id="shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+<symbol id="message" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
+<symbol id="headphones" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="square" viewBox="0 0 24 24"><rect width="16" height="16" x="4" y="4" rx="1.5"/></symbol>
+</svg>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Chippi Mac-style desktop</h1>
+      <p>Hover the notch to open it. Drag it along the top bar: away from the middle it becomes a pill, back near the middle it snaps into the notch. Click dock apps to switch; right-click for their menu. Notepad++ shows an app with real menus; the others show only their name and Window.</p>
+    </div>
+    <div class="ctrls">
+      <div class="seg"><span>Theme</span><div class="opts" id="themeSeg"><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+      <div class="seg"><span>Activity</span><div class="opts" id="actSeg"><button data-v="none">None</button><button data-v="agent">Agent</button><button data-v="song">Song</button><button data-v="awake">Keep awake</button></div></div>
+      <div class="seg"><span>Opening</span><div class="opts" id="openSeg"><button data-v="hover">Hover</button><button data-v="click">Click</button></div></div>
+      <button class="reset" id="resetBtn">Reset notch</button>
+    </div>
+  </header>
+
+  <div class="frame" id="frame">
+    <div class="stage" id="stage">
+      <div class="win" id="win"><div class="tb"><span id="winTitle"></span><div class="caps"><span><svg class="ic" width="12" height="12"><use href="#minus"/></svg></span><span><svg class="ic" width="11" height="11"><use href="#square"/></svg></span><span><svg class="ic" width="12" height="12"><use href="#x"/></svg></span></div></div><div class="body" id="winBody"></div></div>
+
+      <div class="bar" id="bar">
+        <div class="grp l" id="gl"></div>
+        <div class="grp r" id="gr"></div>
+      </div>
+
+      <div class="notch" id="notch" role="button" tabindex="0" aria-label="Chippi">
+        <div class="ears" id="ears"></div>
+        <div class="content" id="content"></div>
+      </div>
+
+      <div class="dockwrap"><div class="dock" id="dock"></div></div>
+    </div>
+  </div>
+
+  <div class="notes"><span>Sample apps, windows, track and times.</span><span>App tiles are stand-ins; the real dock shows each app's own icon.</span><span>The real menu bar blurs whatever is behind it.</span></div>
+</div>
+
+<script>
+(() => {
+const W = 1600, H = 900, BAR = 28;
+const $ = (id) => document.getElementById(id);
+const stage = $('stage'), frame = $('frame'), notch = $('notch'), ears = $('ears'), content = $('content');
+const ic = (id, s, cls = 'ic') => `<svg class="${cls}" width="${s}" height="${s}"><use href="#${id}"/></svg>`;
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+function pet(size, mood = 'idle') {
+  const INK = '#1B1530';
+  const big = (x) => `<ellipse cx="${x}" cy="66" rx="9" ry="10.5" fill="#fff"/><circle cx="${x + 2}" cy="68" r="5" fill="${INK}"/><circle cx="${x + 3.6}" cy="65.6" r="1.7" fill="#fff"/>`;
+  const shut = (x) => `<path d="M${x - 7} 67 Q${x} 72 ${x + 7} 67" fill="none" stroke="${INK}" stroke-width="4" stroke-linecap="round"/>`;
+  const eyes = mood === 'sleepy' ? shut(46) + shut(74) : big(46) + big(74);
+  const mouth = mood === 'sleepy' ? `<ellipse cx="60" cy="85" rx="3.5" ry="3" fill="${INK}"/>` : `<path d="M50 82 Q60 94 70 82 Z" fill="${INK}"/>`;
+  return `<svg width="${size}" height="${size}" viewBox="14 26 92 84" style="display:block;flex:none" aria-hidden="true"><path d="M17 76 C17 45 36 31 60 31 C84 31 103 45 103 76 C103 98 87 106 60 106 C33 106 17 98 17 76 Z" fill="url(#petg)"/>${eyes}${mouth}</svg>`;
+}
+
+// ---------- state ----------
+const S = {
+  theme: null, activity: 'agent', openMode: 'hover',
+  cx: null, pill: false, open: false, page: null, dragging: false,
+  active: 'npp', running: new Set(['explorer', 'edge', 'npp', 'spotify']), minimized: false,
+  micMuted: false, agentSecs: 25,
+};
+try { const saved = JSON.parse(store.get('chippi-notch') || 'null'); if (saved && typeof saved.f === 'number') { S.cx = saved.f * W; S.pill = Math.abs(S.cx - W / 2) > 40; if (!S.pill) S.cx = null; } } catch {}
+
+// ---------- apps ----------
+const APPS = {
+  explorer: { name: 'File Explorer', glyph: 'folder', bg: 'linear-gradient(160deg,#FFD66B,#E9A520)', title: 'Downloads - File Explorer', menus: null },
+  edge: { name: 'Edge', glyph: 'globe', bg: 'linear-gradient(160deg,#3FC1F5,#1B63D6)', title: 'New tab - Edge', menus: null, windows: ['GitHub - tcurtsinger/Chippi', 'Muelle - a dock for Windows'] },
+  terminal: { name: 'Terminal', glyph: 'terminal', bg: 'linear-gradient(160deg,#4A4A52,#1E1E22)', title: 'PowerShell', menus: null },
+  npp: { name: 'Notepad++', glyph: 'filecode', bg: 'linear-gradient(160deg,#9BE07A,#3B9B3A)', title: 'notes.txt - Notepad++', menus: {
+    File: [['New', 'Ctrl+N'], ['Open…', 'Ctrl+O'], ['Save', 'Ctrl+S'], ['Save As…', 'Ctrl+Alt+S'], '-', ['Close', 'Ctrl+W'], ['Exit', 'Alt+F4']],
+    Edit: [['Undo', 'Ctrl+Z'], ['Redo', 'Ctrl+Y'], '-', ['Cut', 'Ctrl+X'], ['Copy', 'Ctrl+C'], ['Paste', 'Ctrl+V'], ['Select All', 'Ctrl+A']],
+    Search: [['Find…', 'Ctrl+F'], ['Find in Files…', 'Ctrl+Shift+F'], ['Replace…', 'Ctrl+H'], ['Go to…', 'Ctrl+G']],
+    View: [['Always on Top', ''], ['Word wrap', ''], ['Zoom In', 'Ctrl+Num +'], ['Zoom Out', 'Ctrl+Num -']],
+    Encoding: [['ANSI', ''], ['UTF-8', ''], ['UTF-8-BOM', '']],
+    Language: [['Normal Text', ''], ['C#', ''], ['Markdown', ''], ['PowerShell', '']],
+    Settings: [['Preferences…', ''], ['Style Configurator…', ''], ['Shortcut Mapper…', '']],
+    Tools: [['MD5', ''], ['SHA-256', '']],
+    Macro: [['Start Recording', 'Ctrl+Shift+R'], ['Playback', 'Ctrl+Shift+P']],
+    Run: [['Run…', 'F5']],
+    Plugins: [['Plugins Admin…', '']],
+  } },
+  code: { name: 'VS Code', glyph: 'code', bg: 'linear-gradient(160deg,#4FB2F5,#1366C0)', title: 'Chippi - VS Code', menus: null },
+  spotify: { name: 'Spotify', glyph: 'music', bg: 'linear-gradient(160deg,#3ED673,#178F43)', title: 'Spotify', menus: null },
+  settings: { name: 'Settings', glyph: 'gear', bg: 'linear-gradient(160deg,#A9AFB9,#5D636D)', title: 'Settings', menus: null },
+};
+const PINNED = ['explorer', 'edge', 'terminal', 'npp', 'code', 'spotify', 'settings'];
+
+const WINDOW_MENU = [['Minimize', 'Win+↓', 'min'], ['Maximize', 'Win+↑'], '-', ['Snap left', 'Win+←'], ['Snap right', 'Win+→'], ['Snap to layout', '›'], ['Move to Display 2', ''], '-', ['Bring All to Front', ''], ['Close Window', 'Alt+F4', 'close']];
+const CHIPPI_MENU = [['About This PC', ''], ['Chippi Settings…', ''], ['Task Manager', 'Ctrl+Shift+Esc'], '-', ['Lock Screen', 'Win+L'], ['Sleep', ''], ['Restart…', ''], ['Shut Down…', ''], '-', ['Sign Out…', '']];
+const appMenu = (a) => [['About ' + a.name, ''], ['Show in Explorer', ''], '-', ['Hide ' + a.name, '', 'min'], ['Quit ' + a.name, '', 'quit'], ['End Task', '']];
+
+// ---------- scale ----------
+let scale = 1;
+function fit() { scale = frame.clientWidth / W; stage.style.transform = `scale(${scale})`; }
+new ResizeObserver(fit).observe(frame); fit();
+function stageX(e) { const r = frame.getBoundingClientRect(); return (e.clientX - r.left) / scale; }
+function stageY(e) { const r = frame.getBoundingClientRect(); return (e.clientY - r.top) / scale; }
+function rectIn(el) { const f = frame.getBoundingClientRect(), r = el.getBoundingClientRect(); return { l: (r.left - f.left) / scale, t: (r.top - f.top) / scale, r: (r.right - f.left) / scale, b: (r.bottom - f.top) / scale, w: r.width / scale, h: r.height / scale }; }
+
+// ---------- floating layers ----------
+let layer = null; // { el, kind, key }
+function closeLayer() { if (layer) { layer.el.remove(); layer.anchor && layer.anchor.classList.remove('open'); layer = null; } }
+function showMenu(items, x, y, anchor, key, above = false) {
+  closeLayer();
+  const m = document.createElement('div');
+  m.className = 'menu'; m.setAttribute('role', 'menu');
+  m.innerHTML = items.map((it) => it === '-' ? '<div class="sep"></div>' : `<div class="mi" role="menuitem" data-act="${it[2] || ''}"><span>${it[0]}</span>${it[1] ? `<span class="k">${it[1]}</span>` : ''}</div>`).join('');
+  stage.appendChild(m);
+  const w = m.offsetWidth, h = m.offsetHeight;
+  m.style.left = Math.max(6, Math.min(W - w - 6, x)) + 'px';
+  m.style.top = (above ? y - h : y) + 'px';
+  m.addEventListener('pointerdown', (e) => e.stopPropagation());
+  m.addEventListener('click', (e) => { const mi = e.target.closest('.mi'); if (!mi) return; menuAction(mi.dataset.act); closeLayer(); });
+  if (anchor) anchor.classList.add('open');
+  layer = { el: m, anchor, key };
+}
+function menuAction(act) {
+  if (act === 'min') { S.minimized = true; renderWin(); }
+  if (act === 'close' || act === 'quit') { if (act === 'quit') S.running.delete(S.active); S.minimized = true; renderWin(); renderDock(); }
+  if (act === 'keep') {}
+}
+
+// ---------- menu bar ----------
+let keep = 99, leftPad = 8, rightPad = 8;
+function barItems() {
+  const a = APPS[S.active];
+  const menus = a.menus ? Object.keys(a.menus) : [];
+  return { a, menus };
+}
+function renderBar() {
+  const { a, menus } = barItems();
+  const gl = $('gl'), gr = $('gr');
+  const shown = menus.slice(0, keep), rest = menus.length - shown.length;
+  const menuHtml = shown.map((m) => `<div class="bi" data-m="app:${m}">${m}</div>`).join('') + (rest ? `<div class="bi" data-m="more" title="More menus">»</div>` : '');
+  gl.innerHTML = `<div class="bi" data-m="chippi" aria-label="Chippi menu">${pet(17)}</div><div class="bi app" data-m="appname">${a.name}</div>${menuHtml}<div class="bi" data-m="window">Window</div>`;
+  const badges = [];
+  if (S.micMuted) badges.push(`<div class="bi badge" title="Microphone muted"><span class="disc mic">${ic('micoff', 11)}</span></div>`);
+  if (S.activity === 'awake') badges.push(`<div class="bi badge" title="Keep awake"><span class="disc ac">${ic('coffee', 11)}</span></div>`);
+  if (S.activity === 'agent') badges.push(`<div class="bi badge" title="Agents"><span class="disc agent">${ic('sparkle', 11, 'fl')}</span></div>`);
+  gr.innerHTML = badges.join('') +
+    `<div class="bi" data-m="tray" title="Hidden icons">${ic('chevu', 15)}</div>` +
+    `<div class="bi lang" title="Input language">ENG</div>` +
+    `<div class="bi" title="Network, volume, battery" data-m="qs">${ic('wifi', 15)}${ic('volume', 15)}${ic('battery', 17)}</div>` +
+    `<div class="bi" data-m="controls" title="Controls">${ic('sliders', 15)}</div>` +
+    `<div class="bi" data-m="clock"><span class="num" id="clock"></span></div>`;
+  tickClock();
+  gl.style.left = leftPad + 'px'; gr.style.right = rightPad + 'px';
+}
+function layoutBar() {
+  // Keep the bar's items clear of the notch or pill wherever it rests; menus that don't fit go into ».
+  const g = geom();
+  const pl = g.left - 10, pr = g.left + g.w + 10;
+  keep = 99; leftPad = 8; rightPad = 8; renderBar();
+  const rW = $('gr').offsetWidth;
+  let limit; // the x the left group must end before
+  if (S.pill && pl > W - 8 - rW - 40) { rightPad = W - pl; limit = W - rightPad - rW - 12; }
+  else if (8 + 140 > pl) { leftPad = pr; limit = W - 8 - rW - 12; }
+  else limit = pl;
+  renderBar();
+  const n = (barItems().menus || []).length;
+  for (keep = n; keep > 0 && leftPad + $('gl').offsetWidth > limit; keep--) renderBar();
+  if (leftPad + $('gl').offsetWidth > limit) { keep = 0; renderBar(); }
+}
+function tickClock() {
+  const el = $('clock'); if (!el) return;
+  const d = new Date();
+  const day = d.toLocaleDateString('en-US', { weekday: 'short' }), mon = d.toLocaleDateString('en-US', { month: 'short' });
+  const t = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  el.textContent = `${day} ${mon} ${d.getDate()} ${t}`;
+}
+setInterval(tickClock, 15000);
+
+$('bar').addEventListener('pointerdown', (e) => {
+  const bi = e.target.closest('.bi[data-m]'); if (!bi) return;
+  e.stopPropagation();
+  const key = bi.dataset.m;
+  if (layer && layer.key === key) { closeLayer(); return; }
+  openBarMenu(bi, key);
+});
+$('bar').addEventListener('pointerover', (e) => {
+  // Moving across titles while a menu is open switches menus, as on a Mac.
+  if (!layer || !layer.key || !layer.anchor || !layer.anchor.closest('#gl')) return;
+  const bi = e.target.closest('#gl .bi[data-m]'); if (!bi || bi.dataset.m === layer.key) return;
+  openBarMenu(bi, bi.dataset.m);
+});
+function openBarMenu(bi, key) {
+  const r = rectIn(bi), a = APPS[S.active];
+  if (key === 'chippi') return showMenu(CHIPPI_MENU, r.l, BAR + 2, bi, key);
+  if (key === 'appname') return showMenu(appMenu(a), r.l, BAR + 2, bi, key);
+  if (key === 'window') return showMenu(WINDOW_MENU, r.l, BAR + 2, bi, key);
+  if (key.startsWith('app:')) return showMenu(a.menus[key.slice(4)], r.l, BAR + 2, bi, key);
+  if (key === 'more') return showMenu(Object.keys(a.menus).slice(keep).map((m) => [m, '›']), r.l, BAR + 2, bi, key);
+  if (key === 'tray') {
+    closeLayer();
+    const f = document.createElement('div'); f.className = 'flyout';
+    f.innerHTML = ['cloud', 'shield', 'message', 'headphones', 'globe', 'music', 'gear', 'activity'].map((g) => `<span>${ic(g, 16)}</span>`).join('');
+    stage.appendChild(f); f.style.left = (r.l + r.w / 2 - f.offsetWidth / 2) + 'px'; f.style.top = (BAR + 4) + 'px';
+    f.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+    bi.classList.add('open'); layer = { el: f, anchor: bi, key }; return;
+  }
+  if (key === 'controls') { closeLayer(); S.page = null; setOpen(true); return; }
+  if (key === 'qs') return showMenu([['Opens Windows Quick Settings', 'Win+A']], r.r - 240, BAR + 2, bi, key);
+  if (key === 'clock') return showMenu([['Opens Windows notifications', 'Win+N']], r.r - 240, BAR + 2, bi, key);
+}
+
+// ---------- notch ----------
+function geom() {
+  const act = S.activity !== 'none';
+  let w, h, top, rad;
+  const cx = S.pill && S.cx != null ? S.cx : W / 2;
+  if (S.open) { w = 520; h = 360; top = S.pill ? 3 : 0; rad = S.pill ? '16px' : '0 0 18px 18px'; }
+  else if (S.pill) { w = act ? 196 : 120; h = 22; top = 3; rad = '11px'; }
+  else { w = act ? 280 : 184; h = 28; top = 0; rad = '0 0 10px 10px'; }
+  const m = S.open ? 8 : 0;
+  const left = Math.max(m, Math.min(W - w - m, cx - w / 2));
+  return { w, h, top, rad, left, cx };
+}
+function renderNotch() {
+  const g = geom();
+  Object.assign(notch.style, { width: g.w + 'px', height: g.h + 'px', top: g.top + 'px', left: g.left + 'px', borderRadius: g.rad });
+  notch.style.borderTopWidth = (S.pill || S.open && S.pill) ? '1px' : '0';
+  notch.classList.toggle('isopen', S.open);
+  ears.style.height = g.h + 'px';
+  ears.style.padding = S.pill ? '0 9px' : '0 11px';
+  const p = S.pill;
+  let L = '', R = '';
+  if (S.activity === 'none') { L = pet(p ? 16 : 19); }
+  if (S.activity === 'agent') { L = `<span style="color:var(--agent)">${ic('sparkle', p ? 13 : 15, 'fl')}</span>`; R = `<span style="color:var(--agent)">${fmt(S.agentSecs)}</span>`; }
+  if (S.activity === 'song') { L = `<span class="cov"${p ? ' style="width:15px;height:15px"' : ''}></span>`; R = `<span class="eq"><i></i><i></i><i></i></span>`; }
+  if (S.activity === 'awake') { L = `<span style="color:var(--ac)">${ic('coffee', p ? 13 : 15)}</span>`; R = `<span style="color:var(--ac)">1 hr</span>`; }
+  ears.innerHTML = `<span class="ear">${L}</span><span class="ear">${R}</span>`;
+  notch.setAttribute('aria-expanded', S.open ? 'true' : 'false');
+}
+const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+setInterval(() => { if (S.activity === 'agent') { S.agentSecs++; if (!S.open) renderNotch(); } }, 1000);
+
+const TILES = [
+  ['Audio', 'sliders', ''], ['Clipboard', 'cliplist', 'Ctrl+Shift+V'], ['Scratchpad', 'notepen', 'Ctrl+Alt+N'], ['Shelf', 'inbox', ''], ['Capture', 'scan', 'PrtSc'],
+  ['Keep awake', 'coffee', ''], ['System', 'activity', ''], ['Displays', 'sun', ''], ['Organizer', 'folder', ''], ['Agents', 'gauge', ''],
+  ['Color', 'pipette', 'Ctrl+Alt+C'], ['Text', 'scantext', ''], ['Actions', 'toggle', ''], ['Search', 'search', 'Alt+Space'], ['Soundboard', 'music', ''],
+];
+function renderContent() {
+  if (S.page) {
+    content.innerHTML = `<div class="page"><div class="ph"><span class="back" data-back aria-label="Back">${ic('chevl', 16)}</span>${S.page}</div><div class="pb"><div><b>${S.page}</b>Today's page, unchanged</div></div></div>`;
+    return;
+  }
+  const on = (n) => (n === 'Keep awake' && S.activity === 'awake') || (n === 'Agents' && S.activity === 'agent');
+  const song = S.activity === 'song';
+  content.innerHTML = `
+    <div class="hdr"><span class="t">Tools</span><span class="find">${ic('search', 13)}Find a tool</span></div>
+    <div class="grid">${TILES.map(([n, g, k]) => `<div class="tile${on(n) ? ' on' : ''}" data-tile="${n}" title="${n}">${ic(g, 20)}<span class="n">${n}</span><span class="k">${k}</span></div>`).join('')}</div>
+    <div class="quick">
+      <span class="sw${S.micMuted ? ' on' : ''}" data-sw="mic"><span class="t"></span>Mute mic</span>
+      <span class="sw${S.activity === 'awake' ? ' on' : ''}" data-sw="awake"><span class="t"></span>Keep awake</span>
+      <span class="vol">${ic('volume', 15)}<span class="sl"><span class="f"></span><span class="k"></span></span><span class="num" style="width:30px;text-align:right">62%</span></span>
+    </div>
+    <div class="foot">
+      <span class="np">${song ? '<span class="cov" style="width:22px;height:22px;border-radius:4px"></span>Midnight City <span class="s">· M83</span>' : ic('music', 15) + 'Now Playing <span class="s">· Nothing playing</span>'}</span>
+      <span class="ib" title="Settings">${ic('gear', 16)}</span>
+      <span class="ib" title="Close Chippi" data-close>${pet(26)}</span>
+    </div>`;
+}
+content.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-tile]'); if (t) { S.page = t.dataset.tile; renderContent(); return; }
+  if (e.target.closest('[data-back]')) { S.page = null; renderContent(); return; }
+  if (e.target.closest('[data-close]')) { setOpen(false); return; }
+  const sw = e.target.closest('[data-sw]');
+  if (sw) {
+    if (sw.dataset.sw === 'mic') S.micMuted = !S.micMuted;
+    if (sw.dataset.sw === 'awake') S.activity = S.activity === 'awake' ? 'none' : 'awake';
+    syncSegs(); renderContent(); renderBar(); layoutBar();
+  }
+});
+
+function setOpen(v) {
+  if (S.open === v) return;
+  S.open = v; if (!v) S.page = null;
+  if (v) renderContent();
+  renderNotch(); layoutBar();
+}
+
+let hoverT = 0, leaveT = 0, press = null;
+notch.addEventListener('pointerenter', () => {
+  clearTimeout(leaveT);
+  if (S.openMode === 'hover' && !S.open && !press) hoverT = setTimeout(() => { if (!press) setOpen(true); }, 300);
+});
+notch.addEventListener('pointerleave', () => {
+  clearTimeout(hoverT);
+  if (S.open && !press) leaveT = setTimeout(() => setOpen(false), 400);
+});
+notch.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  if (e.button !== 0) return;
+  closeLayer();
+  if (S.open) return;
+  press = { x: stageX(e), id: e.pointerId, moved: false };
+  notch.setPointerCapture(e.pointerId);
+});
+notch.addEventListener('pointermove', (e) => {
+  if (!press) return;
+  const x = stageX(e);
+  if (!press.moved && Math.abs(x - press.x) < 4) return;
+  if (!press.moved) { press.moved = true; clearTimeout(hoverT); notch.classList.add('dragging', 'lift'); }
+  const halfPill = (S.activity !== 'none' ? 196 : 120) / 2;
+  const cx = Math.max(halfPill + 4, Math.min(W - halfPill - 4, x));
+  S.pill = Math.abs(cx - W / 2) > 40;
+  S.cx = S.pill ? cx : null;
+  renderNotch(); layoutBar();
+});
+function endPress(e) {
+  if (!press) return;
+  const moved = press.moved; press = null;
+  notch.classList.remove('dragging', 'lift');
+  if (moved) {
+    store.set('chippi-notch', JSON.stringify({ f: (S.pill ? S.cx : W / 2) / W }));
+    renderNotch(); layoutBar();
+  } else if (e.type === 'pointerup') {
+    clearTimeout(hoverT); setOpen(true);
+  }
+}
+notch.addEventListener('pointerup', endPress);
+notch.addEventListener('pointercancel', endPress);
+notch.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(!S.open); }
+  if (e.key === 'Escape') { if (S.page) { S.page = null; renderContent(); } else setOpen(false); }
+});
+stage.addEventListener('pointerdown', () => { closeLayer(); if (S.open) setOpen(false); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeLayer(); setOpen(false); } });
+
+// ---------- window ----------
+function renderWin() {
+  const a = APPS[S.active], w = $('win');
+  $('winTitle').textContent = a.title;
+  w.classList.toggle('min', S.minimized);
+  const widths = [62, 88, 74, 40, 92, 66, 81, 55, 70, 36, 84];
+  $('winBody').innerHTML = widths.map((p) => `<div class="line" style="width:${p}%"></div>`).join('');
+}
+
+// ---------- dock ----------
+const dock = $('dock');
+let tipEl = null, prevEl = null, prevT = 0;
+function renderDock() {
+  const icon = (id, a, extra = '') => `<div class="di${S.running.has(id) ? ' running' : ''}" data-app="${id}" title=""><div class="ico" style="background:${a.bg}">${ic(a.glyph, 24)}</div><span class="run"></span>${extra}</div>`;
+  const extras = PINNED.filter(() => false);
+  dock.innerHTML =
+    icon('start', { glyph: 'grid', bg: 'linear-gradient(160deg,#9C7CFF,#5B86FF)' }) +
+    PINNED.map((id) => icon(id, APPS[id])).join('') +
+    '<div class="dsep"></div>' +
+    icon('downloads', { glyph: 'down', bg: 'linear-gradient(160deg,#7CC0FF,#2E7BE6)' }) +
+    `<div class="di" data-app="trash"><div class="ico" style="background:linear-gradient(160deg,rgba(255,255,255,.75),rgba(205,212,224,.75));color:#5A6170">${ic('trash', 24)}</div></div>`;
+  magnify(null);
+}
+const NAMES = { start: 'Start', downloads: 'Downloads', trash: 'Recycle Bin' };
+function magnify(px) {
+  const items = [...dock.querySelectorAll('.di')];
+  // Measure resting centers once, so growth doesn't feed back into distance.
+  items.forEach((el) => { el.style.width = el.style.height = '48px'; });
+  const centers = items.map((el) => { const r = rectIn(el); return r.l + r.w / 2; });
+  items.forEach((el, i) => {
+    let s = 1;
+    if (px != null) { const d = Math.abs(px - centers[i]); const R = 150; if (d < R) s = 1 + 0.5 * (Math.cos(Math.PI * d / R) + 1) / 2; }
+    el.style.width = el.style.height = (48 * s).toFixed(1) + 'px';
+  });
+}
+function hideTip() { tipEl && tipEl.remove(); tipEl = null; }
+function hidePrev() { clearTimeout(prevT); prevEl && prevEl.remove(); prevEl = null; }
+let overId = null;
+dock.addEventListener('pointermove', (e) => {
+  magnify(stageX(e));
+  const di = e.target.closest('.di');
+  const id = di ? di.dataset.app : null;
+  if (id !== overId) {
+    overId = id; hideTip(); hidePrev();
+    if (di && !layer) {
+      const r = rectIn(di);
+      tipEl = document.createElement('div'); tipEl.className = 'tip';
+      tipEl.textContent = NAMES[id] || APPS[id].name; stage.appendChild(tipEl);
+      tipEl.style.left = (r.l + r.w / 2 - tipEl.offsetWidth / 2) + 'px'; tipEl.style.top = (r.t - 34) + 'px';
+      const a = APPS[id];
+      if (a && a.windows && S.running.has(id)) prevT = setTimeout(() => showPreviews(id, di), 450);
+    }
+  }
+});
+dock.addEventListener('pointerleave', () => { overId = null; magnify(null); hideTip(); prevT && clearTimeout(prevT); setTimeout(() => { if (prevEl && !prevEl.matches(':hover')) hidePrev(); }, 250); });
+function showPreviews(id, di) {
+  hideTip(); hidePrev();
+  const a = APPS[id], r = rectIn(di);
+  prevEl = document.createElement('div'); prevEl.className = 'prev';
+  prevEl.innerHTML = a.windows.map((t) => `<div class="pv"><div class="im"><i style="width:70%"></i><i style="width:90%"></i><i style="width:55%"></i><i style="width:80%"></i></div><span>${t}</span></div>`).join('');
+  stage.appendChild(prevEl);
+  prevEl.style.left = Math.max(8, Math.min(W - prevEl.offsetWidth - 8, r.l + r.w / 2 - prevEl.offsetWidth / 2)) + 'px';
+  prevEl.style.top = (r.t - prevEl.offsetHeight - 14) + 'px';
+  prevEl.addEventListener('pointerdown', (ev) => ev.stopPropagation());
+  prevEl.addEventListener('click', () => { activate(id); hidePrev(); });
+  prevEl.addEventListener('pointerleave', hidePrev);
+}
+function activate(id) {
+  if (!APPS[id]) return;
+  if (S.active === id && S.running.has(id) && !S.minimized) { S.minimized = true; renderWin(); return; }
+  const launching = !S.running.has(id);
+  S.active = id; S.running.add(id); S.minimized = false;
+  renderWin(); renderDock(); layoutBar();
+  if (launching) { const el = dock.querySelector(`[data-app="${id}"]`); el && el.classList.add('bounce'); }
+}
+dock.addEventListener('pointerdown', (e) => {
+  e.stopPropagation(); closeLayer(); if (S.open) setOpen(false);
+  const di = e.target.closest('.di'); if (!di) return;
+  const id = di.dataset.app;
+  if (e.button === 2) {
+    hideTip(); hidePrev();
+    const r = rectIn(di), a = APPS[id];
+    const running = S.running.has(id);
+    const items = a ? [['Open', ''], ['New Window', ''], '-', [PINNED.includes(id) ? 'Remove from Dock' : 'Keep in Dock', ''], ['Show in Explorer', ''], '-', ...(running ? [['Close Windows', '', 'close'], ['Quit', '', 'quit']] : [])]
+      : id === 'trash' ? [['Open', ''], ['Empty Recycle Bin', '']] : id === 'downloads' ? [['Open Downloads', ''], '-', ['report-q4.pdf', ''], ['photos-2025.zip', ''], ['setup.exe', '']] : [['Open Start', '']];
+    if (items[items.length - 1] === '-') items.pop();
+    if (a) S.ctx = id;
+    showMenu(items, r.l + r.w / 2 - 110, r.t - 10, null, 'dock:' + id, true);
+    layer.el.addEventListener('click', (ev) => { const mi = ev.target.closest('.mi'); if (mi && (mi.dataset.act === 'quit' || mi.dataset.act === 'close') && a) { if (mi.dataset.act === 'quit') S.running.delete(id); if (S.active === id) S.minimized = true; renderWin(); renderDock(); } }, true);
+    return;
+  }
+  if (id === 'start') return showMenu([['Opens the Windows Start menu', 'Win']], rectIn(di).l, rectIn(di).t - 10, null, 'start', true);
+  if (id === 'downloads') return showMenu([['report-q4.pdf', 'now'], ['photos-2025.zip', '2 min'], ['setup.exe', '1 hr'], '-', ['Open Downloads', '']], rectIn(di).l - 60, rectIn(di).t - 10, null, 'dl', true);
+  if (id === 'trash') return;
+  activate(id);
+});
+stage.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ---------- controls ----------
+function seg(id, key, onSet) {
+  const el = $(id);
+  el.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; onSet(b.dataset.v); syncSegs(); });
+}
+function syncSegs() {
+  const theme = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const mark = (id, v) => $(id).querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
+  mark('themeSeg', theme); mark('actSeg', S.activity); mark('openSeg', S.openMode);
+}
+seg('themeSeg', 'theme', (v) => { document.documentElement.setAttribute('data-theme', v); });
+seg('actSeg', 'activity', (v) => { S.activity = v; if (v === 'agent') S.agentSecs = 25; renderNotch(); if (S.open) renderContent(); layoutBar(); });
+seg('openSeg', 'open', (v) => { S.openMode = v; });
+$('resetBtn').addEventListener('click', () => { S.pill = false; S.cx = null; S.open = false; store.set('chippi-notch', ''); renderNotch(); layoutBar(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncSegs);
+
+// ---------- go ----------
+renderWin(); renderDock(); renderNotch(); layoutBar(); syncSegs();
+})();
+</script>
+
+</html>
