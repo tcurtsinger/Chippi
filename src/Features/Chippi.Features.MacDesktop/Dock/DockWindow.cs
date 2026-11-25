@@ -740,26 +740,25 @@ internal sealed class DockWindow : Window
     }
 
     /// <summary>
-    /// Where a dragged app would land among the pins (an index for DockApps.Move), or null where it wouldn't: an app that
-    /// isn't pinned is pinned only when let go among the pins, so a small nudge doesn't pin it.
+    /// The place in the row of apps a dragged app would land in (an index for DockController.Place): any app, pinned or
+    /// only running, anywhere among the apps.
     /// </summary>
     /// <remarks>
-    /// Measured from the middle of the icon as it's drawn, not from the pointer, against the places the pins hold in the
+    /// Measured from the middle of the icon as it's drawn, not from the pointer, against the places the apps hold in the
     /// row, not where the drag has moved them aside to: measuring the moved tiles made the answer chase its own animation.
-    /// A pin lands in the place its middle is over, so it gives way to a neighbor half a place in, the same both ways.
+    /// It lands in the place its middle is over, so it gives way to a neighbor half a place in, the same both ways.
     /// </remarks>
     private int? Landing(DockTile dragged, Point at)
     {
-        var pins = _tiles.Where(t => t.App is { Pinned: true }).ToList();
-        var centers = pins.Select(RestCenter).ToArray();
-        double icon = Along(at - _grip);
+        var apps = AppTiles();
+        if (apps.Count == 0)
+            return null;
         double pitch = (DockLayout.Icon + DockLayout.Gap) * _fit;
-        if (pins.Contains(dragged))
-            return DockApps.SlotAt(icon, centers[0], pitch, pins.Count);
-        // Not pinned: it goes between the pins it's dropped among, and stays as it is past the last of them.
-        double end = pins.Count > 0 ? centers[^1] + pitch / 2 : RestCenter(_tiles[0]) + pitch;
-        return icon > end ? null : DockApps.InsertIndex(centers, -1, icon);
+        return DockApps.SlotAt(Along(at - _grip), RestCenter(apps[0]), pitch, apps.Count);
     }
+
+    /// <summary>The apps' tiles in the row's order: every tile between Start and the divider.</summary>
+    private List<DockTile> AppTiles() => _tiles.Where(t => t.App is not null).ToList();
 
     /// <summary>The middle of the tile's own place in the row, along the shelf: where it rests, not where a drag has shifted it.</summary>
     private double RestCenter(DockTile tile)
@@ -825,8 +824,9 @@ internal sealed class DockWindow : Window
                 if (app.Pinned)
                     _dock.Unpin(app.Launch, offerUndo: true);
             }
-            else if (landing is { } index)
-                _dock.Pin(app.Launch, index);
+            // Let go where it started, nothing changes: a nudge doesn't keep an app that's only running.
+            else if (landing is { } index && index != AppTiles().IndexOf(tile))
+                _dock.Place(app, index);
         }
         _dock.SettingsChanged();
     }

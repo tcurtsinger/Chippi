@@ -181,17 +181,51 @@ public static class DockApps
     }
 
     /// <summary>
-    /// The unpinned apps kept in the order they first appeared (<paramref name="seen"/>, updated), so bringing one to the
-    /// front doesn't reorder the dock. Pins keep their own order, first.
+    /// The apps in the order the dock shows them: one row, kept in <paramref name="order"/> (their keys, updated) for as
+    /// long as the dock runs. An app keeps the place it has, so bringing one to the front moves nothing. A running app
+    /// that's new goes at the end, in the order it opened; a new pin goes after the pin before it. The places pins hold
+    /// are filled in the pins' own order, which is the order that's saved. At a fresh start that's the pins, then the
+    /// running apps.
     /// </summary>
-    public static IReadOnlyList<DockApp> KeepOrder(IReadOnlyList<DockApp> apps, List<string> seen)
+    public static IReadOnlyList<DockApp> Arrange(IReadOnlyList<DockApp> apps, List<string> order)
     {
-        var running = apps.Where(a => !a.Pinned).ToArray();
-        seen.RemoveAll(key => running.All(a => a.Key != key));
-        foreach (var app in running)
-            if (!seen.Contains(app.Key))
-                seen.Add(app.Key);
-        return [.. apps.Where(a => a.Pinned), .. running.OrderBy(a => seen.IndexOf(a.Key))];
+        var byKey = new Dictionary<string, DockApp>();
+        foreach (var app in apps)
+            byKey.TryAdd(app.Key, app);
+        order.RemoveAll(key => !byKey.ContainsKey(key));
+        string? before = null; // the pin before this one, in the pins' own order
+        foreach (var app in apps)
+        {
+            if (!order.Contains(app.Key))
+            {
+                if (app.Pinned)
+                    order.Insert(before is null ? 0 : order.IndexOf(before) + 1, app.Key);
+                else
+                    order.Add(app.Key);
+            }
+            if (app.Pinned)
+                before = app.Key;
+        }
+        var pins = apps.Where(a => a.Pinned).Select(a => a.Key).Distinct().ToArray();
+        var pinned = pins.ToHashSet();
+        for (int i = 0, next = 0; i < order.Count && next < pins.Length; i++)
+            if (pinned.Contains(order[i]))
+                order[i] = pins[next++];
+        return order.Select(key => byKey[key]).ToArray();
+    }
+
+    /// <summary>
+    /// The row after <paramref name="moved"/> is dropped at <paramref name="index"/> among the apps: the keys in their new
+    /// order (for <see cref="Arrange"/>) and the pins to save. Any app can go anywhere in the row. One that wasn't pinned
+    /// is kept from then on, as on a Mac; the others stay as they were, so a pin can sit to the right of a running app.
+    /// </summary>
+    public static (IReadOnlyList<string> Order, IReadOnlyList<string> Pins) Place(IReadOnlyList<DockApp> apps, DockApp moved, int index)
+    {
+        var row = apps.Where(a => a.Key != moved.Key).ToList();
+        row.Insert(Math.Clamp(index, 0, row.Count), moved);
+        // Pinned, it's known by what launches it.
+        return (row.Select(a => a.Key == moved.Key ? Key(moved.Launch) : a.Key).ToArray(),
+            row.Where(a => a.Pinned || a.Key == moved.Key).Select(a => a.Launch).ToArray());
     }
 
     private static int IndexOf(IReadOnlyList<DockPin> pins, Func<DockPin, bool> match)

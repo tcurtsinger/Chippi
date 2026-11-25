@@ -194,11 +194,11 @@ public sealed class DockLayoutTests
     [Fact]
     public void RunningAppsKeepTheirPlaceWhenBroughtToTheFront()
     {
-        var seen = new List<string>();
-        var first = DockApps.KeepOrder(DockApps.Compose([], [Window(@"C:\a.exe", "A", 1), Window(@"C:\b.exe", "B", 2)]), seen);
-        var later = DockApps.KeepOrder(DockApps.Compose([], [Window(@"C:\b.exe", "B", 2), Window(@"C:\a.exe", "A", 1)]), seen);
+        var order = new List<string>();
+        var first = DockApps.Arrange(DockApps.Compose([], [Window(@"C:\a.exe", "A", 1), Window(@"C:\b.exe", "B", 2)]), order);
+        var later = DockApps.Arrange(DockApps.Compose([], [Window(@"C:\b.exe", "B", 2), Window(@"C:\a.exe", "A", 1)]), order);
         Assert.Equal(first.Select(a => a.Name), later.Select(a => a.Name));
-        var closed = DockApps.KeepOrder(DockApps.Compose([], [Window(@"C:\b.exe", "B", 2)]), seen);
+        var closed = DockApps.Arrange(DockApps.Compose([], [Window(@"C:\b.exe", "B", 2)]), order);
         Assert.Equal(["B"], closed.Select(a => a.Name));
     }
 

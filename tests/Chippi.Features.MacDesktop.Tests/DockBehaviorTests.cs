@@ -99,6 +99,86 @@ public sealed class DockClickTests
 }
 
 /// <summary>
+/// The apps are one row: pinned or only running, any of them can be dropped anywhere in it. With pins kept first, a pin
+/// couldn't go right of the last pin and a running app couldn't be moved at all, so drags to the right did nothing.
+/// </summary>
+public sealed class DockRowTests
+{
+    private static ListedWindow Window(string name, nint handle) => new(handle, 1, name, name, $@"C:\apps\{name}.exe", false, 0);
+
+    private static DockPin Pin(string name) => new($@"C:\apps\{name}.exe", $@"C:\apps\{name}.exe", name);
+
+    private static readonly ListedWindow[] Running = [Window("x", 1), Window("y", 2)];
+
+    private static string[] Names(IEnumerable<DockApp> apps) => apps.Select(a => a.Name).ToArray();
+
+    /// <summary>The row as the dock builds it: the saved pins and the open windows, in the order kept so far.</summary>
+    private static IReadOnlyList<DockApp> Row(IEnumerable<string> pins, List<string> order, params ListedWindow[] windows) =>
+        DockApps.Arrange(DockApps.Compose(pins.Select(Pin).ToArray(), windows), order);
+
+    /// <summary>Drops an app at a place in the row, then builds the row again from what was saved.</summary>
+    private static IReadOnlyList<DockApp> Drop(IReadOnlyList<DockApp> row, string name, int index, List<string> order)
+    {
+        var (keys, pins) = DockApps.Place(row, row.Single(a => a.Name == name), index);
+        order.Clear();
+        order.AddRange(keys);
+        return DockApps.Arrange(DockApps.Compose(pins.Select(p => Pin(Path.GetFileNameWithoutExtension(p))).ToArray(), Running), order);
+    }
+
+    [Fact]
+    public void A_fresh_start_shows_the_pins_then_the_running_apps()
+    {
+        Assert.Equal(["a", "b", "x", "y"], Names(Row(["a", "b"], [], Running)));
+    }
+
+    [Fact]
+    public void A_pin_dragged_right_of_a_running_app_stays_there()
+    {
+        var order = new List<string>();
+        var row = Drop(Row(["a", "b"], order, Running), "a", 2, order);
+        Assert.Equal(["b", "x", "a", "y"], Names(row));
+        Assert.Equal([true, false, true, false], row.Select(a => a.Pinned));
+        // ...to the very end too.
+        Assert.Equal(["b", "x", "y", "a"], Names(Drop(row, "a", 3, order)));
+    }
+
+    [Fact]
+    public void A_running_app_can_be_moved_and_is_kept_from_then_on()
+    {
+        var order = new List<string>();
+        var row = Drop(Row(["a", "b"], order, Running), "x", 3, order); // right, past another running app
+        Assert.Equal(["a", "b", "y", "x"], Names(row));
+        Assert.Equal([true, true, false, true], row.Select(a => a.Pinned));
+
+        row = Drop(row, "y", 0, order); // left, to the front
+        Assert.Equal(["y", "a", "b", "x"], Names(row));
+        Assert.All(row, app => Assert.True(app.Pinned));
+    }
+
+    [Fact]
+    public void Apps_keep_their_places_as_others_open_and_close()
+    {
+        var order = new List<string>();
+        var row = Drop(Row(["a", "b"], order, Running), "a", 2, order);
+        Assert.Equal(["b", "x", "a", "y"], Names(row));
+        // A new app opens at the end; one that closes leaves the rest where they are.
+        Assert.Equal(["b", "x", "a", "y", "z"], Names(Row(["b", "a"], order, Window("x", 1), Window("y", 2), Window("z", 3))));
+        Assert.Equal(["b", "a", "y", "z"], Names(Row(["b", "a"], order, Window("y", 2), Window("z", 3))));
+    }
+
+    [Fact]
+    public void The_places_pins_hold_follow_the_saved_order()
+    {
+        var order = new List<string>();
+        Assert.Equal(["a", "b", "x", "y"], Names(Row(["a", "b"], order, Running)));
+        // The pins are put the other way round from elsewhere: they swap, in the places pins hold.
+        Assert.Equal(["b", "a", "x", "y"], Names(Row(["b", "a"], order, Running)));
+        // A new pin goes after the pin before it.
+        Assert.Equal(["b", "c", "a", "x", "y"], Names(Row(["b", "c", "a"], order, Running)));
+    }
+}
+
+/// <summary>
 /// Whose the keyboard is while a dock menu or question is open. A menu reports that it closed only after it has faded
 /// out, by when the question its item opened holds the keyboard: the menu letting go then closed the question.
 /// </summary>

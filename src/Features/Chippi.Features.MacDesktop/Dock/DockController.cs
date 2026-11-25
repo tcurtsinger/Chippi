@@ -32,7 +32,7 @@ internal sealed class DockController : IDisposable
     private readonly Dictionary<nint, string> _appIds = [];
     private readonly Dictionary<nint, int> _appIdMisses = [];
     private readonly HashSet<nint> _known = [];
-    private readonly List<string> _seen = [];
+    private readonly List<string> _order = [];
     private DockWindow? _window;
     private IInputRegistration? _keys;
     private bool _disposed;
@@ -139,7 +139,7 @@ internal sealed class DockController : IDisposable
             _appIds.Remove(gone);
         foreach (var gone in _appIdMisses.Keys.Where(h => !_known.Contains(h)).ToArray())
             _appIdMisses.Remove(gone);
-        Apps = DockApps.KeepOrder(DockApps.Compose(pins, windows, AppId), _seen);
+        Apps = DockApps.Arrange(DockApps.Compose(pins, windows, AppId), _order);
         _window?.SetApps(Apps);
     }
 
@@ -371,6 +371,18 @@ internal sealed class DockController : IDisposable
     {
         var pins = Settings.Pins ?? [];
         Save(Settings with { Pins = DockApps.Move(pins, launch, at ?? pins.Count) });
+    }
+
+    /// <summary>
+    /// Puts a dragged app at <paramref name="index"/> in the row of apps, wherever that is. One that wasn't pinned is kept
+    /// from then on.
+    /// </summary>
+    public void Place(DockApp app, int index)
+    {
+        var (order, pins) = DockApps.Place(Apps, Apps.FirstOrDefault(a => a.Key == app.Key) ?? app, index);
+        _order.Clear();
+        _order.AddRange(order);
+        Save(Settings with { Pins = pins });
     }
 
     /// <summary>Takes the pin off; <paramref name="offerUndo"/> shows "Removed" with Undo, which puts it back where it was.</summary>
