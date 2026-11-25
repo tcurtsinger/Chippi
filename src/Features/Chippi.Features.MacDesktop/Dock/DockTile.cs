@@ -158,7 +158,7 @@ internal sealed class DockTile : Grid
     {
         var tile = new DockTile(null, "|", "", null, null) { IsDivider = true, IsHitTestVisible = false, _slot = new(DockLayout.Divider, 0, 1) };
         tile.Children.Clear();
-        tile.Children.Add(new Border { Width = 1, Margin = new Thickness(4, 0, 4, 0) });
+        tile.Children.Add(new Border { Width = 1, Margin = new Thickness(4, 0, 4, 0), RenderTransform = tile._glide });
         return tile;
     }
 
@@ -357,11 +357,10 @@ internal sealed class DockTile : Grid
         bool bottom = _edge == MacDesktop.DockEdge.Bottom;
         if (bottom) Width = slot.Extent;
         else Height = slot.Extent;
-        if (IsDivider)
-            return;
-        _grow.ScaleX = _grow.ScaleY = slot.Scale;
         _glide.X = _dotGlide.X = bottom ? slot.Shift : 0;
         _glide.Y = _dotGlide.Y = bottom ? 0 : slot.Shift;
+        if (!IsDivider)
+            _grow.ScaleX = _grow.ScaleY = slot.Scale;
     }
 
     /// <summary>Moves the tile <paramref name="offset"/> along the shelf, out of the way of a dragged icon's landing place.</summary>

@@ -221,19 +221,25 @@ public sealed class DockSlotTests
     }
 
     [Fact]
-    public void The_shelfs_room_covers_its_growth_in_whole_pixels()
+    public void The_shelfs_room_covers_its_growth_in_an_even_number_of_pixels()
     {
-        Assert.Equal(37, DockLayout.Room(72, 1));
-        Assert.Equal(1, DockLayout.Room(DockLayout.Icon, 1));
-        Assert.Equal(Math.Round(DockLayout.Room(72, 1.25) * 1.25), DockLayout.Room(72, 1.25) * 1.25, 9);
+        Assert.Equal(38, DockLayout.Room(72, 1)); // 36 a side, and a pixel, made even
+        Assert.Equal(2, DockLayout.Room(DockLayout.Icon, 1));
+        foreach (double pixels in new[] { 1, 1.25, 1.5, 1.75, 2 })
+            foreach (double max in new[] { 56.0, 72, 81, 96 })
+            {
+                double room = DockLayout.Room(max, pixels) * pixels;
+                Assert.Equal(Math.Round(room / 2) * 2, room, 9);
+                Assert.True(room >= DockLayout.Growth(max) * pixels / 2);
+            }
     }
 }
 
 /// <summary>
-/// The row as the dock builds it (its tiles in a row in the shelf, layout rounding on), measured offscreen: where each
-/// icon is drawn as the pointer creeps along. With CHIPPI_ISLAND_SHOTS naming a folder it also saves
-/// <c>dock-glide.png</c> (one icon's edge per pointer step, as it was and as it is, 6 times) and <c>dock-glide.txt</c>.
-/// Shows nothing.
+/// The row as the dock builds it (its tiles in a row in the shelf, the shelf in its centered holder, layout rounding on,
+/// seated by DockWindow.Seat), measured offscreen: where each icon and the shelf are drawn as the pointer creeps from off
+/// one end of the row to off the other. With CHIPPI_ISLAND_SHOTS naming a folder it also saves <c>dock-glide.png</c> (one
+/// icon's edge per pointer step, as it was and as it is, 6 times) and <c>dock-glide.txt</c>. Shows nothing.
 /// </summary>
 public sealed class DockGlideTests
 {
@@ -246,19 +252,31 @@ public sealed class DockGlideTests
         var row = new Row(magnified: 72);
         double pixels = row.Pixels;
         var rest = row.Read(null, glide: true);
+        var restShelf = row.Shelf;
         double worstGlide = 0, worstStepped = 0;
         var report = new List<string> { "pointer\tas it was: left,size\tnow: left,size  (icon 6, pixels)" };
         var frames = new List<(BitmapSource Was, BitmapSource Now)>();
+        var lengths = new HashSet<double>();
+        var middlesBefore = new HashSet<double>();
         string? output = Environment.GetEnvironmentVariable("CHIPPI_ISLAND_SHOTS");
         bool shots = !string.IsNullOrWhiteSpace(output);
         Rect[]? lastNow = null, lastWas = null;
-        for (double pointer = 4 * Pitch + 24; pointer <= 6 * Pitch + 24; pointer += 0.25)
+        // Off the row's start to off its end: the row's length changes at both ends and is steady between them.
+        for (double pointer = -40; pointer <= Icons * Pitch + 40; pointer += 0.25)
         {
+            bool shoot = shots && pointer >= 4 * Pitch + 24 && pointer <= 6 * Pitch + 24;
             var was = row.Read(pointer, glide: false);
-            var wasShot = shots ? row.Shot(5) : null;
+            middlesBefore.Add(row.Shelf.Left + row.Shelf.Width / 2);
+            var wasShot = shoot ? row.Shot(5) : null;
             var now = row.Read(pointer, glide: true);
-            var nowShot = shots ? row.Shot(5) : null;
-            // Now, each icon is where the exact sizes put it, about the row's middle.
+            var nowShot = shoot ? row.Shot(5) : null;
+            // The shelf is on whole pixels and grows the same to each side, whatever its length.
+            var shelf = row.Shelf;
+            lengths.Add(shelf.Width);
+            Assert.Equal(Math.Round(shelf.Left), shelf.Left, 6);
+            Assert.Equal(Math.Round(shelf.Width), shelf.Width, 6);
+            Assert.Equal(restShelf.Left + restShelf.Width / 2, shelf.Left + shelf.Width / 2, 6);
+            // Each icon is where the exact sizes put it, about the row's middle.
             var sizes = row.Sizes(pointer);
             double before = 0, total = sizes.Sum(s => s - DockLayout.Icon);
             for (int i = 0; i < Icons; i++)
@@ -277,78 +295,130 @@ public sealed class DockGlideTests
                     worstStepped = Math.Max(worstStepped, Math.Max(Math.Abs(was[i].Left - lastWas[i].Left), Math.Abs(was[i].Width - lastWas[i].Width)));
                 }
             (lastNow, lastWas) = (now, was);
-            report.Add(string.Create(CultureInfo.InvariantCulture, $"{pointer:0.00}\t{was[5].Left:0.00},{was[5].Width:0.00}\t{now[5].Left:0.00},{now[5].Width:0.00}"));
+            if (shoot)
+                report.Add(string.Create(CultureInfo.InvariantCulture, $"{pointer:0.00}\t{was[5].Left:0.00},{was[5].Width:0.00}\t{now[5].Left:0.00},{now[5].Width:0.00}"));
             if (wasShot is not null && nowShot is not null)
                 frames.Add((wasShot, nowShot));
         }
+        Assert.True(lengths.Count > 20, "the sweep never changed the row's length: the shelf's growth to each side went unmeasured");
+        Assert.True(middlesBefore.Count > 1, "centered on its own length the shelf's middle never moved: the root no longer puts it on a half pixel");
         Assert.True(worstGlide < 0.35 * pixels, $"an icon jumped {worstGlide:0.###} px");
         Assert.True(worstStepped >= 1, "the row as it was no longer steps: the comparison measures nothing");
-        // Back at rest, every icon is on the pixels it started on.
+        // Back at rest, every icon and the shelf are on the pixels they started on.
         Assert.Equal(rest, row.Read(null, glide: true));
+        Assert.Equal(restShelf, row.Shelf);
 
         if (!shots)
             return;
         Directory.CreateDirectory(output!);
-        report.Insert(0, string.Create(CultureInfo.InvariantCulture, $"largest move of any icon's edge or size per 0.25 DIP of pointer: as it was {worstStepped:0.###} px, now {worstGlide:0.###} px ({pixels:0.##} px per DIP)"));
+        report.Insert(0, string.Create(CultureInfo.InvariantCulture, $"largest move of any icon's edge or size per 0.25 DIP of pointer, end to end: as it was {worstStepped:0.###} px, now {worstGlide:0.###} px ({pixels:0.##} px per DIP)"));
         File.WriteAllLines(Path.Combine(output!, "dock-glide.txt"), report);
         Save(Strip(frames), Path.Combine(output!, "dock-glide.png"));
     });
 
-    /// <summary>The dock's row without its window: the shelf centered in a root with layout rounding on, as DockWindow has it.</summary>
+    [Fact]
+    public void Still_the_icons_at_rest_are_on_whole_pixels_and_the_divider_moves_with_its_neighbours() => OnSta(() =>
+    {
+        var row = new Row(magnified: 81, divider: true); // grows 99 pixels in all at 100%: half a pixel to each side
+        // Near the row's start, where its length is between two whole pixels a side.
+        foreach (double pointer in new[] { 0.6 * Pitch, 1.3 * Pitch, 2.2 * Pitch, 5.4 * Pitch })
+        {
+            var moving = row.Read(pointer, glide: true);
+            var still = row.Read(pointer, glide: true, still: true);
+            for (int i = 0; i < Icons; i++)
+            {
+                Assert.InRange(Math.Abs(still[i].Left - moving[i].Left), 0, 0.5 + 1e-6);
+                if (row.Sizes(pointer)[i] == DockLayout.Icon && Math.Abs(pointer - (i * Pitch + 24)) > 4 * Pitch)
+                    Assert.Equal(Math.Round(still[i].Left), still[i].Left, 6);
+            }
+        }
+        // The divider's line is moved as the icons beside it are, not left on its slot's pixel.
+        row.Read(Icons * Pitch - 30, glide: true);
+        Assert.Equal(row.Slot(Icons).Shift, row.DividerShift, 9);
+    });
+
+    /// <summary>The dock's row without its window: the shelf in its holder, centered in a root with layout rounding on, as DockWindow has it.</summary>
     private sealed class Row
     {
-        private readonly Grid _root = new() { UseLayoutRounding = true, Width = 1201, Height = 150, Background = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x2E)) };
-        private readonly Border _shelf = new() { BorderThickness = new Thickness(1), Height = DockLayout.Shelf, Padding = new Thickness(DockLayout.Padding, 0, DockLayout.Padding, 0), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom };
+        private readonly Grid _root = new() { UseLayoutRounding = true, Height = 150, Background = new SolidColorBrush(Color.FromRgb(0x28, 0x28, 0x2E)) };
+        private readonly Grid _holder = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, DockLayout.EdgeGap) };
+        private readonly Border _shadow = new() { HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+        private readonly Border _shelf = new() { BorderThickness = new Thickness(1), Height = DockLayout.Shelf, Padding = new Thickness(DockLayout.Padding, 0, DockLayout.Padding, 0), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
         private readonly List<DockTile> _tiles = [];
+        private readonly DockTile? _divider;
         private readonly double _max;
+        private DockSlot[] _slots = [];
 
-        public Row(double magnified)
+        public Row(double magnified, bool divider = false)
         {
             _max = magnified;
             var row = new StackPanel { Orientation = Orientation.Horizontal };
             var picture = Picture(72);
             for (int i = 0; i < Icons; i++)
+                _tiles.Add(DockTile.Still("icon" + i, picture));
+            if (divider)
+                _tiles.Add(_divider = DockTile.Divider());
+            foreach (var tile in _tiles)
             {
-                var tile = DockTile.Still("icon" + i, picture);
                 tile.Orient(DockEdge.Bottom);
-                _tiles.Add(tile);
                 row.Children.Add(tile);
             }
             _shelf.Child = row;
-            _root.Children.Add(_shelf);
+            _holder.Children.Add(_shadow);
+            _holder.Children.Add(_shelf);
+            _root.Children.Add(_holder);
             Pixels = VisualTreeHelper.GetDpi(_root).DpiScaleX;
+            // An odd number of pixels against the shelf's even length: its middle falls on a half pixel, as the owner's does.
+            _root.Width = 1201 / Pixels;
         }
 
         public double Pixels { get; }
 
+        /// <summary>The shelf's bounds, in pixels.</summary>
+        public Rect Shelf => InPixels(_shelf);
+
+        public DockSlot Slot(int tile) => _slots[tile];
+
+        /// <summary>How far the divider's line is drawn from its slot's place, in DIPs.</summary>
+        public double DividerShift => ((TranslateTransform)((Border)_divider!.Children[0]).RenderTransform).X;
+
         public double[] Sizes(double? pointer) =>
-            [.. _tiles.Select((_, i) => pointer is { } p ? DockLayout.Magnified((p - (i * Pitch + DockLayout.Icon / 2)) / Pitch, _max) : DockLayout.Icon)];
+            [.. Enumerable.Range(0, Icons).Select(i => pointer is { } p ? DockLayout.Magnified((p - (i * Pitch + DockLayout.Icon / 2)) / Pitch, _max) : DockLayout.Icon)];
 
         /// <summary>
         /// Lays the row out for the pointer and returns each icon's drawn bounds in pixels. Not gliding, each slot and icon
-        /// is its size rounded to pixels on its own, as the row was laid out before.
+        /// is its size rounded to pixels on its own and the shelf is centered on its own length, as the row was laid out
+        /// before.
         /// </summary>
-        public Rect[] Read(double? pointer, bool glide)
+        public Rect[] Read(double? pointer, bool glide, bool still = false)
         {
             var sizes = Sizes(pointer);
-            var rests = Enumerable.Repeat(DockLayout.Icon, Icons).ToArray();
-            var slots = DockLayout.Slots(sizes, rests, Pixels, still: false, out double grown);
             for (int i = 0; i < Icons; i++)
-            {
                 _tiles[i].SetSize(sizes[i]);
-                double rounded = Math.Round(sizes[i] * Pixels) / Pixels;
-                _tiles[i].Place(glide ? slots[i] : new DockSlot(rounded, (rounded - DockLayout.Icon) / 2, rounded / DockLayout.Icon));
+            if (glide)
+            {
+                DockWindow.Seat(_tiles, _shelf, _shadow, horizontal: true, _max, Pixels, still);
+                _slots = DockLayout.Slots([.. _tiles.Select(t => t.IsDivider ? t.Rest : t.Size)], [.. _tiles.Select(t => t.Rest)], Pixels, still, out _);
             }
-            double room = glide ? DockLayout.Room(_max, Pixels) - grown / 2 : 0;
-            _shelf.Margin = new Thickness(room, 0, room, DockLayout.EdgeGap);
+            else
+            {
+                for (int i = 0; i < Icons; i++)
+                {
+                    double rounded = Math.Round(sizes[i] * Pixels) / Pixels;
+                    _tiles[i].Place(new DockSlot(rounded, (rounded - DockLayout.Icon) / 2, rounded / DockLayout.Icon));
+                }
+                _shelf.Margin = _shadow.Margin = default;
+            }
             _root.Measure(new Size(_root.Width, _root.Height));
             _root.Arrange(new Rect(0, 0, _root.Width, _root.Height));
             _root.UpdateLayout();
-            return [.. _tiles.Select(t =>
-            {
-                var bounds = t.Art.TransformToAncestor(_root).TransformBounds(new Rect(t.Art.RenderSize));
-                return new Rect(bounds.X * Pixels, bounds.Y * Pixels, bounds.Width * Pixels, bounds.Height * Pixels);
-            })];
+            return [.. _tiles.Take(Icons).Select(t => InPixels(t.Art))];
+        }
+
+        private Rect InPixels(FrameworkElement element)
+        {
+            var bounds = element.TransformToAncestor(_root).TransformBounds(new Rect(element.RenderSize));
+            return new Rect(bounds.X * Pixels, bounds.Y * Pixels, bounds.Width * Pixels, bounds.Height * Pixels);
         }
 
         /// <summary>The row as drawn now, cropped to one line across one icon's left edge.</summary>
@@ -356,9 +426,9 @@ public sealed class DockGlideTests
         {
             var target = new RenderTargetBitmap((int)Math.Round(_root.Width * Pixels), (int)Math.Round(_root.Height * Pixels), 96 * Pixels, 96 * Pixels, PixelFormats.Pbgra32);
             target.Render(_root);
-            var art = _tiles[icon].Art.TransformToAncestor(_root).TransformBounds(new Rect(_tiles[icon].Art.RenderSize));
+            var art = InPixels(_tiles[icon].Art);
             int rest = (int)Math.Round((_root.Width - Icons * Pitch) / 2 * Pixels) + (int)Math.Round(icon * Pitch * Pixels);
-            var crop = new CroppedBitmap(target, new Int32Rect(rest - 36, (int)Math.Round((art.Y + art.Height / 2) * Pixels), StripWidth, 1));
+            var crop = new CroppedBitmap(target, new Int32Rect(rest - 36, (int)Math.Round(art.Y + art.Height / 2), StripWidth, 1));
             crop.Freeze();
             return crop;
         }

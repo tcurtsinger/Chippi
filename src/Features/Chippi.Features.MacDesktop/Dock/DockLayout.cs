@@ -101,14 +101,16 @@ public static class DockLayout
 
     /// <summary>
     /// The room the shelf keeps each side of itself to grow into, in DIPs: half of what its icons grow by at
-    /// <paramref name="max"/>, in whole pixels. The shelf's margins are this less half of what it has grown, so its length
-    /// with them stays the same and its middle stays put.
+    /// <paramref name="max"/>, in an even number of pixels. The shelf's margins are this less half of what it has grown,
+    /// so its length with them stays the same and its middle stays put. Even, so the shelf at rest is on the pixel that
+    /// centering it on its own length puts it on.
     /// </summary>
     public static double Room(double max, double pixels)
     {
         if (!(pixels > 0) || !double.IsFinite(pixels))
             pixels = 1;
-        return (Math.Ceiling(Growth(max) * pixels / 2) + 1) / pixels;
+        double half = Math.Ceiling(Growth(max) * pixels / 2) + 1;
+        return (half + half % 2) / pixels;
     }
 
     /// <summary>
