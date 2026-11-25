@@ -50,7 +50,7 @@ An optional mode that gives Windows a top menu bar, a bottom dock and turns the 
 The widget's form while the mode is on. Same activities, same panel, same pages.
 
 - **Rest:** centered on the main display's menu bar, attached to the top edge: 28 tall, 184 wide, square top, 10 bottom corners. A tiny Chippi sits in the left ear when nothing is going on.
-- **Color:** dark theme, pure black like a camera notch. Light theme, frosted glass like the menu bar but lighter: white at 50% over a blur (80% once open, so pages stay readable), a 1px white edge and a soft shadow. Solid `#F5F5F6` when Windows transparency effects are off (Travis, 2026-11-25).
+- **Color** (Travis, 2026-11-25): the menu bar's own frosted glass, one shade darker so it still reads, with no edge or shadow, so the bar and notch look like one piece. Light: `rgba(222,222,230,.74)` over the bar's blur; dark: `rgba(8,8,12,.80)`. Once open it firms up to 90% (`#EEEEF3` light, `#16161A` dark) so pages stay readable. Solid island fill when Windows transparency effects are off.
 - **Ears:** the highest activity, as on the bar today: the left ear shows its glyph, cover or provider mark, the right ear its value (the agent's elapsed time, the equalizer, the time left). The notch widens to 280 to make room and narrows back when it ends.
 - **Opening:** hover 300 ms or click. The notch grows down into the 520 × 360 panel, keeping its top edge; it closes 400 ms after the pointer leaves, or on Esc or a click outside. Click only is an option.
 - **Home:** the Tool gallery in 5 columns, each tile with its shortcut under its name when one is set. Pages open inside the notch with Back, as today.
