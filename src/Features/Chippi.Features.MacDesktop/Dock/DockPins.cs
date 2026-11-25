@@ -60,8 +60,18 @@ internal static class DockPins
     {
         if (!pin.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
             return !pin.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) && Path.IsPathFullyQualified(pin) ? pin : null;
-        return Links.GetOrAdd(pin, static link => ReadShortcut(link)).Program;
+        var (program, appId) = Links.GetOrAdd(pin, static link => ReadShortcut(link));
+        return program ?? (appId is not null ? KnownProgram(appId) : null);
     }
+
+    /// <summary>
+    /// The program behind a shortcut with no file target but a known ID: the taskbar's File Explorer pin is only
+    /// <c>Microsoft.Windows.Explorer</c>, and its windows carry no ID, so they're matched by explorer.exe.
+    /// </summary>
+    public static string? KnownProgram(string appId) =>
+        string.Equals(appId, "Microsoft.Windows.Explorer", StringComparison.OrdinalIgnoreCase)
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe")
+            : null;
 
     /// <summary>The AppUserModelID a pin's windows carry: a Store app's ID, or the one its shortcut sets; null for none.</summary>
     public static string? AppId(string pin)

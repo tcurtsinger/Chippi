@@ -30,6 +30,7 @@ internal sealed class DockController : IDisposable
     private readonly Native.WinEventProc _proc;
     private readonly List<nint> _hooks = [];
     private readonly Dictionary<nint, string> _appIds = [];
+    private readonly List<string> _seen = [];
     private DockWindow? _window;
     private IInputRegistration? _keys;
     private bool _disposed;
@@ -114,7 +115,7 @@ internal sealed class DockController : IDisposable
         var pins = (Settings.Pins ?? []).Select(DockPins.Read).ToArray();
         foreach (var gone in _appIds.Keys.Where(h => windows.All(w => w.Handle != h)).ToArray())
             _appIds.Remove(gone);
-        Apps = DockApps.Compose(pins, windows, AppId);
+        Apps = DockApps.KeepOrder(DockApps.Compose(pins, windows, AppId), _seen);
         _window?.SetApps(Apps);
     }
 
@@ -162,7 +163,8 @@ internal sealed class DockController : IDisposable
     {
         if (Native.IsIconic(window))
             _shell.Window(window, WindowAction.Restore);
-        Native.SetForegroundWindow(window);
+        // The dock never takes the foreground, so Windows may refuse it the right to give it away; this earns it.
+        Chippi.UI.Actions.ForegroundRight.Take(window);
     }
 
     public void Launch(string target, string arguments = "")

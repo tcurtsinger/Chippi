@@ -179,6 +179,30 @@ public sealed class DockLayoutTests
     }
 
     [Fact]
+    public void ASquirrelAppsWindowsGoToItsLaunchersPin()
+    {
+        // Claude's and Discord's shortcuts run App\x.exe; their windows run App\app-1.2.3\x.exe and carry no ID.
+        const string stub = @"C:\Users\T\AppData\Local\AnthropicClaude\claude.exe";
+        var apps = DockApps.Compose([new DockPin(@"C:\pins\Claude.lnk", stub, "Claude", "com.squirrel.AnthropicClaude.claude")],
+            [Window(@"C:\Users\T\AppData\Local\AnthropicClaude\app-7.37095.0\claude.exe", "Claude", 1)], _ => null);
+        Assert.Single(apps);
+        Assert.True(apps[0].Running);
+        Assert.False(DockApps.SameProgram(stub, @"C:\Users\T\AppData\Local\Other\app-1.0\claude.exe"));
+        Assert.False(DockApps.SameProgram(stub, @"C:\Users\T\AppData\Local\AnthropicClaude\tools\claude.exe"));
+    }
+
+    [Fact]
+    public void RunningAppsKeepTheirPlaceWhenBroughtToTheFront()
+    {
+        var seen = new List<string>();
+        var first = DockApps.KeepOrder(DockApps.Compose([], [Window(@"C:\a.exe", "A", 1), Window(@"C:\b.exe", "B", 2)]), seen);
+        var later = DockApps.KeepOrder(DockApps.Compose([], [Window(@"C:\b.exe", "B", 2), Window(@"C:\a.exe", "A", 1)]), seen);
+        Assert.Equal(first.Select(a => a.Name), later.Select(a => a.Name));
+        var closed = DockApps.KeepOrder(DockApps.Compose([], [Window(@"C:\b.exe", "B", 2)]), seen);
+        Assert.Equal(["B"], closed.Select(a => a.Name));
+    }
+
+    [Fact]
     public void UnpinnedStoreAppsOpenAgainThroughTheirId()
     {
         var apps = DockApps.Compose([], [Window(@"C:\Program Files\WindowsApps\Calc\CalculatorApp.exe", "Calculator", 1)], _ => "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App");

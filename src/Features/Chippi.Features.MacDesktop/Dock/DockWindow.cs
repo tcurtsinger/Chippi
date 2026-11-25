@@ -57,6 +57,9 @@ internal sealed class DockWindow : Window
     private nint _hwnd;
     private Rect _monitor;
     private double _scale = 1;
+
+    /// <summary>Device pixels per DIP on the dock's monitor.</summary>
+    internal double Scale => _scale;
     private bool _shown = true;
     private bool _fullscreen;
     private DateTime _leftAt = DateTime.MaxValue;
@@ -716,8 +719,49 @@ internal sealed class DockWindow : Window
         if (_menu is { IsOpen: true })
             _menu.IsOpen = false;
         var placement = Edge switch { DockEdge.Left => PlacementMode.Right, DockEdge.Right => PlacementMode.Left, _ => PlacementMode.Top };
-        _menu = BarMenu.Open(tile, items, placement, horizontalOffset: Horizontal ? -12 : 0, verticalOffset: Horizontal ? 0 : -16);
+        // The dock never takes the foreground, and a menu in a window that hasn't it can't hold the mouse: a click elsewhere
+        // never reached it and Esc went to the app in front. The menu takes the foreground while it's open, and hands it
+        // back when it closes without a click elsewhere.
+        nint before = Native.GetForegroundWindow();
+        _menu = BarMenu.Open(tile, items, placement, horizontalOffset: Horizontal ? -12 : 0, verticalOffset: Horizontal ? 0 : -16, closed: () =>
+        {
+            nint now = Native.GetForegroundWindow();
+            Native.GetWindowThreadProcessId(now, out uint owner);
+            if (before != 0 && Native.IsWindow(before) && (now == 0 || owner == (uint)Environment.ProcessId))
+                Chippi.UI.Actions.ForegroundRight.Take(before);
+        });
+        var opened = _menu;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            if (opened.IsOpen && PresentationSource.FromVisual(opened) is System.Windows.Interop.HwndSource source)
+                Chippi.UI.Actions.ForegroundRight.Take(source.Handle);
+        });
+        _menuPressed = Pressing();
     }
+
+    private bool _menuPressed;
+
+    private static bool Pressing() => (Native.GetAsyncKeyState(0x01) & 0x8000) != 0 || (Native.GetAsyncKeyState(0x02) & 0x8000) != 0;
+
+    /// <summary>A press outside the open menu closes it, wherever the foreground is.</summary>
+    private void WatchMenu()
+    {
+        if (_menu is not { IsOpen: true } menu)
+            return;
+        bool pressing = Pressing();
+        if (pressing && !_menuPressed && PresentationSource.FromVisual(menu) is not null)
+        {
+            var p = menu.PointFromScreen(Native.Cursor());
+            if (!new Rect(menu.RenderSize).Contains(p) && !SubmenuUnder())
+                menu.IsOpen = false;
+        }
+        _menuPressed = pressing;
+    }
+
+    /// <summary>Whether the pointer is over one of the menu's open submenus, which are popups of their own.</summary>
+    private bool SubmenuUnder() => _menu is { } menu && menu.Items.OfType<MenuItem>().Any(item =>
+        item.IsSubmenuOpen && item.Template.FindName("PART_Popup", item) is Popup { Child: FrameworkElement child }
+        && PresentationSource.FromVisual(child) is not null && new Rect(child.RenderSize).Contains(child.PointFromScreen(Native.Cursor())));
 
     internal DockController Controller => _dock;
 
@@ -789,6 +833,7 @@ internal sealed class DockWindow : Window
     {
         if (_hwnd == 0)
             return;
+        WatchMenu();
         if (_tick % 50 == 0)
             CheckBin();
         if (_tick % 10 == 0 && _backdrop is not null)
@@ -796,7 +841,12 @@ internal sealed class DockWindow : Window
         if (++_tick % 5 == 0)
         {
             nint front = Native.GetForegroundWindow();
-            bool fullscreen = FullscreenCheck.IsFullscreen(front) && Native.MonitorFromWindow(front, Native.MonitorDefaultToNearest) == DockController.MainDisplay;
+            bool fullscreen = FullscreenCheck.IsFullscreen(front) && Native.MonitorFromWindow(front, Native.MonitorDefaultToNearest) == DockController.MainDisplay
+                && !Overlay(front);
+            // A fullscreen window hides the dock only once it's stayed a second, so a moment's overlay doesn't flash it away.
+            _fullscreenSeen = fullscreen ? _fullscreenSeen + 1 : 0;
+            if (fullscreen && !_fullscreen && _fullscreenSeen < 2)
+                fullscreen = false;
             if (fullscreen != _fullscreen)
             {
                 _fullscreen = fullscreen;
@@ -829,6 +879,28 @@ internal sealed class DockWindow : Window
             : FrontTouches() && !PointerNear();
         if (leave)
             SetShown(false, animate: true);
+    }
+
+    private int _fullscreenSeen;
+
+    /// <summary>
+    /// A screenshot overlay rather than a fullscreen app: Chippi's own capture, the Snipping Tool's or Windows' screen clip.
+    /// It covers the screen with a picture of it, the dock included, so hiding the dock only makes it blink.
+    /// </summary>
+    private static bool Overlay(nint window)
+    {
+        Native.GetWindowThreadProcessId(window, out uint pid);
+        if (pid == (uint)Environment.ProcessId)
+            return true;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById((int)pid);
+            return process.ProcessName is "SnippingTool" or "ScreenClippingHost" or "ScreenSketch";
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
     }
 
     private bool PointerAtEdge()

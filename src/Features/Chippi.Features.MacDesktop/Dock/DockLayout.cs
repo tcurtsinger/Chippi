@@ -11,6 +11,12 @@ public static class DockLayout
 {
     public const double Icon = 48, Gap = 6, Shelf = 64, Padding = 8, Corner = 16, EdgeGap = 6;
 
+    /// <summary>The shelf's edge line. Its tiles sit inside it, in a slot this much shallower than the shelf on each side.</summary>
+    public const double Edge = 1;
+
+    /// <summary>A tile's depth across the shelf: the shelf inside its edge line.</summary>
+    public const double Slot = Shelf - 2 * Edge;
+
     /// <summary>The magnification reaches this many icons each side of the pointer.</summary>
     public const double Reach = 3;
 
@@ -86,7 +92,7 @@ public static class DockApps
         {
             if (owner[i] >= 0 || windows[i].Executable.Length == 0)
                 continue;
-            owner[i] = IndexOf(pins, p => p.Program is not null && string.Equals(p.Program, windows[i].Executable, StringComparison.OrdinalIgnoreCase)
+            owner[i] = IndexOf(pins, p => p.Program is not null && SameProgram(p.Program, windows[i].Executable)
                 && (p.AppId is null || ids[i] is null));
         }
 
@@ -118,6 +124,35 @@ public static class DockApps
             apps.Add(new DockApp(key, launch, front.Executable, front.App, false, own));
         }
         return apps;
+    }
+
+    /// <summary>
+    /// Whether a window's program is the one a pin runs: the same file, or a Squirrel app's versioned copy of the launcher
+    /// the pin targets (Discord's and Claude's shortcuts run <c>App\x.exe</c>, their windows <c>App\app-1.2.3\x.exe</c>).
+    /// </summary>
+    public static bool SameProgram(string pinned, string running)
+    {
+        if (string.Equals(pinned, running, StringComparison.OrdinalIgnoreCase))
+            return true;
+        string? folder = Path.GetDirectoryName(running);
+        return folder is not null
+            && Path.GetFileName(folder).StartsWith("app-", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(Path.GetFileName(pinned), Path.GetFileName(running), StringComparison.OrdinalIgnoreCase)
+            && string.Equals(Path.GetDirectoryName(folder), Path.GetDirectoryName(pinned), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The unpinned apps kept in the order they first appeared (<paramref name="seen"/>, updated), so bringing one to the
+    /// front doesn't reorder the dock. Pins keep their own order, first.
+    /// </summary>
+    public static IReadOnlyList<DockApp> KeepOrder(IReadOnlyList<DockApp> apps, List<string> seen)
+    {
+        var running = apps.Where(a => !a.Pinned).ToArray();
+        seen.RemoveAll(key => running.All(a => a.Key != key));
+        foreach (var app in running)
+            if (!seen.Contains(app.Key))
+                seen.Add(app.Key);
+        return [.. apps.Where(a => a.Pinned), .. running.OrderBy(a => seen.IndexOf(a.Key))];
     }
 
     private static int IndexOf(IReadOnlyList<DockPin> pins, Func<DockPin, bool> match)

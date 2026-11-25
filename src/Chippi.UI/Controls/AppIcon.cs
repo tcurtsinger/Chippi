@@ -30,20 +30,32 @@ public static class AppIcon
     /// <summary>Read on an STA worker, never on the UI thread. Callers may own their request cache.</summary>
     public static BitmapSource? Read(string? parsing, int pixels = 64) => WindowsAppIcons.Read(parsing, SourcePixels(pixels));
 
+    /// <summary>The <see cref="LoadExactAsync"/> frame, read here: on an STA worker, never on the UI thread.</summary>
+    public static BitmapSource? ReadExact(string? parsing, int pixels) => WindowsAppIcons.Read(parsing, Math.Clamp(pixels, 16, 256), exact: true);
+
     /// <summary>A bounded window-icon fallback. Physical display size determines the DPI hint.</summary>
     public static BitmapSource? ReadWindow(nint window, int pixels) => WindowsAppIcons.ReadWindow(window, pixels);
 
-    public static Task<BitmapSource?> LoadAsync(string? parsing, int pixels = 64)
+    public static Task<BitmapSource?> LoadAsync(string? parsing, int pixels = 64) => Load(parsing, SourcePixels(pixels));
+
+    /// <summary>
+    /// The frame Windows draws at exactly <paramref name="pixels"/> device pixels: an icon's own hinted small size where it
+    /// has one, which stays sharp where a 256-pixel frame scaled down to it goes soft (the dock's icons at rest).
+    /// </summary>
+    public static Task<BitmapSource?> LoadExactAsync(string? parsing, int pixels) => Load(parsing, -Math.Clamp(pixels, 16, 256));
+
+    /// <summary>A negative <paramref name="source"/> asks for exactly that many pixels (cached apart from the larger frames).</summary>
+    private static Task<BitmapSource?> Load(string? parsing, int source)
     {
         if (string.IsNullOrWhiteSpace(parsing)) return Task.FromResult<BitmapSource?>(null);
-        var key = (parsing.ToUpperInvariant(), SourcePixels(pixels));
+        var key = (parsing.ToUpperInvariant(), source);
         lock (Gate)
         {
             if (Cache.TryGetValue(key, out var known)) return known;
             if (Cache.Count >= 256)
                 foreach (var old in Cache.Where(pair => pair.Value.IsCompleted).Select(pair => pair.Key).Take(64).ToArray())
                     Cache.Remove(old);
-            return Cache[key] = Run(() => Read(parsing, key.Item2));
+            return Cache[key] = Run(() => WindowsAppIcons.Read(parsing, Math.Abs(source), exact: source < 0));
         }
     }
 

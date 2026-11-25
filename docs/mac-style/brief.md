@@ -39,10 +39,10 @@ An optional mode that gives Windows a top menu bar, a bottom dock and turns the 
 
 - Main display, bottom, centered. 48-DIP icons on a 64-DIP glass shelf with 16 corners, 6 under each icon for the running dot. Registered as an AppBar (maximized windows stop above it).
 - **Hide:** Always shown (default), Auto-hide, or Hide when a window touches it. **Position:** bottom (default), left, right.
-- **Contents:** Start (opens the Windows Start menu), pinned apps (brought over from the taskbar's pins on first use), running apps not pinned, a divider, Downloads (a stack menu of the newest files) and Recycle Bin.
+- **Contents:** Start (opens the Windows Start menu), pinned apps (brought over from the taskbar's pins on first use), running apps not pinned (in the order they opened, so bringing one forward doesn't move it), a divider, Downloads (a stack menu of the newest files) and Recycle Bin.
 - **Magnification** (on by default, size adjustable): icons near the pointer grow to 72 with a cosine falloff over 3 icons.
 - **Clicks:** an app not running opens; a running one comes to the front; its window in front minimizes, as on the taskbar. Several windows show the App switcher's live previews above the icon on hover.
-- **Right click:** Open, New window, Keep in Dock / Remove from Dock, Show in Explorer, Close windows, Quit. Empty Recycle Bin asks "Empty Recycle Bin?" with Cancel and Empty.
+- **Right click:** Open, New window, Keep in Dock / Remove from Dock, Show in Explorer, Close windows, Quit. Empty Recycle Bin asks "Empty Recycle Bin?" with Cancel and Empty. The menu takes the foreground while open, so a click elsewhere or Esc closes it.
 - **Drag:** reorder, drag off to remove, drop files on an app to open them with it, on Downloads to move them there, on Recycle Bin to delete them.
 - **Keys:** Win+1 to Win+9 open the dock's apps in its order (the hidden taskbar would answer them in its own). Each tile is a UI Automation button with its name.
 - **Polish after the critique** (Travis, 2026-11-25): the glass is Windows' acrylic blur behind the shelf, the Start tile keeps its gradient, taskbar pins come over in the taskbar's order, Store apps and web apps match their windows by AppUserModelID, and the menus are sentence case.

@@ -150,22 +150,38 @@ internal sealed class DockTile : Grid
         return tile;
     }
 
+    /// <summary>A magnified icon reaches past the slot, and past the shelf; nothing clips it to its place in the row.</summary>
+    protected override Geometry GetLayoutClip(Size layoutSlotSize) => null!;
+
+    private BitmapSource? _rest, _large;
+
+    /// <summary>
+    /// Two frames: the icon's own at the resting size in device pixels, sharp, and a 256-pixel one for while it's magnified,
+    /// which a resting 48 would only blur.
+    /// </summary>
     private void Load(string path)
     {
-        var pending = AppIcon.LoadAsync(path, 192);
-        if (pending.IsCompletedSuccessfully)
-            _image.Source = pending.Result;
-        else
-            _ = Paint();
+        int rest = (int)Math.Round(DockLayout.Icon * (_dock?.Scale ?? 1));
+        var small = AppIcon.LoadExactAsync(path, rest);
+        var large = AppIcon.LoadAsync(path, 192);
+        _ = Paint();
 
         async Task Paint()
         {
-            var source = await pending;
-            if (source is not null)
-                _image.Source = source;
-            else if (_image.Source is null)
+            _rest = await small;
+            ShowFrame();
+            _large = await large;
+            ShowFrame();
+            if (_rest is null && _large is null && _image.Source is null)
                 ShowMonogram();
         }
+    }
+
+    private void ShowFrame()
+    {
+        var frame = Size > DockLayout.Icon + 0.5 ? _large ?? _rest : _rest ?? _large;
+        if (frame is not null && _image.Source != frame)
+            _image.Source = frame;
     }
 
     private void ShowMonogram()
@@ -206,17 +222,21 @@ internal sealed class DockTile : Grid
     /// <summary>The icon read again (the Recycle Bin's, as it fills and empties).</summary>
     public async void ReloadIcon(string path)
     {
-        var source = await Task.Run(() =>
+        int rest = (int)Math.Round(DockLayout.Icon * (_dock?.Scale ?? 1));
+        var (small, large) = await Task.Run(() =>
         {
-            BitmapSource? read = null;
-            var thread = new Thread(() => read = AppIcon.Read(path, 192));
+            BitmapSource? a = null, b = null;
+            var thread = new Thread(() => { a = AppIcon.ReadExact(path, rest); b = AppIcon.Read(path, 192); });
             thread.SetApartmentState(ApartmentState.STA);
             thread.Start();
             thread.Join();
-            return read;
+            return (a, b);
         });
-        if (source is not null)
-            _image.Source = source;
+        if (small is null && large is null)
+            return;
+        (_rest, _large) = (small, large);
+        _image.Source = null;
+        ShowFrame();
     }
 
     public void Update(DockApp app)
@@ -242,8 +262,8 @@ internal sealed class DockTile : Grid
             line.Width = across ? 1 : double.NaN;
             line.Height = across ? double.NaN : 1;
             line.Margin = across ? new Thickness(4, 12, 4, 12) : new Thickness(12, 4, 12, 4);
-            Width = across ? 9 : DockLayout.Shelf;
-            Height = across ? DockLayout.Shelf : 9;
+            Width = across ? 9 : DockLayout.Slot;
+            Height = across ? DockLayout.Slot : 9;
             Margin = across ? new Thickness(0, 0, DockLayout.Gap, 0) : new Thickness(0, 0, 0, DockLayout.Gap);
             return;
         }
@@ -260,20 +280,23 @@ internal sealed class DockTile : Grid
             return;
         Size = size;
         _art.Width = _art.Height = size;
+        ShowFrame();
         bool bottom = _edge == MacDesktop.DockEdge.Bottom;
-        // The slot stays the shelf's depth; a grown icon overflows it outward, past the shelf.
-        double inner = DockLayout.Shelf - DockLayout.Padding;
+        // The slot is the shelf's depth inside its edge line, so the row never clips it; a grown icon overflows it outward,
+        // past the shelf (GetLayoutClip lets it). The icon keeps the shelf's padding from the outer edge, the dot under it.
+        double pad = DockLayout.Padding - DockLayout.Edge;
+        double inner = DockLayout.Slot - pad;
         ClipToBounds = false;
-        Width = bottom ? size : DockLayout.Shelf;
-        Height = bottom ? DockLayout.Shelf : size;
+        Width = bottom ? size : DockLayout.Slot;
+        Height = bottom ? DockLayout.Slot : size;
         Margin = bottom ? new Thickness(0, 0, DockLayout.Gap, 0) : new Thickness(0, 0, 0, DockLayout.Gap);
         _art.HorizontalAlignment = _edge switch { MacDesktop.DockEdge.Left => HorizontalAlignment.Left, MacDesktop.DockEdge.Right => HorizontalAlignment.Right, _ => HorizontalAlignment.Center };
         _art.VerticalAlignment = bottom ? VerticalAlignment.Bottom : VerticalAlignment.Center;
         _art.Margin = _edge switch
         {
-            MacDesktop.DockEdge.Left => new Thickness(DockLayout.Padding, 0, inner - size, 0),
-            MacDesktop.DockEdge.Right => new Thickness(inner - size, 0, DockLayout.Padding, 0),
-            _ => new Thickness(0, inner - size, 0, DockLayout.Padding),
+            MacDesktop.DockEdge.Left => new Thickness(pad, 0, inner - size, 0),
+            MacDesktop.DockEdge.Right => new Thickness(inner - size, 0, pad, 0),
+            _ => new Thickness(0, inner - size, 0, pad),
         };
         Dot.HorizontalAlignment = _edge switch { MacDesktop.DockEdge.Left => HorizontalAlignment.Left, MacDesktop.DockEdge.Right => HorizontalAlignment.Right, _ => HorizontalAlignment.Center };
         Dot.VerticalAlignment = bottom ? VerticalAlignment.Bottom : VerticalAlignment.Center;
