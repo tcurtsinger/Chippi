@@ -72,6 +72,38 @@ public sealed class DockClickTests
 }
 
 /// <summary>
+/// Whose the keyboard is while a dock menu or question is open. A menu reports that it closed only after it has faded
+/// out, by when the question its item opened holds the keyboard: the menu letting go then closed the question.
+/// </summary>
+public sealed class FocusLeaseTests
+{
+    [Fact]
+    public void A_menu_closing_late_does_not_let_go_of_the_question_it_opened()
+    {
+        var lease = new FocusLease();
+        object menu = new(), question = new();
+        lease.Take(menu);
+        lease.Take(question); // the item ran while the menu was still fading out
+
+        Assert.False(lease.Leave(menu));
+        Assert.True(lease.Held);
+        Assert.True(lease.Leave(question));
+        Assert.False(lease.Held);
+    }
+
+    [Fact]
+    public void Its_holder_lets_go_once()
+    {
+        var lease = new FocusLease();
+        object menu = new();
+        lease.Take(menu);
+
+        Assert.True(lease.Leave(menu));
+        Assert.False(lease.Leave(menu));
+    }
+}
+
+/// <summary>
 /// The arithmetic on icon pixels. Windows hands app icons over with straight alpha; drawn as premultiplied their soft
 /// edges come out brighter than the icon, which is what made the dock's icons jagged.
 /// </summary>

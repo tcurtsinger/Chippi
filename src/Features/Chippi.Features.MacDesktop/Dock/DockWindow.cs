@@ -680,12 +680,12 @@ internal sealed class DockWindow : Window
             if (_confirm != popup)
                 return;
             _confirm = null;
-            _focus?.Release();
+            _focus?.Release(popup);
         };
         _confirm = popup;
         // The question holds the keyboard while it's open, as a menu does, so Esc and a click elsewhere answer Cancel.
         _focus ??= new DockFocus();
-        _focus.Hold(Native.Cursor(), () => popup.IsOpen = false);
+        _focus.Hold(popup, Native.Cursor(), () => popup.IsOpen = false);
         popup.IsOpen = true;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => { if (popup.IsOpen) cancel.Focus(); });
     }
@@ -857,18 +857,21 @@ internal sealed class DockWindow : Window
         // with the mouse; only then is a press elsewhere watched for.
         _focus ??= new DockFocus();
         ContextMenu? opened = null;
-        bool held = _focus.Hold(Native.Cursor(), () => { if (opened is { IsOpen: true }) opened.IsOpen = false; });
+        var holder = new object(); // the menu itself isn't made yet
+        bool held = _focus.Hold(holder, Native.Cursor(), () => { if (opened is { IsOpen: true }) opened.IsOpen = false; });
         // Above the icon as it is now, grown or not, 8 clear of it; the icons stay as they are while it's open, so it isn't
         // left hanging over a gap. (The menu's own card sits 16 inside its bottom edge, for its shadow.)
         double above = (DockLayout.Slot - (DockLayout.Padding - DockLayout.Edge) - tile.Size - 8) * _fit + 16;
         _holdMagnify = true;
         void Closed()
         {
+            // A menu reports this once it has faded out. By then its item has run, and what that opened (the Empty
+            // question, another menu) may hold the keyboard: this lets go only of its own hold.
+            _focus?.Release(holder);
             if (opened is not null && _menu != opened)
                 return;
             _menu = null;
             _holdMagnify = false;
-            _focus?.Release();
             // The pointer may be anywhere by now: the icons rest unless it's still on the dock.
             Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { if (!_root.IsMouseOver && !_dragging && !_holdMagnify) Magnify(null); });
         }

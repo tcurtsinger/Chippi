@@ -20,6 +20,7 @@ namespace Chippi.Features.MacDesktop.Dock;
 internal sealed class DockFocus : Window
 {
     private readonly uint _self = (uint)Environment.ProcessId;
+    private readonly FocusLease _lease = new();
     private nint _hwnd, _before;
     private Action? _lost;
 
@@ -67,11 +68,13 @@ internal sealed class DockFocus : Window
     }
 
     /// <summary>
-    /// Takes the keyboard at <paramref name="at"/> (physical pixels). <paramref name="lost"/> runs once if another app
-    /// takes it, or on Esc. False when Windows refused the foreground: the menu still opens, and works with the mouse.
+    /// Takes the keyboard for <paramref name="holder"/> at <paramref name="at"/> (physical pixels). <paramref name="lost"/>
+    /// runs once if another app takes it, or on Esc. False when Windows refused the foreground: the menu still opens, and
+    /// works with the mouse.
     /// </summary>
-    public bool Hold(Point at, Action lost)
+    public bool Hold(object holder, Point at, Action lost)
     {
+        _lease.Take(holder);
         nint front = Native.GetForegroundWindow();
         if (front != _hwnd || _before == 0)
             _before = front;
@@ -88,20 +91,45 @@ internal sealed class DockFocus : Window
     }
 
     /// <summary>
-    /// Lets go. The app that was in front gets the keyboard back while this still holds it (Windows picks another window
-    /// otherwise), unless another app has come forward since.
+    /// <paramref name="holder"/> lets go, if the keyboard is still its own: a menu reports that it closed only once it has
+    /// faded out, by when the question its item opened may hold the keyboard. The app that was in front gets the keyboard
+    /// back while this window still has it (Windows picks another window otherwise); not when anything else has come
+    /// forward since, another app or one of Chippi's own windows (Settings, opened from a menu).
     /// </summary>
-    public void Release()
+    public void Release(object holder)
     {
+        if (!_lease.Leave(holder))
+            return;
         _lost = null;
         if (!IsVisible)
             return;
         nint before = _before;
         _before = 0;
         nint now = Native.GetForegroundWindow();
-        Native.GetWindowThreadProcessId(now, out uint owner);
-        if (before != 0 && before != _hwnd && Native.IsWindow(before) && (now == 0 || owner == _self))
+        if (before != 0 && before != _hwnd && Native.IsWindow(before) && (now == 0 || now == _hwnd))
             ForegroundRight.Take(before);
         Hide();
+    }
+}
+
+/// <summary>
+/// Whose the held keyboard is. The last to take it holds it, and only its holder can let it go: one that was replaced
+/// (a menu still fading out behind the question it opened) lets go of nothing.
+/// </summary>
+internal sealed class FocusLease
+{
+    private object? _holder;
+
+    public bool Held => _holder is not null;
+
+    public void Take(object holder) => _holder = holder;
+
+    /// <summary>True when <paramref name="holder"/> held it, and it's now free.</summary>
+    public bool Leave(object holder)
+    {
+        if (!ReferenceEquals(_holder, holder))
+            return false;
+        _holder = null;
+        return true;
     }
 }
