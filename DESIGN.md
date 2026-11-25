@@ -158,6 +158,8 @@ The personality comes from one place: **Chippi**, a soft blob with a face who li
 
 **Boundaries.** vorssaint-utils is the feature reference, not a visual one: its name, icon, trade dress and branding are covered by its trademark policy. Chippi follows Windows 11 conventions, keeps its own name, icon and pet, and never copies vorssaint's screens or assets.
 
+**The Mac-style desktop** (Settings › Mac-style desktop, off by default; [brief](docs/mac-style/brief.md)) is the one place Chippi takes a macOS shape on purpose: a top menu bar, a bottom dock and the widget as a notch. It follows macOS 26's layout and behavior, not its pixels: Chippi's own surfaces, font, icons and pet stay. See §5, Mac-style desktop.
+
 ## 2. Colors
 
 ### Surfaces
@@ -494,6 +496,15 @@ Behavior approved 2026-10-22 (`docs/phase-2/design/notifications/`); visuals res
   - Held and Ready to review: clicking, or the Review button, opens the review.
 - **The widget on a stash:** Chippi celebrates, then goes idle, and the chip shows the folder glyph. Held and failed stashes turn it Caution.
 
+### Mac-style desktop
+
+Approved by Travis, 2026-11-25 ([brief](docs/mac-style/brief.md), [mockup](docs/mac-style/design/mockup.html)).
+
+- **Menu bar:** 28 tall across the top of every display, reserved like a taskbar. No fill and no blur: the wallpaper shows through, as on macOS 26. Its ink follows the wallpaper under it, not the theme: white below an average luminance of 0.5, dark above. Left: Chippi's mark, the app in front (bold), its classic menus, Window; menus that don't fit fold into ». Right: Chippi's badges, the hidden-icons chevron, input language, Wi-Fi, volume, battery, Controls and the clock.
+- **Dock:** a glass shelf 64 deep, 48 icons, 16 corners, centered on the bottom edge (or a side). Magnification to 72 by default over three icons each side. A 4 dot under a running app. Pins, then running apps, a divider, Downloads and the Recycle Bin.
+- **Notch:** the widget's form while on. Pure black in both themes, at rest, carried and open, with no edge, shadow or blur; the dark island ink always. 28 tall, 184 wide (280 with an activity), square top and 10 bottom corners. It opens down into the 520 × 360 panel, centered on it and kept 8 inside the work area, in the same black. Carried, it is a 22-tall round pill; pulled 12 below the bar it lifts (1.06, −3°) with a 3px accent-fill landing line on the top edge where it will land. It snaps to the center within 40.
+- The taskbar is hidden while the menu bar or the dock stands in for it, and given back on every way out: switching the mode off, quitting, a crash and the next start, uninstall, and `Chippi.exe --restore`.
+
 ## 6. Components
 
 Every interactive control is custom-templated with the full state set: rest, hover, pressed, keyboard focus and disabled. Focus is a 2px outline in the Text color at 1px offset, and it is non-negotiable. On the island it sits 3 out and follows the control's shape: round around the transport and the play disc, 9 corners around the 6-corner buttons, a pill around the switch (revised 2026-10-30, polish pass). Disabled is 45% opacity with no hover.
@@ -607,7 +618,7 @@ Where text beside it carries the state (the puck, the home, Now Playing, About),
 
 ### Don't
 - **Don't** use gradients beyond the Gradient Rule's two, and never gradient text.
-- **Don't** use Bold, colored glows, glassmorphism or hero metrics.
+- **Don't** use Bold, colored glows, glassmorphism or hero metrics. The Mac-style desktop's dock shelf is the one glass surface, and the menu bar's front app is the one bold label (§5).
 - **Don't** put a description under a page title, or a sentence where a label will do.
 - **Don't** nest cards, or give each row its own card.
 - **Don't** ship stock WPF chrome: no default checkboxes, group boxes or gray dialogs.

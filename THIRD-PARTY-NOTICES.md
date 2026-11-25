@@ -9,6 +9,7 @@ Chippi uses fonts installed on Windows: Segoe UI Variable (with Segoe UI fallbac
 ## Icons and reused application code
 
 - Lucide geometry: ISC, including the upstream Feather/MIT notice. Source: https://github.com/lucide-icons/lucide
+- Muelle (MIT, Copyright (c) 2026 Muelle contributors): the Mac-style desktop follows its approach to hiding the Windows taskbar (auto-hide, then the taskbar windows made layered, transparent and click-through, re-applied after Explorer restarts) and to the AppBar strips. No code or assets are copied. Source: https://github.com/crafter-station/Muelle
 - Hopper: theme, icon, tray, logging, config, startup, startup-hardening and audio engine code adapted into Chippi. The original author has authorized GPL-3.0-or-later relicensing for Chippi (phase-1-handoff.md). Hopper's separate repository is unchanged. Source: https://github.com/tcurtsinger/Hopper
 
 ## Coding agent product icons

@@ -65,6 +65,7 @@
     <ProjectReference Include="..\Features\Chippi.Features.WindowLayouts\Chippi.Features.WindowLayouts.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.TextSnippets\Chippi.Features.TextSnippets.csproj" />
     <ProjectReference Include="..\Features\Chippi.Features.SmoothScrolling\Chippi.Features.SmoothScrolling.csproj" />
+    <ProjectReference Include="..\Features\Chippi.Features.MacDesktop\Chippi.Features.MacDesktop.csproj" />
   </ItemGroup>
 
   <!-- P/Invoke via CsWin32. Each workstream lists its APIs in a NativeMethods.txt inside its own

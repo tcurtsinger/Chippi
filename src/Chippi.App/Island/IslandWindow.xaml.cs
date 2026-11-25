@@ -512,7 +512,9 @@ public partial class IslandWindow : Window
 
     private void ApplyVisibility()
     {
-        bool visible = _enabled && (!_suppressed || _summoned) && _monitor != default && _hwnd != default;
+        bool shown = _enabled && (!_suppressed || _summoned) && _monitor != default && _hwnd != default;
+        _notch?.SetShown(shown);
+        bool visible = shown && _notch is null; // the notch is the widget while the Mac-style desktop has one
         if (visible && !IsVisible)
         {
             Show();
@@ -582,7 +584,7 @@ public partial class IslandWindow : Window
         _puck = _fallback ? IslandGeometry.Start(area.Work, area.Scale) : IslandGeometry.PuckRect(_x, _y, area.Work, area.Scale);
         ApplySide(IslandGeometry.OpensLeft(_puck, area.Work));
         IslandNative.Move(_hwnd, WindowAt(Center(_puck), area.Scale));
-        if (_panel.IsOpen)
+        if (_panel.IsOpen && _notch is null)
             _panel.Open(_puck, WidgetRect, area, tabExtension: Body.TabExtension, opensLeft: _left);
         Land(); // a drop's slide this cut short still sets him down
     }
@@ -705,7 +707,7 @@ public partial class IslandWindow : Window
     /// </summary>
     internal void PressedAt(Point physical)
     {
-        if (_peeking || !_panel.IsOpen || _panel.Covers(physical) || (IsVisible && CoversWidget(physical))
+        if (_peeking || !_panel.IsOpen || _panel.Covers(physical) || (IsVisible && CoversWidget(physical)) || _notch?.Covers(physical) == true
             || Menu.IsOpen || Mouse.Captured is not null)
             return;
         Dispatcher.BeginInvoke(() => { if (!_peeking) CloseIsland(); });
@@ -802,6 +804,11 @@ public partial class IslandWindow : Window
 
     private void OpenIsland()
     {
+        if (_notch is not null)
+        {
+            OpenFromNotch();
+            return;
+        }
         if (!IsVisible || _dragging || Area is not { } area)
             return;
         if (!_heldWidth.HasValue && !_panel.IsVisible)
@@ -839,8 +846,14 @@ public partial class IslandWindow : Window
         }
         // A reversal can still have a half-unfolded bar underneath it. Land there first;
         // the remaining unfold or a change of activity takes over after the panel hides.
-        var widget = _resumeBar || _heldWidth.HasValue ? RenderedWidgetRect() : WidgetRect;
-        _panel.CloseIsland(immediate, widget, Body.TabExtension, _left);
+        _notchLeave?.Stop();
+        if (_notch?.Bounds is { } notch)
+            _panel.CloseIsland(immediate, notch, 0, false);
+        else
+        {
+            var widget = _resumeBar || _heldWidth.HasValue ? RenderedWidgetRect() : WidgetRect;
+            _panel.CloseIsland(immediate, widget, Body.TabExtension, _left);
+        }
         EndPeek();
         RefreshPuck();
         if (_summoned)
@@ -849,6 +862,85 @@ public partial class IslandWindow : Window
             ApplyVisibility(); // hidden again while the fullscreen app is still in front
         }
     }
+
+    // ----- The notch (docs/mac-style/brief.md) -----
+
+    private NotchWindow? _notch;
+    private DispatcherTimer? _notchLeave;
+    private long _notchAway;
+
+    /// <summary>
+    /// The Mac-style desktop's notch takes the widget's place (null gives it back): the puck and bar hide, and the panel
+    /// opens out of the notch instead, in black with the dark island ink.
+    /// </summary>
+    internal void SetNotch(NotchWindow? notch)
+    {
+        if (ReferenceEquals(notch, _notch))
+            return;
+        if (_panel.IsVisible)
+            CloseIsland(immediate: true);
+        _notch = notch;
+        _panel.SetNotch(notch is not null);
+        ApplyVisibility();
+        if (notch is null && IsVisible)
+        {
+            Place();
+            RefreshPuck();
+        }
+    }
+
+    /// <summary>A click on the notch: opens the panel out of it, or closes it.</summary>
+    internal void ToggleFromNotch()
+    {
+        if (_panel.IsOpen)
+            CloseIsland();
+        else
+            OpenFromNotch();
+    }
+
+    /// <summary>The pointer rested on the notch: the panel opens, and closes again 400 ms after the pointer leaves both.</summary>
+    internal void HoverFromNotch()
+    {
+        if (_panel.IsOpen)
+            return;
+        OpenFromNotch();
+        if (!_panel.IsOpen)
+            return;
+        _notchAway = 0;
+        _notchLeave ??= new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Input, (_, _) => WatchNotchLeave(), Dispatcher);
+        _notchLeave.Start();
+    }
+
+    private void OpenFromNotch()
+    {
+        if (_notch is not { Bounds: { } notch, Area: { } area } || _notch.IsCarried)
+            return;
+        _panel.Open(notch, notch, area);
+        Hook();
+    }
+
+    private void WatchNotchLeave()
+    {
+        if (!_panel.IsOpen || _notch is null)
+        {
+            _notchLeave?.Stop();
+            return;
+        }
+        var at = CursorAt();
+        // Typing into a page, a list it opened, or a hold keeps it open; so does the pointer over the notch or the panel.
+        if (_panel.Covers(at) || _notch.Covers(at) || _panel.HasKeyboard || Mouse.Captured is not null || _openHolds.IsHeld || Menu.IsOpen)
+        {
+            _notchAway = 0;
+            return;
+        }
+        long now = Environment.TickCount64;
+        if (_notchAway == 0)
+            _notchAway = now;
+        else if (now - _notchAway >= NotchLeaveDelay.TotalMilliseconds)
+            CloseIsland();
+    }
+
+    internal static readonly TimeSpan NotchLeaveDelay = TimeSpan.FromMilliseconds(400);
 
     // ----- A drag from another app (Phase 5 notes #48) -----
 
@@ -931,7 +1023,7 @@ public partial class IslandWindow : Window
         if (!_openedByDrag)
             return;
         var at = CursorAt();
-        if (_panel.Covers(at) || (IsVisible && CoversWidget(at)))
+        if (_panel.Covers(at) || (IsVisible && CoversWidget(at)) || _notch?.Covers(at) == true)
             return; // still over the widget: a later leave starts this again
         CloseIsland();
     }

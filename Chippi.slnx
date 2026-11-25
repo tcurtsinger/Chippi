@@ -46,6 +46,7 @@
     <Project Path="src/Features/Chippi.Features.RadialMenu/Chippi.Features.RadialMenu.csproj" />
     <Project Path="src/Features/Chippi.Features.Displays/Chippi.Features.Displays.csproj" />
     <Project Path="src/Features/Chippi.Features.AppSwitcher/Chippi.Features.AppSwitcher.csproj" />
+    <Project Path="src/Features/Chippi.Features.MacDesktop/Chippi.Features.MacDesktop.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Chippi.Features.AppUpdates.Tests/Chippi.Features.AppUpdates.Tests.csproj" />
@@ -80,6 +81,7 @@
     <Project Path="tests/Chippi.Features.ColorPicker.Tests/Chippi.Features.ColorPicker.Tests.csproj" />
     <Project Path="tests/Chippi.Features.CloseProtection.Tests/Chippi.Features.CloseProtection.Tests.csproj" />
     <Project Path="tests/Chippi.Features.AppSwitcher.Tests/Chippi.Features.AppSwitcher.Tests.csproj" />
+    <Project Path="tests/Chippi.Features.MacDesktop.Tests/Chippi.Features.MacDesktop.Tests.csproj" />
     <Project Path="tests/Chippi.Features.CommandBar.Tests/Chippi.Features.CommandBar.Tests.csproj" />
     <Project Path="tests/Chippi.Features.ScreenText.Tests/Chippi.Features.ScreenText.Tests.csproj" />
     <Project Path="tests/Chippi.Features.Debounce.Tests/Chippi.Features.Debounce.Tests.csproj" />
