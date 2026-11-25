@@ -26,17 +26,26 @@ public sealed class VbCableRequirement : IFeatureRequirement
     private readonly IDriverSetup _setup;
     private readonly Action _openSoundSettings;
     private readonly IAsyncDisposable _lease;
+    private readonly Func<string, string> _readMarker;
     private bool _installing;
     private bool _disposed;
 
     /// <param name="prepare">Checks and extracts the package, returning the setup's path (<see cref="VbCablePackage.Prepare"/>).</param>
     public VbCableRequirement(AudioService audio, string dataDirectory, Func<string> prepare, IDriverSetup setup, Action openSoundSettings)
+        : this(audio, dataDirectory, prepare, setup, openSoundSettings, ReadMarker)
+    {
+    }
+
+    /// <param name="readMarker">Reads the restart marker at a path; a test's stands in for another scan clearing it first.</param>
+    internal VbCableRequirement(AudioService audio, string dataDirectory, Func<string> prepare, IDriverSetup setup, Action openSoundSettings,
+        Func<string, string> readMarker)
     {
         _audio = audio;
         _dataDirectory = dataDirectory;
         _prepare = prepare;
         _setup = setup;
         _openSoundSettings = openSoundSettings;
+        _readMarker = readMarker;
         _lease = audio.Acquire();
         try
         {
@@ -133,13 +142,41 @@ public sealed class VbCableRequirement : IFeatureRequirement
             TryDelete(pending);
             return cable == CableState.Disabled ? RequirementState.Disabled : RequirementState.Ready;
         }
-        if (File.Exists(pending)
-            && DateTimeOffset.TryParse(File.ReadAllText(pending), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var bootAtSetup)
-            && (BootTime() - bootAtSetup).Duration() < TimeSpan.FromMinutes(1))
-            return RequirementState.RestartNeeded;
+        if (File.Exists(pending))
+        {
+            string marker;
+            try { marker = _readMarker(pending); }
+            // Compute runs on several threads (the constructor, the audio thread's snapshots, the scans'
+            // continuations) and in every requirement over this folder, so another one can clear a stale
+            // marker between the check above and this read. Gone means no restart is pending.
+            catch (FileNotFoundException) { return RequirementState.Missing; }
+            catch (DirectoryNotFoundException) { return RequirementState.Missing; }
+            // Windows' answer for a file whose delete is still under way: going is gone.
+            catch (UnauthorizedAccessException) { return RequirementState.Missing; }
+            // There but unreadable. ReadMarker shares reads and deletes, so in Chippi only InstallAsync writing
+            // a fresh marker blocks it, and then a restart is pending. Anything else holding it doesn't say the
+            // PC restarted either: the marker stays and the next change reads it again.
+            catch (IOException) { return RequirementState.RestartNeeded; }
+            if (DateTimeOffset.TryParse(marker, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var bootAtSetup)
+                && (BootTime() - bootAtSetup).Duration() < TimeSpan.FromMinutes(1))
+                return RequirementState.RestartNeeded;
+        }
         TryDelete(pending); // restarted and still no cable: back to Install Driver
         return RequirementState.Missing;
     }
+
+    internal static string ReadMarker(string path)
+    {
+        using var reader = new StreamReader(OpenMarker(path));
+        return reader.ReadToEnd();
+    }
+
+    /// <summary>
+    /// The marker, open to read. It shares Delete as well as Read, so a read and another scan's
+    /// <see cref="TryDelete"/> never refuse each other, and not Write, so a marker half written by setup is never read.
+    /// </summary>
+    internal static FileStream OpenMarker(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
 
     private static void TryDelete(string path)
     {

@@ -354,6 +354,71 @@ public sealed class VbCableRequirementTests : IDisposable
         Assert.Equal(RequirementState.Missing, rebooted.State);
     }
 
+    [Theory]
+    [InlineData(typeof(FileNotFoundException))]
+    [InlineData(typeof(DirectoryNotFoundException))]
+    [InlineData(typeof(UnauthorizedAccessException))] // a delete still under way
+    public void A_marker_gone_between_the_check_and_the_read_is_no_restart_pending(Type gone)
+    {
+        WriteMarker(); // read, it would be Restart to finish
+        var reads = 0;
+        using var requirement = Create(_ =>
+        {
+            Interlocked.Increment(ref reads);
+            throw (Exception)Activator.CreateInstance(gone)!;
+        });
+
+        Assert.Equal(RequirementState.Missing, requirement.State);
+        Assert.True(reads > 0); // the marker was there at the check
+    }
+
+    [Fact]
+    public void A_marker_another_scan_clears_before_the_read_is_no_restart_pending()
+    {
+        WriteMarker();
+        var reads = 0;
+        using var requirement = Create(path =>
+        {
+            Interlocked.Increment(ref reads);
+            // The constructor and the first snapshot can both be here: the second finds the delete under way.
+            try { File.Delete(path); } catch (UnauthorizedAccessException) { }
+            return VbCableRequirement.ReadMarker(path);
+        });
+
+        Assert.Equal(RequirementState.Missing, requirement.State);
+        Assert.True(reads > 0);
+    }
+
+    [Fact]
+    public void A_marker_setup_is_still_writing_is_a_restart_pending()
+    {
+        var marker = WriteMarker();
+        using var writing = new FileStream(marker, FileMode.Create, FileAccess.Write, FileShare.Read); // as File.WriteAllText holds it
+        using var requirement = Create();
+        Assert.Equal(RequirementState.RestartNeeded, requirement.State);
+    }
+
+    [Fact]
+    public void Reading_the_marker_never_blocks_clearing_it()
+    {
+        var marker = WriteMarker();
+        using var reading = VbCableRequirement.OpenMarker(marker);
+        File.Delete(marker); // an IOException here is what a blocked read would report as a restart pending
+        Assert.False(File.Exists(marker));
+    }
+
+    /// <summary>The marker setup leaves, from this boot.</summary>
+    private string WriteMarker()
+    {
+        Directory.CreateDirectory(_data);
+        var marker = Path.Combine(_data, "restart-pending.txt");
+        File.WriteAllText(marker, VbCableRequirement.BootTime().ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+        return marker;
+    }
+
+    private VbCableRequirement Create(Func<string, string> readMarker) =>
+        new(_audio, _data, () => { _prepared++; return @"C:\fake\VBCABLE_Setup_x64.exe"; }, _setup, () => { }, readMarker);
+
     [Fact]
     public async Task The_devices_appearing_make_it_ready_and_never_install_the_feature()
     {
