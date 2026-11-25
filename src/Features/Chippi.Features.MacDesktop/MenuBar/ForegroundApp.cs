@@ -19,6 +19,9 @@ internal sealed class ForegroundApp : IDisposable
     public uint ProcessId { get; private set; }
     public AppIdentity App { get; private set; } = AppIdentity.Desktop;
 
+    /// <summary>Nothing is in front but the desktop.</summary>
+    public bool IsDesktop => App == AppIdentity.Desktop;
+
     public event Action? Changed;
 
     public ForegroundApp()
@@ -32,6 +35,14 @@ internal sealed class ForegroundApp : IDisposable
 
     /// <summary>Reads the window in front again, as after a window closed or a menu ran.</summary>
     public void Refresh() => Read(Native.GetForegroundWindow());
+
+    /// <summary>Names the window the bar is showing again: a better name for its app has come in.</summary>
+    public void Reread()
+    {
+        if (Window != 0 && !IsDesktop && Native.IsWindow(Window))
+            Read(Window);
+        Refresh();
+    }
 
     private void Read(nint window)
     {

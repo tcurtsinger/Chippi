@@ -66,6 +66,10 @@ internal sealed class MenuBarController : IDisposable
         _status.Start();
         _clock.Start();
         _wallpaperPoll.Start();
+        // What the Start menu calls each app ("Steam", not its window's helper program): read once, off this thread, and
+        // the bar names the app in front again when it's in.
+        AppNames.CatalogRead += OnCatalogRead;
+        AppNames.ReadCatalog();
         _ = ReadInkAsync(onlyChanged: false);
     }
 
@@ -105,6 +109,13 @@ internal sealed class MenuBarController : IDisposable
         _ = ReadInkAsync(onlyChanged: false);
     }
 
+    private void OnCatalogRead() => _dispatcher.BeginInvoke(() =>
+    {
+        if (_disposed)
+            return;
+        _front.Reread();
+    });
+
     /// <summary>The notch moved or changed size: the bars make room for it.</summary>
     public void NotchMoved() => ForEach(b => b.Arrange());
 
@@ -117,7 +128,7 @@ internal sealed class MenuBarController : IDisposable
         if (!_gate.Changed())
             return; // a menu of ours is open: its app stays, and the bar catches up when the menu closes
         _titlesWindow = _front.Window;
-        bool desktop = _front.App == AppIdentity.Desktop;
+        bool desktop = _front.IsDesktop;
         // An app running as administrator takes no commands from Chippi (Windows refuses them): its menus aren't offered,
         // and the rows that act on its window are greyed out.
         _elevated = !desktop && WindowsActionPc.IsWindowElevated(_front.Window);
@@ -187,12 +198,13 @@ internal sealed class MenuBarController : IDisposable
     {
         var app = _front.App;
         uint pid = _front.ProcessId;
-        if (app == AppIdentity.Desktop)
+        if (_front.IsDesktop)
             return Opening(
             [
-                new BarMenuItem("About File Explorer") { Run = () => Properties(app.Path) },
+                new BarMenuItem("New File Explorer window") { Hint = "Win+E", Run = () => _ = Shell.PressAsync("Win+E") },
                 BarMenuItem.Separator,
-                new BarMenuItem("New window") { Hint = "Win+E", Run = () => _ = Shell.PressAsync("Win+E") },
+                new BarMenuItem("Display settings") { Run = () => Open("ms-settings:display") },
+                new BarMenuItem("Personalize") { Run = () => Open("ms-settings:personalization") },
             ]);
         bool can = !_elevated;
         return Opening(
@@ -262,7 +274,7 @@ internal sealed class MenuBarController : IDisposable
     private List<BarMenuItem> WindowItems()
     {
         nint window = _front.Window;
-        bool has = _front.App != AppIdentity.Desktop && window != 0 && !_elevated;
+        bool has = !_front.IsDesktop && window != 0 && !_elevated;
         bool maximized = has && Native.IsZoomed(window);
         var here = has ? Native.MonitorFromWindow(window, Native.MonitorDefaultToNearest) : 0;
         var displays = DisplayCatalog.Connected().Where(d => d.Handle != here).ToArray();
@@ -393,7 +405,7 @@ internal sealed class MenuBarController : IDisposable
 
     /// <summary>
     /// The taskbar's hidden icons, Windows' own flyout: Win+B gives the hidden taskbar's notification area the keyboard and
-    /// Space opens it (Enter's key-up would start the first icon's app). It opens where the taskbar would be, so it's moved
+    /// Space opens it (Enter's key-up would start the first icon's app). It opens where the taskbar would be, so it's put
     /// under the chevron. A second click closes it. Follows Muelle (MIT).
     /// </summary>
     public async Task ToggleHiddenIconsAsync(MenuBarWindow bar, FrameworkElement chevron)
@@ -406,6 +418,10 @@ internal sealed class MenuBarController : IDisposable
         }
         nint before = _front.Window;
         var anchor = bar.Below(chevron);
+        // Out of sight before it shows: it's where the last one was left until Windows moves it to the taskbar's place.
+        foreach (string cls in OverflowClasses)
+            if (Native.FindWindow(cls, null) is var hidden && hidden != 0)
+                KeepAway(hidden);
         await Shell.PressAsync("Win+B");
         var pressed = Stopwatch.StartNew();
         while (!IsTaskbar(Native.GetForegroundWindow()))
@@ -418,49 +434,138 @@ internal sealed class MenuBarController : IDisposable
         if (wait > 0)
             await Task.Delay(wait);
         await Shell.TapAsync(0x20); // Space
-        // Under the chevron for as long as it's open: Windows puts it back by the taskbar when its icons change.
-        var held = Stopwatch.StartNew();
-        bool seen = false;
-        while (!_disposed)
-        {
-            nint flyout = Overflow();
-            if (flyout != 0)
-            {
-                seen = true;
-                KeepUnder(flyout, anchor, bar.Bounds);
-            }
-            else if (seen || held.ElapsedMilliseconds > 1200)
-                break;
-            await Task.Delay(held.ElapsedMilliseconds < 1200 ? 10 : 100);
-        }
+        await KeepUnderAsync(Overflow, anchor, bar);
         // Closed with the keyboard still on the hidden taskbar (Esc, or a second click on the chevron): the app that was
         // in front gets it back. Anything else that came forward meanwhile keeps it.
         if (!_disposed && IsTaskbar(Native.GetForegroundWindow()) && before != 0 && Native.IsWindow(before) && !Native.IsIconic(before))
             ForegroundRight.Take(before);
     }
 
+    /// <summary>
+    /// Quick Settings (Win+A) and notifications (Win+N), Windows' own flyouts: they open by the hidden taskbar, at the
+    /// bottom of the main display, so they're put under the bar item that opened them, on its display. The flyout is the
+    /// window of Windows' shell that takes the keyboard after the keys. A second press closes it (the keys toggle).
+    /// </summary>
+    public async Task ToggleFlyoutAsync(MenuBarWindow bar, FrameworkElement item, string keys)
+    {
+        nint was = Native.GetForegroundWindow();
+        var anchor = bar.Below(item);
+        await Shell.PressAsync(keys);
+        bool wasOpen = IsShellFlyout(was); // one of them was open: these keys closed it, or opened the other in its place
+        var waited = Stopwatch.StartNew();
+        nint flyout = 0;
+        while (!_disposed && waited.ElapsedMilliseconds < 1500)
+        {
+            nint front = Native.GetForegroundWindow();
+            if (front != 0 && front != was && IsShellFlyout(front))
+            {
+                flyout = Native.GetAncestor(front, Native.GaRoot) is var root && root != 0 ? root : front;
+                break;
+            }
+            await Task.Delay(10);
+        }
+        if (flyout == 0 && wasOpen)
+            return;
+        if (flyout == 0)
+        {
+            Log.Info($"Mac-style desktop: {keys} opened nothing the bar could place (in front: {Native.ClassOf(Native.GetForegroundWindow())})");
+            return;
+        }
+        KeepAway(flyout);
+        if (Native.GetWindowRect(flyout, out var rect))
+            Log.Info($"Mac-style desktop: {keys} opened {Native.ClassOf(flyout)} '{Native.TitleOf(flyout)}', {rect.Width}x{rect.Height}, on a {bar.Bounds.Width:0}-wide bar");
+        await KeepUnderAsync(() => Native.IsShown(flyout) ? flyout : 0, anchor, bar);
+    }
+
+    /// <summary>A window of the hosts Windows draws Quick Settings and notifications in; not Start or Search, which have hosts of their own.</summary>
+    private static bool IsShellFlyout(nint window)
+    {
+        if (window == 0 || Native.GetWindowThreadProcessId(window, out uint pid) == 0)
+            return false;
+        string host = Path.GetFileName(AppNames.ImagePath(pid) ?? "");
+        return host.Equals("ShellHost.exe", StringComparison.OrdinalIgnoreCase) || host.Equals("ShellExperienceHost.exe", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static bool IsTaskbar(nint window) => Native.ClassOf(window) is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd";
+
+    private static readonly string[] OverflowClasses = ["TopLevelWindowForOverflowXamlIsland", "NotifyIconOverflowWindow"];
 
     private static nint Overflow()
     {
-        foreach (string cls in new[] { "TopLevelWindowForOverflowXamlIsland", "NotifyIconOverflowWindow" })
+        foreach (string cls in OverflowClasses)
         {
             nint window = Native.FindWindow(cls, null);
-            if (window != 0 && Native.IsWindowVisible(window))
+            if (window != 0 && Native.IsShown(window))
                 return window;
         }
         return 0;
     }
 
-    private static void KeepUnder(nint flyout, Point anchor, Rect bar)
+    /// <summary>How long Windows' flyouts take to slide in from the taskbar's edge.</summary>
+    private const int SlideIn = 230;
+
+    /// <summary>
+    /// Keeps one of Windows' flyouts under <paramref name="anchor"/> for as long as it's open. Windows slides it in from the
+    /// taskbar's edge and puts it back there whenever it changes size, so while it slides in it's kept off every display,
+    /// and it's shown under the bar once it's whole: it opens at the bar, not at the bottom.
+    /// </summary>
+    private async Task KeepUnderAsync(Func<nint> find, Point anchor, MenuBarWindow bar)
+    {
+        var held = Stopwatch.StartNew();
+        long seen = -1;
+        int slide = SystemParameters.ClientAreaAnimation ? SlideIn : 0;
+        double bottom = Native.Area(bar.Monitor) is { } area ? area.Monitor.Bottom : bar.Bounds.Bottom + 2000;
+        while (!_disposed)
+        {
+            nint flyout = find();
+            if (flyout != 0)
+            {
+                if (seen < 0)
+                    seen = held.ElapsedMilliseconds;
+                if (held.ElapsedMilliseconds - seen < slide)
+                    KeepAway(flyout);
+                else
+                    KeepUnder(flyout, anchor, bar.Bounds, bottom);
+            }
+            else if (seen >= 0 || held.ElapsedMilliseconds > 1500)
+                break;
+            await Task.Delay(seen >= 0 && held.ElapsedMilliseconds - seen > 1000 ? 30 : 10);
+        }
+    }
+
+    /// <summary>Puts a flyout below every display, where it can't be seen, keeping its place across.</summary>
+    private static void KeepAway(nint flyout)
     {
         if (!Native.GetWindowRect(flyout, out var rect))
             return;
-        int gap = (int)Math.Round(6 * (bar.Height / MenuBarWindow.Height28));
-        int left = (int)Math.Clamp(anchor.X - rect.Width / 2.0, bar.Left + gap, Math.Max(bar.Left, bar.Right - gap - rect.Width));
-        int top = (int)anchor.Y + gap;
+        int away = (int)Native.Desktop().Bottom + 200;
+        if (rect.Top != away)
+            Native.SetWindowPos(flyout, 0, rect.Left, away, 0, 0, Native.SwpNoSize | Native.SwpNoZOrder | Native.SwpNoActivate);
+    }
+
+    /// <summary>
+    /// Under the anchor, centered on it and kept inside the bar's display; one too tall for the room under the bar sits
+    /// as low as it must.
+    /// </summary>
+    private static void KeepUnder(nint flyout, Point anchor, Rect bar, double displayBottom)
+    {
+        if (!Native.GetWindowRect(flyout, out var rect))
+            return;
+        var (left, top) = FlyoutPlace(new Size(rect.Width, rect.Height), anchor.X, bar, displayBottom);
         if (rect.Left != left || rect.Top != top)
             Native.SetWindowPos(flyout, 0, left, top, 0, 0, Native.SwpNoSize | Native.SwpNoZOrder | Native.SwpNoActivate);
+    }
+
+    /// <summary>Where a flyout of <paramref name="size"/> goes under a bar item centered at <paramref name="anchorX"/>. Physical pixels.</summary>
+    public static (int Left, int Top) FlyoutPlace(Size size, double anchorX, Rect bar, double displayBottom)
+    {
+        int gap = (int)Math.Round(6 * (bar.Height / MenuBarWindow.Height28));
+        double least = bar.Left + gap, most = Math.Max(least, bar.Right - gap - size.Width);
+        int left = (int)Math.Clamp(anchorX - size.Width / 2.0, least, most);
+        int top = (int)bar.Bottom + gap;
+        if (top + size.Height > displayBottom)
+            top = (int)Math.Max(bar.Top, displayBottom - size.Height);
+        return (left, top);
     }
 
     private void OnActivities(object? sender, EventArgs e)
@@ -546,6 +651,7 @@ internal sealed class MenuBarController : IDisposable
         _wallpaperPoll.Stop();
         _status.Dispose();
         _front.Dispose();
+        AppNames.CatalogRead -= OnCatalogRead;
         if (Shell.Activities is { } hub)
             hub.Changed -= OnActivities;
         BarQuestion.Close();

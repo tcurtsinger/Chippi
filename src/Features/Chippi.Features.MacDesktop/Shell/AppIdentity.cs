@@ -12,16 +12,55 @@ namespace Chippi.Features.MacDesktop.Shell;
 /// <summary>An app with a window in front or in the dock: its program and the name people know it by.</summary>
 public sealed record AppIdentity(string Path, string Name)
 {
-    /// <summary>The desktop, or nothing Chippi can name: Explorer's name, no menus.</summary>
-    public static AppIdentity Desktop { get; } = new(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), "File Explorer");
+    /// <summary>The desktop itself, with no window in front: "Desktop", no menus. Its program is Explorer's.</summary>
+    public static AppIdentity Desktop { get; } = new(System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"), "Desktop");
 
     public bool Is(string path) => string.Equals(Path, path, StringComparison.OrdinalIgnoreCase);
 }
 
-/// <summary>Names a window's app from its program: the file's description ("Notepad++"), else its name.</summary>
+/// <summary>
+/// Names a window's app: what the Start menu calls it (<see cref="AppCatalog"/>), else its program's description
+/// ("Notepad++"), else the program's name.
+/// </summary>
 internal static class AppNames
 {
     private static readonly ConcurrentDictionary<string, string> Names = new(StringComparer.OrdinalIgnoreCase);
+    private static volatile AppCatalog _catalog = AppCatalog.Empty;
+    private static int _reading;
+
+    /// <summary>Raised (on the thread that read it) when the Start menu's names have been read: names given before may be better now.</summary>
+    public static event Action? CatalogRead;
+
+    /// <summary>The Start menu's names, as last read.</summary>
+    public static AppCatalog Catalog
+    {
+        get => _catalog;
+        set
+        {
+            _catalog = value;
+            Names.Clear();
+        }
+    }
+
+    /// <summary>Reads the Start menu's names on a thread of its own (it takes a second), once at a time.</summary>
+    public static void ReadCatalog()
+    {
+        if (Interlocked.Exchange(ref _reading, 1) == 1)
+            return;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var catalog = AppCatalog.Read();
+                if (catalog.Count > 0)
+                    Catalog = catalog;
+                CatalogRead?.Invoke();
+            }
+            finally { Interlocked.Exchange(ref _reading, 0); }
+        }) { IsBackground = true, Name = "Chippi app names" };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+    }
 
     /// <summary>The app that owns <paramref name="window"/>, looking through a UWP frame to the app inside; null when unreadable.</summary>
     public static (uint ProcessId, AppIdentity App)? Of(nint window)
@@ -35,14 +74,23 @@ internal static class AppNames
             if (content != 0)
                 Native.GetWindowThreadProcessId(content, out pid);
         }
-        return ImagePath(pid) is { } path ? (pid, new AppIdentity(path, Name(path))) : null;
+        if (ImagePath(pid) is not { } path)
+            return null;
+        // A window with a taskbar identity of its own (a Store app, a web app in a browser's window) is named by it.
+        string? id = ShellProperties.AppId(new Chippi.Core.Actions.ListedWindow(window, pid, "", "", path, false, 0));
+        return (pid, new AppIdentity(path, id is not null && _catalog.NameOf(null, id) is { } known ? known : Name(path)));
     }
+
+    /// <summary>The name for a window of <paramref name="path"/> with the taskbar identity <paramref name="appId"/>, for the dock's running apps.</summary>
+    public static string Name(string path, string? appId) => appId is not null && _catalog.NameOf(null, appId) is { } known ? known : Name(path);
 
     public static string Name(string path) => Names.GetOrAdd(path, static exe =>
     {
         // Windows 11 calls it File Explorer; the program still describes itself as "Windows Explorer".
         if (AppIdentity.Desktop.Is(exe))
-            return AppIdentity.Desktop.Name;
+            return "File Explorer";
+        if (_catalog.NameOf(exe, null) is { } listed)
+            return listed;
         try
         {
             var info = FileVersionInfo.GetVersionInfo(exe);

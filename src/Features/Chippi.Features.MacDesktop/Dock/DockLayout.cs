@@ -102,7 +102,8 @@ public static class DockApps
     /// name="appIdOf"/>; Store apps, web apps and apps that set one), else to a pin that runs its program, unless both have
     /// an ID and they differ (an Edge web app's windows aren't Edge's). Windows no pin claims are grouped by ID, else program.
     /// </summary>
-    public static IReadOnlyList<DockApp> Compose(IReadOnlyList<DockPin> pins, IReadOnlyList<ListedWindow> windows, Func<ListedWindow, string?>? appIdOf = null)
+    public static IReadOnlyList<DockApp> Compose(IReadOnlyList<DockPin> pins, IReadOnlyList<ListedWindow> windows, Func<ListedWindow, string?>? appIdOf = null,
+        Func<ListedWindow, string?, string?>? name = null)
     {
         var ids = windows.Select(w => appIdOf?.Invoke(w) is { Length: > 0 } id ? id : null).ToArray();
         var owner = new int[windows.Count];
@@ -146,7 +147,7 @@ public static class DockApps
             var front = own[0];
             // A Store app opens again through its ID; a desktop app through its program.
             string launch = id is not null && IsPackaged(front.Executable) ? @"shell:AppsFolder\" + id : front.Executable;
-            apps.Add(new DockApp(key, launch, front.Executable, front.App, false, own));
+            apps.Add(new DockApp(key, launch, front.Executable, name?.Invoke(front, id) ?? front.App, false, own));
         }
         return apps;
     }

@@ -99,12 +99,12 @@ internal sealed class MenuBarWindow : Window
         var quick = new StackPanel { Orientation = Orientation.Horizontal, Children = { _wired, _wifi, _volume, _battery } };
         _volume.Margin = new Thickness(6, 0, 6, 0);
         _quick = new BarItem(quick, "Network, volume, battery");
-        _quick.Pressed += () => _ = _bar.Shell.PressAsync("Win+A");
+        _quick.Pressed += () => _ = _bar.ToggleFlyoutAsync(this, _quick, "Win+A");
         _controls = new BarItem(Glyph(LucideIcons.Sliders), "Controls", tip: true);
         _controls.Pressed += () => _bar.Shell.OpenNotchHome();
         _clockText.FontFeatures(); // tabular figures
         _clock = new BarItem(_clockText, "Notifications");
-        _clock.Pressed += () => _ = _bar.Shell.PressAsync("Win+N");
+        _clock.Pressed += () => _ = _bar.ToggleFlyoutAsync(this, _clock, "Win+N");
         foreach (var item in new UIElement[] { _badges, _chevron, _language, _quick, _controls, _clock })
             _right.Children.Add(item);
         // Controls is the notch's own home, a click away; the language and the hidden icons have keys of their own (Win+Space,
@@ -403,9 +403,13 @@ internal sealed class MenuBarWindow : Window
 
     private void Toggle(BarItem item, Func<IReadOnlyList<BarMenuItem>> items)
     {
-        if (_open is { IsOpen: true } && _openItem == item)
+        // A press on the title whose menu is open closes it. The press itself has already closed the menu by the time it
+        // gets here (a click outside a menu does), and the menu is still fading out: so it's this title's menu, open or
+        // just closed, and the press must not open it again.
+        if (_openItem == item && _open is { } own)
         {
-            _open.IsOpen = false;
+            if (own.IsOpen)
+                own.IsOpen = false;
             return;
         }
         OpenMenu(item, items);

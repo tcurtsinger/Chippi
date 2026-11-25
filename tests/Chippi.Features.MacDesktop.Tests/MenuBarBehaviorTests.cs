@@ -203,8 +203,82 @@ public sealed class MenuBarTitleTests
     public void WifiArcsFollowTheSignal(int? bars, int lit) => Assert.Equal(lit, MenuBarWindow.WifiGlyph.Lit(bars));
 
     [Fact]
-    public void FileExplorerIsCalledWhatWindowsCallsIt() =>
+    public void TheDesktopIsNotFileExplorer()
+    {
+        // A folder window is File Explorer (the program still calls itself "Windows Explorer"); the bare desktop is the Desktop.
         Assert.Equal("File Explorer", AppNames.Name(AppIdentity.Desktop.Path));
+        Assert.Equal("Desktop", AppIdentity.Desktop.Name);
+    }
+
+    [Fact]
+    public void AFlyoutHangsUnderItsItemInsideTheDisplay()
+    {
+        var bar = new Rect(3440, 0, 1920, 28); // the second display's bar
+        // Quick Settings, 360 × 330, opened from the item at 4800: centered under it, 6 below the bar.
+        Assert.Equal((4620, 34), MenuBarController.FlyoutPlace(new Size(360, 330), 4800, bar, 1080));
+        // From the clock at the far right: kept 6 inside the display's edge, on that display.
+        Assert.Equal((5360 - 6 - 360, 34), MenuBarController.FlyoutPlace(new Size(360, 330), 5340, bar, 1080));
+        // Taller than the room under the bar (notifications over the calendar): as low as it must be, no lower.
+        Assert.Equal((5360 - 6 - 400, 1080 - 1060), MenuBarController.FlyoutPlace(new Size(400, 1060), 5340, bar, 1080));
+        // At 150%, the gap scales with the bar.
+        Assert.Equal(42 + 9, MenuBarController.FlyoutPlace(new Size(540, 495), 900, new Rect(0, 0, 2880, 42), 1620).Top);
+    }
+}
+
+/// <summary>An app is called what the Start menu calls it.</summary>
+public sealed class AppCatalogTests
+{
+    private static readonly AppCatalog Catalog = new(
+    [
+        new CatalogApp("Steam", "", @"C:\Program Files (x86)\Steam\steam.exe"),
+        new CatalogApp("Discord", "com.squirrel.Discord.Discord", @"C:\Users\me\AppData\Local\Discord\Update.exe", "--processStart Discord.exe"),
+        new CatalogApp("Git Bash", "", @"C:\Program Files\Git\git-bash.exe"),
+        new CatalogApp("Git GUI", "", @"C:\Program Files\Git\cmd\git-gui.exe"),
+        new CatalogApp("Python 3.12 (64-bit)", "", @"C:\Python312\python.exe"),
+        new CatalogApp("IDLE", "", @"C:\Python312\pythonw.exe", @"C:\Python312\Lib\idlelib\idle.pyw"),
+        new CatalogApp("Command Prompt", "", @"C:\Windows\System32\cmd.exe"),
+        new CatalogApp("YouTube", "Chrome._crx_agimnkijcaahngcdmfeangaknmldooml", @"C:\Program Files\Google\Chrome\Application\chrome_proxy.exe", "--app-id=agimnk"),
+        new CatalogApp("Google Chrome", "Chrome", @"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+        new CatalogApp("Calculator", "Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", ""),
+        new CatalogApp("Uninstall Steam", "", @"C:\Program Files (x86)\Steam\uninstall.exe"),
+        new CatalogApp("SDK folder", "", @"C:\Windows\explorer.exe", @"C:\SDK"),
+        new CatalogApp("Notes", "", @"C:\Tools\editor.exe", "--notes"),
+        new CatalogApp("Editor", "", @"C:\Tools\editor.exe"),
+    ], [@"C:\Windows", @"C:\Windows\System32", @"C:\Program Files", @"C:\Program Files (x86)", @"C:\Users\me\AppData\Local"]);
+
+    [Fact]
+    public void AHelperThatDrawsTheWindowIsNamedAfterItsApp()
+    {
+        // Steam's window belongs to a helper three folders down; a Squirrel app's to a versioned copy beside its updater.
+        Assert.Equal("Steam", Catalog.NameOf(@"C:\Program Files (x86)\Steam\bin\cef\cef.win7x64\steamwebhelper.exe", null));
+        Assert.Equal("Discord", Catalog.NameOf(@"C:\Users\me\AppData\Local\Discord\app-1.0.9172\Discord.exe", null));
+    }
+
+    [Fact]
+    public void ItsIdentityComesFirstThenItsProgram()
+    {
+        // A web app in the browser's own program is the web app, by the window's identity.
+        Assert.Equal("YouTube", Catalog.NameOf(@"C:\Program Files\Google\Chrome\Application\chrome.exe", "Chrome._crx_agimnkijcaahngcdmfeangaknmldooml"));
+        Assert.Equal("Google Chrome", Catalog.NameOf(@"C:\Program Files\Google\Chrome\Application\chrome.exe", null));
+        Assert.Equal("Calculator", Catalog.NameOf(null, "microsoft.windowscalculator_8wekyb3d8bbwe!app"));
+        // Two shortcuts to one program: the one without arguments.
+        Assert.Equal("Editor", Catalog.NameOf(@"C:\Tools\editor.exe", null));
+    }
+
+    [Fact]
+    public void NothingIsNamedAfterANeighbourItMightNotBe()
+    {
+        // Several apps in the folder above: it could be any of them.
+        Assert.Null(Catalog.NameOf(@"C:\Program Files\Git\mingw64\bin\gitk.exe", null));
+        // A folder everything shares: a neighbour there says nothing.
+        Assert.Null(Catalog.NameOf(@"C:\Windows\System32\mmc.exe", null));
+        Assert.Null(Catalog.NameOf(@"C:\Program Files\Unlisted\app.exe", null));
+        Assert.Null(Catalog.NameOf("app.exe", null));
+        // A shortcut that opens a folder through Explorer doesn't name Explorer.
+        Assert.Null(Catalog.NameOf(@"C:\Windows\explorer.exe", null));
+        Assert.Null(Catalog.NameOf(@"C:\Python312\pythonw.exe", null));
+        Assert.Null(AppCatalog.Empty.NameOf(@"C:\Tools\editor.exe", "Chrome"));
+    }
 }
 
 /// <summary>
@@ -409,6 +483,23 @@ public sealed class MenuBarOffscreenTests
                         .AppendLine("  " + string.Join(" | ", bar.Showing));
             }
             Save(bitmap, Path.Combine(output, scale == 1.0 ? "menu-bar.png" : "menu-bar-2x.png"));
+        }
+        // This PC's Start menu, read as the bar reads it: how many names, how long, and what the programs with a window
+        // open now would be called (their file names only).
+        var catalogTimer = System.Diagnostics.Stopwatch.StartNew();
+        var catalog = AppCatalog.Read();
+        report.AppendLine($"app names: {catalog.Count} keys in {catalogTimer.ElapsedMilliseconds} ms");
+        foreach (var process in System.Diagnostics.Process.GetProcesses())
+        {
+            try
+            {
+                if (process.MainWindowHandle == 0 || AppNames.ImagePath((uint)process.Id) is not { } path)
+                    continue;
+                string? id = ShellProperties.AppId(new Chippi.Core.Actions.ListedWindow(process.MainWindowHandle, (uint)process.Id, "", "", path, false, 0));
+                report.AppendLine($"  {Path.GetFileName(path),-36} {(id is not null ? catalog.NameOf(null, id) : null) ?? catalog.NameOf(path, null) ?? "(not listed)"}{(id is null ? "" : "  [by identity]")}");
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { }
+            finally { process.Dispose(); }
         }
         // This PC's default output, read as the bar reads it (never set): that the reading works here, and how long it takes.
         var timer = System.Diagnostics.Stopwatch.StartNew();
