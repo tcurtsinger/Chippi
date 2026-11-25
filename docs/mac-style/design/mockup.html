@@ -8,7 +8,7 @@ body{margin:0;font-size:14px}
 :root{
   --bg:#ECEBF0;--fg:#1A1A1A;--muted:#5D5D5D;--chip:#FFFFFF;--chipb:rgba(0,0,0,.10);--chipon:#7444F0;--chiponTx:#FFFFFF;
   --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(190,160,255,.75),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(150,200,255,.7),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(245,170,230,.55),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(150,215,245,.6),transparent 70%),linear-gradient(160deg,#F1EDFB,#E9F0FB);
-  --bar:rgba(30,30,34,.55);--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.10);
+  --bar:transparent;--bartx:#1A1A1A;--bartx2:#3A3A3A;--barhov:rgba(0,0,0,.08);--barshadow:0 0 6px rgba(255,255,255,.45);
   --menu:rgba(246,246,248,.94);--menub:rgba(0,0,0,.09);--menutx:#1A1A1A;--menutx3:#707070;--menusel:linear-gradient(135deg,#8F5CFF,#5B86FF);--menuselTx:#FFFFFF;--menushadow:0 12px 32px rgba(0,0,0,.18),0 1px 4px rgba(0,0,0,.08);
   --guide:linear-gradient(90deg,#8F5CFF,#5B86FF);
   --ntx:#1A1A1A;--ntx2:#4A4A4A;--ntx3:#707070;--tile:rgba(0,0,0,.035);--tileh:rgba(0,0,0,.075);--hair:rgba(0,0,0,.08);
@@ -20,7 +20,7 @@ body{margin:0;font-size:14px}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#141418;--fg:#F2F2F2;--muted:#ABABAB;--chip:#2B2B2F;--chipb:rgba(255,255,255,.09);--chipon:#B79CFF;--chiponTx:#170F2E;
   --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);
-  --bar:rgba(30,30,34,.55);--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.10);
+  --bar:transparent;--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.12);--barshadow:0 1px 3px rgba(0,0,0,.45);
   --menu:rgba(40,40,44,.94);--menub:rgba(255,255,255,.09);--menutx:#FFFFFF;--menutx3:#9A9A9A;--menusel:linear-gradient(135deg,#B78FFF,#82AEFF);--menuselTx:#170F2E;--menushadow:0 12px 32px rgba(0,0,0,.5),0 1px 4px rgba(0,0,0,.3);
   --guide:linear-gradient(90deg,#B78FFF,#82AEFF);
   --ntx:#FFFFFF;--ntx2:#C9C9C9;--ntx3:#9A9A9A;--tile:rgba(255,255,255,.07);--tileh:rgba(255,255,255,.12);--hair:rgba(255,255,255,.09);
@@ -31,7 +31,7 @@ body{margin:0;font-size:14px}
 :root[data-theme="dark"]{
   --bg:#141418;--fg:#F2F2F2;--muted:#ABABAB;--chip:#2B2B2F;--chipb:rgba(255,255,255,.09);--chipon:#B79CFF;--chiponTx:#170F2E;
   --wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);
-  --bar:rgba(30,30,34,.55);--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.10);
+  --bar:transparent;--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.12);--barshadow:0 1px 3px rgba(0,0,0,.45);
   --menu:rgba(40,40,44,.94);--menub:rgba(255,255,255,.09);--menutx:#FFFFFF;--menutx3:#9A9A9A;--menusel:linear-gradient(135deg,#B78FFF,#82AEFF);--menuselTx:#170F2E;--menushadow:0 12px 32px rgba(0,0,0,.5),0 1px 4px rgba(0,0,0,.3);
   --guide:linear-gradient(90deg,#B78FFF,#82AEFF);
   --ntx:#FFFFFF;--ntx2:#C9C9C9;--ntx3:#9A9A9A;--tile:rgba(255,255,255,.07);--tileh:rgba(255,255,255,.12);--hair:rgba(255,255,255,.09);
@@ -61,9 +61,13 @@ header.top p{margin:2px 0 0;color:var(--muted);font-size:13px;line-height:18px;m
 .fl{fill:currentColor;stroke:none;display:block;flex:none}
 
 /* menu bar */
-.bar{position:absolute;left:0;top:0;width:1600px;height:28px;background:var(--bar);backdrop-filter:blur(28px) saturate(1.7);-webkit-backdrop-filter:blur(28px) saturate(1.7);color:var(--bartx);font-size:13px;z-index:20}
+.stage.wall-light{--wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(190,160,255,.75),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(150,200,255,.7),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(245,170,230,.55),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(150,215,245,.6),transparent 70%),linear-gradient(160deg,#F1EDFB,#E9F0FB);--bartx:#1A1A1A;--bartx2:#3A3A3A;--barhov:rgba(0,0,0,.08);--barshadow:0 0 6px rgba(255,255,255,.45)}
+.stage.wall-dark{--wall:radial-gradient(ellipse 55% 50% at 18% 22%,rgba(110,70,210,.55),transparent 70%),radial-gradient(ellipse 50% 60% at 88% 18%,rgba(40,90,170,.55),transparent 70%),radial-gradient(ellipse 60% 50% at 70% 88%,rgba(150,50,140,.4),transparent 70%),radial-gradient(ellipse 50% 50% at 20% 92%,rgba(30,110,150,.45),transparent 70%),linear-gradient(160deg,#121222,#0C1220);--bartx:#FFFFFF;--bartx2:#D5D5D5;--barhov:rgba(255,255,255,.12);--barshadow:0 1px 3px rgba(0,0,0,.45)}
+/* Like macOS 26: no bar of its own. The wallpaper shows through untouched; the ink is dark or white by the wallpaper's brightness under the bar. */
+.bar{position:absolute;left:0;top:0;width:1600px;height:28px;background:var(--bar);text-shadow:var(--barshadow);color:var(--bartx);font-size:13px;z-index:20}
 .grp{position:absolute;top:0;height:28px;display:flex;align-items:center;gap:2px;white-space:nowrap}
 .grp.l{left:8px}.grp.r{right:8px}
+.bi svg{filter:drop-shadow(var(--barshadow,none))}
 .bi{height:22px;padding:0 8px;border-radius:5px;display:flex;align-items:center;gap:6px;cursor:default;color:var(--bartx)}
 .bi:hover,.bi.open{background:var(--barhov)}
 .bi.app{font-weight:700}
@@ -218,10 +222,11 @@ header.top p{margin:2px 0 0;color:var(--muted);font-size:13px;line-height:18px;m
   <header class="top">
     <div>
       <h1>Chippi Mac-style desktop</h1>
-      <p>Hover the notch to open it. Drag it: it becomes a pill while you carry it and lands as the notch wherever you drop it on the top bar, snapping to the middle when close. Pull it down to lift it off; a line on the bar shows where it lands. Click dock apps to switch; right-click for their menu. Notepad++ shows an app with real menus; the others show only their name and Window.</p>
+      <p>Hover the notch to open it. Drag it: it becomes a pill while you carry it and lands as the notch wherever you drop it on the top bar, snapping to the middle when close. Pull it down to lift it off; a line on the bar shows where it lands. Click dock apps to switch; right-click for their menu. Notepad++ shows an app with real menus; the others show only their name and Window. The bar has no fill of its own: its text turns dark or white by the wallpaper under it, not by the theme.</p>
     </div>
     <div class="ctrls">
       <div class="seg"><span>Theme</span><div class="opts" id="themeSeg"><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
+      <div class="seg"><span>Wallpaper</span><div class="opts" id="wallSeg"><button data-v="auto">Match theme</button><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
       <div class="seg"><span>Activity</span><div class="opts" id="actSeg"><button data-v="none">None</button><button data-v="agent">Agent</button><button data-v="song">Song</button><button data-v="awake">Keep awake</button></div></div>
       <div class="seg"><span>Opening</span><div class="opts" id="openSeg"><button data-v="hover">Hover</button><button data-v="click">Click</button></div></div>
       <button class="reset" id="resetBtn">Reset notch</button>
@@ -666,11 +671,12 @@ function seg(id, key, onSet) {
 function syncSegs() {
   const theme = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   const mark = (id, v) => $(id).querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
-  mark('themeSeg', theme); mark('actSeg', S.activity); mark('openSeg', S.openMode);
+  mark('themeSeg', theme); mark('actSeg', S.activity); mark('openSeg', S.openMode); mark('wallSeg', S.wall || 'auto');
 }
 seg('themeSeg', 'theme', (v) => { document.documentElement.setAttribute('data-theme', v); });
 seg('actSeg', 'activity', (v) => { S.activity = v; if (v === 'agent') S.agentSecs = 25; renderNotch(); if (S.open) renderContent(); layoutBar(); });
 seg('openSeg', 'open', (v) => { S.openMode = v; });
+seg('wallSeg', 'wall', (v) => { S.wall = v; stage.classList.remove('wall-light', 'wall-dark'); if (v !== 'auto') stage.classList.add('wall-' + v); });
 $('resetBtn').addEventListener('click', () => { S.pill = false; S.cx = null; S.open = false; store.set('chippi-notch', ''); renderNotch(); layoutBar(); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncSegs);
 
