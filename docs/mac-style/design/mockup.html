@@ -214,7 +214,7 @@ header.top p{margin:2px 0 0;color:var(--muted);font-size:13px;line-height:18px;m
   <header class="top">
     <div>
       <h1>Chippi Mac-style desktop</h1>
-      <p>Hover the notch to open it. Drag it along the top bar: away from the middle it becomes a pill, back near the middle it snaps into the notch. Pull it down to lift it off; a line on the bar shows where it lands. Click dock apps to switch; right-click for their menu. Notepad++ shows an app with real menus; the others show only their name and Window.</p>
+      <p>Hover the notch to open it. Drag it: it becomes a pill while you carry it and lands as the notch wherever you drop it on the top bar, snapping to the middle when close. Pull it down to lift it off; a line on the bar shows where it lands. Click dock apps to switch; right-click for their menu. Notepad++ shows an app with real menus; the others show only their name and Window.</p>
     </div>
     <div class="ctrls">
       <div class="seg"><span>Theme</span><div class="opts" id="themeSeg"><button data-v="light">Light</button><button data-v="dark">Dark</button></div></div>
@@ -265,7 +265,7 @@ function pet(size, mood = 'idle') {
 // ---------- state ----------
 const S = {
   theme: null, activity: 'agent', openMode: 'hover',
-  cx: null, pill: false, open: false, page: null, dragging: false,
+  cx: null, pill: false, carry: false, open: false, page: null, dragging: false,
   active: 'npp', running: new Set(['explorer', 'edge', 'npp', 'spotify']), minimized: false,
   micMuted: false, agentSecs: 25,
 };
@@ -363,7 +363,7 @@ function layoutBar() {
   keep = 99; leftPad = 8; rightPad = 8; renderBar();
   const rW = $('gr').offsetWidth;
   let limit; // the x the left group must end before
-  if (S.pill && pl > W - 8 - rW - 40) { rightPad = W - pl; limit = W - rightPad - rW - 12; }
+  if (S.pill && !S.open && pr > W - 8 - rW) { rightPad = W - pl; limit = W - rightPad - rW - 12; }
   else if (8 + 140 > pl) { leftPad = pr; limit = W - 8 - rW - 12; }
   else limit = pl;
   renderBar();
@@ -418,8 +418,8 @@ function geom() {
   const act = S.activity !== 'none';
   let w, h, top, rad;
   const cx = S.pill && S.cx != null ? S.cx : W / 2;
-  if (S.open) { w = 520; h = 360; top = S.pill ? 3 : 0; rad = S.pill ? '16px' : '0 0 18px 18px'; }
-  else if (S.pill) { w = pillW(); h = 22; top = 3; rad = '11px'; }
+  if (S.open) { w = 520; h = 360; top = 0; rad = '0 0 18px 18px'; }
+  else if (S.carry) { w = pillW(); h = 22; top = 3; rad = '11px'; }
   else { w = act ? 280 : 184; h = 28; top = 0; rad = '0 0 10px 10px'; }
   const m = S.open ? 8 : 0;
   const left = Math.max(m, Math.min(W - w - m, cx - w / 2));
@@ -428,16 +428,16 @@ function geom() {
 function renderNotch() {
   const g = geom();
   Object.assign(notch.style, { width: g.w + 'px', height: g.h + 'px', top: g.top + 'px', left: g.left + 'px', borderRadius: g.rad });
-  notch.style.borderTopWidth = (S.pill || S.open && S.pill) ? '1px' : '0';
+  notch.style.borderTopWidth = S.carry ? '1px' : '0';
   notch.classList.toggle('isopen', S.open);
   ears.style.height = g.h + 'px';
-  ears.style.padding = S.pill ? (S.activity === 'none' ? '0 10px' : '0 9px') : '0 11px';
-  ears.style.justifyContent = S.pill && S.activity === 'none' ? 'center' : 'space-between';
+  ears.style.padding = S.carry ? (S.activity === 'none' ? '0 10px' : '0 9px') : '0 11px';
+  ears.style.justifyContent = S.carry && S.activity === 'none' ? 'center' : 'space-between';
   ears.innerHTML = earsHtml();
   notch.setAttribute('aria-expanded', S.open ? 'true' : 'false');
 }
 function earsHtml() {
-  const p = S.pill;
+  const p = S.carry;
   let L = '', R = '';
   if (S.activity === 'none') { L = pet(p ? 16 : 19); }
   if (S.activity === 'agent') { L = `<span style="color:var(--agent)">${ic('sparkle', p ? 13 : 15, 'fl')}</span>`; R = `<span style="color:var(--agent)">${fmt(S.agentSecs)}</span>`; }
@@ -517,7 +517,7 @@ notch.addEventListener('pointermove', (e) => {
   if (!press) return;
   const x = stageX(e), y = stageY(e);
   if (!press.moved && Math.abs(x - press.x) < 4 && y < BAR + 4) return;
-  if (!press.moved) { press.moved = true; clearTimeout(hoverT); notch.classList.add('dragging', 'lift'); }
+  if (!press.moved) { press.moved = true; S.carry = true; clearTimeout(hoverT); notch.classList.add('dragging', 'lift'); }
   // Pulling down detaches it: a free pill follows the pointer, and a line on the top bar shows where it lands.
   if (!press.free && y > BAR + 12) { press.free = true; notch.classList.add('free'); }
   const half = pillW() / 2;
@@ -526,20 +526,18 @@ notch.addEventListener('pointermove', (e) => {
   S.cx = S.pill ? cx : null;
   renderNotch(); layoutBar();
   if (press.free) {
-    const g = geom();
+    S.carry = false; const g = geom(); S.carry = true;
     const pw = pillW(), ph = 22;
     Object.assign(notch.style, { width: pw + 'px', height: ph + 'px', borderRadius: '11px', left: (x - pw / 2) + 'px', top: Math.max(3, Math.min(H - 120, y - ph / 2)) + 'px' });
     notch.style.borderTopWidth = '1px';
     ears.style.height = ph + 'px'; ears.style.padding = '0 9px'; ears.style.justifyContent = S.activity === 'none' ? 'center' : 'space-between';
-    if (!S.pill) renderEarsPill();
     if (!guide) { guide = document.createElement('div'); guide.className = 'guide'; stage.appendChild(guide); }
     guide.style.left = g.left + 'px'; guide.style.width = g.w + 'px';
   }
 });
-function renderEarsPill() { const was = S.pill; S.pill = true; const html = earsHtml(); S.pill = was; ears.innerHTML = html; }
 function endPress(e) {
   if (!press) return;
-  const moved = press.moved; press = null;
+  const moved = press.moved; press = null; S.carry = false;
   notch.classList.remove('dragging', 'lift', 'free');
   guide && guide.remove(); guide = null;
   if (moved) {
