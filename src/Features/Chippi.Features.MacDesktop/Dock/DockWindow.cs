@@ -49,7 +49,7 @@ internal sealed class DockWindow : Window
     private DateTime _edgeSince = DateTime.MaxValue;
     private DateTime _slideUntil = DateTime.MinValue;
     private Popup? _confirm;
-    private readonly TextBlock _labelText = new() { FontSize = 12 };
+    private readonly TextBlock _labelText = new() { FontSize = 12, MaxWidth = 320, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly TranslateTransform _slide = new();
     private readonly DispatcherTimer _watch;
     private readonly List<DockTile> _tiles = [];
@@ -116,6 +116,19 @@ internal sealed class DockWindow : Window
         _root.MouseMove += (_, e) => Magnify(e.GetPosition(_row));
         _root.MouseLeave += (_, _) => { if (!_dragging) Magnify(null); _leftAt = DateTime.UtcNow; HideLabel(); };
         _root.MouseEnter += (_, _) => _leftAt = DateTime.MaxValue;
+        // Files dragged over the dock grow the icons under them too, as the pointer does.
+        _root.AllowDrop = true;
+        _root.PreviewDragOver += (_, e) => { _leftAt = DateTime.MaxValue; Magnify(e.GetPosition(_row)); };
+        _root.DragLeave += (_, e) =>
+        {
+            // Leave bubbles up from each icon as the drag crosses it; only leaving the shelf puts them at rest.
+            if (OverShelf(e.GetPosition(_row)))
+                return;
+            Magnify(null);
+            HideLabel();
+            _leftAt = DateTime.UtcNow;
+        };
+        _root.Drop += (_, _) => Magnify(null);
 
         _watch = new DispatcherTimer(TimeSpan.FromMilliseconds(100), DispatcherPriority.Background, (_, _) => Watch(), Dispatcher);
         SourceInitialized += (_, _) =>
@@ -175,7 +188,10 @@ internal sealed class DockWindow : Window
             statusShadow.Opacity = light ? 0.14 : 0.28;
         var dot = Frozen(light ? Color.FromRgb(0x3A, 0x3A, 0x3A) : Color.FromRgb(0xE6, 0xE6, 0xE6));
         foreach (var tile in _tiles)
+        {
             tile.Dot.Fill = dot;
+            tile.SetLine(_shelf.BorderBrush);
+        }
     }
 
     private static SolidColorBrush Frozen(Color color)
@@ -501,6 +517,20 @@ internal sealed class DockWindow : Window
         _undo = null;
     }
 
+    private bool? _binFull;
+
+    /// <summary>Redraws the Recycle Bin's icon when it fills or empties (read every 5 seconds and after the dock's own drops).</summary>
+    internal void CheckBin()
+    {
+        var full = DockController.RecycleBinFull();
+        if (full is null || full == _binFull)
+            return;
+        bool first = _binFull is null;
+        _binFull = full;
+        if (!first && _tiles.FirstOrDefault(t => t.IsBin) is { } bin)
+            bin.ReloadIcon(DockController.RecycleBin);
+    }
+
     // ----- Empty Recycle Bin: the question, Cancel and Empty -----
 
     internal void ConfirmEmptyRecycleBin()
@@ -555,6 +585,7 @@ internal sealed class DockWindow : Window
         _pressed = tile;
         _pressAt = e.GetPosition(_root);
         tile.CaptureMouse();
+        tile.SetPressed(true);
         ClosePreview();
     }
 
@@ -581,6 +612,11 @@ internal sealed class DockWindow : Window
         bool away = Away(at);
         tile.Lift(Horizontal ? new Vector(delta.X, Math.Min(0, delta.Y)) : new Vector(Edge == DockEdge.Left ? Math.Max(0, delta.X) : Math.Min(0, delta.X), delta.Y), away);
         OpenGap(tile, away ? null : Landing(tile, at));
+        // Far enough off to come off the dock: it says so over the icon.
+        if (away && tile.App is { Pinned: true })
+            ShowLabel(tile, "Remove");
+        else
+            HideLabel();
     }
 
     /// <summary>
@@ -641,6 +677,7 @@ internal sealed class DockWindow : Window
             return;
         _pressed = null;
         tile.ReleaseMouseCapture();
+        tile.SetPressed(false);
         if (!_dragging)
         {
             tile.Click();
@@ -752,6 +789,8 @@ internal sealed class DockWindow : Window
     {
         if (_hwnd == 0)
             return;
+        if (_tick % 50 == 0)
+            CheckBin();
         if (_tick % 10 == 0 && _backdrop is not null)
             _backdrop.Restack(_hwnd); // another topmost window may have come between them
         if (++_tick % 5 == 0)

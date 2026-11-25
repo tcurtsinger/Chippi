@@ -44,7 +44,7 @@ internal sealed class DockPreview : Window
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         foreach (var window in app.Windows.Take(6))
         {
-            var title = new TextBlock { Text = window.Title, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(4, 6, 4, 0), Height = TitleHeight - 6 };
+            var title = new TextBlock { Text = window.Title.Length > 0 ? window.Title : app.Name, ToolTip = window.Title.Length > 0 ? window.Title : null, FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(4, 6, 4, 0), Height = TitleHeight - 6 };
             title.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
             var slot = new Border
             {

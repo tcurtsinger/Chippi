@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Chippi.UI.Controls;
 using Chippi.UI.Themes;
@@ -58,6 +59,7 @@ internal sealed class DockTile : Grid
         MouseLeftButtonDown += (_, e) => { e.Handled = true; dock.Pressed(this, e); };
         MouseMove += (_, e) => dock.Moved(this, e);
         MouseLeftButtonUp += (_, e) => { e.Handled = true; dock.Released(this, e); };
+        LostMouseCapture += (_, _) => SetPressed(false);
         MouseRightButtonUp += (_, e) =>
         {
             e.Handled = true;
@@ -71,11 +73,12 @@ internal sealed class DockTile : Grid
         var tile = new DockTile(dock, "start", "Start", dock.Controller.OpenStart, dock.Controller.StartMenu);
         var face = new Border
         {
-            CornerRadius = new CornerRadius(11),
+            Width = DockLayout.Icon, Height = DockLayout.Icon,
+            CornerRadius = new CornerRadius(DockLayout.Icon * 0.225),
             Background = new LinearGradientBrush(Color.FromRgb(0x4C, 0xC2, 0xFF), Color.FromRgb(0x00, 0x5F, 0xB8), new Point(0, 0), new Point(1, 1)),
             Child = new LucideIcon { Data = LucideIcons.LayoutGrid, Size = 24, Brush = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
         };
-        tile._art.Children.Insert(0, face);
+        tile._art.Children.Insert(0, Scaled(face));
         return tile;
     }
 
@@ -85,7 +88,9 @@ internal sealed class DockTile : Grid
         tile.App = app;
         tile.AllowDrop = true;
         tile.DragOver += (_, e) => { e.Effects = DockWindow.Files(e) is not null && app.Path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? DragDropEffects.Copy : DragDropEffects.None; e.Handled = true; };
-        tile.Drop += (_, e) => { if (DockWindow.Files(e) is { } files && tile.App is { } now) { e.Handled = true; dock.Controller.OpenWith(now, files); } };
+        tile.Drop += (_, e) => { dock.HideLabel(); if (DockWindow.Files(e) is { } files && tile.App is { } now) { e.Handled = true; dock.Controller.OpenWith(now, files); } };
+        tile.DragEnter += (_, e) => { if (DockWindow.Files(e) is not null && app.Path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) dock.ShowLabel(tile, "Open with " + tile._name); };
+        tile.DragLeave += (_, _) => dock.HideLabel();
         tile.Load(app.Launch);
         tile.Update(app);
         return tile;
@@ -105,8 +110,11 @@ internal sealed class DockTile : Grid
             tile._clickMenu = true; // a click opens the stack of newest files, as the right click does
         tile.AllowDrop = true;
         tile.DragOver += (_, e) => { e.Effects = DockWindow.Files(e) is not null ? DragDropEffects.Move : DragDropEffects.None; e.Handled = true; };
+        tile.DragEnter += (_, e) => { if (DockWindow.Files(e) is not null) dock.ShowLabel(tile, bin ? "Delete" : "Move to Downloads"); };
+        tile.DragLeave += (_, _) => dock.HideLabel();
         tile.Drop += (_, e) =>
         {
+            dock.HideLabel();
             if (DockWindow.Files(e) is not { } files)
                 return;
             e.Handled = true;
@@ -114,6 +122,8 @@ internal sealed class DockTile : Grid
             else controller.MoveToDownloads(files);
         };
         tile.Load(path);
+        if (!bin)
+            tile.MouseEnter += (_, _) => DockController.PrefetchDownloadIcons();
         return tile;
     }
 
@@ -124,6 +134,13 @@ internal sealed class DockTile : Grid
 
     /// <summary>The icon itself, for placing the name and previews against its grown edge.</summary>
     public FrameworkElement Art => _art;
+
+    /// <summary>The divider's line, in the shelf's own edge color.</summary>
+    public void SetLine(Brush brush)
+    {
+        if (IsDivider && Children.Count > 0 && Children[0] is Border line)
+            line.Background = brush;
+    }
 
     public static DockTile Divider()
     {
@@ -154,12 +171,52 @@ internal sealed class DockTile : Grid
     private void ShowMonogram()
     {
         string letter = _name.Length > 0 ? _name[..1].ToUpperInvariant() : "?";
-        _art.Children.Insert(0, new Border
+        _art.Children.Insert(0, Scaled(new Border
         {
-            CornerRadius = new CornerRadius(11),
+            Width = DockLayout.Icon, Height = DockLayout.Icon,
+            CornerRadius = new CornerRadius(DockLayout.Icon * 0.225),
             Background = new SolidColorBrush(Color.FromRgb(0x6B, 0x6B, 0x76)),
             Child = new TextBlock { Text = letter, FontSize = 22, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+        }));
+    }
+
+    /// <summary>A 48-DIP drawn tile that grows with magnification as an app's icon does: its corners and glyph scale too.</summary>
+    private static Viewbox Scaled(Border face) => new() { Stretch = Stretch.Uniform, Child = face };
+
+    // ----- States -----
+
+    private DateTime _launchedAt = DateTime.MinValue;
+
+    /// <summary>Darker while pressed, as a pressed icon is.</summary>
+    public void SetPressed(bool pressed) => _art.Opacity = pressed ? 0.7 : 1;
+
+    /// <summary>
+    /// Clicked open and not running yet: its dot shows at half strength until its window appears, for up to 15 seconds,
+    /// so a slow start reads as starting.
+    /// </summary>
+    public void MarkLaunching()
+    {
+        if (App is { Running: true })
+            return;
+        _launchedAt = DateTime.UtcNow;
+        Dot.Opacity = 0.5;
+        Dot.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>The icon read again (the Recycle Bin's, as it fills and empties).</summary>
+    public async void ReloadIcon(string path)
+    {
+        var source = await Task.Run(() =>
+        {
+            BitmapSource? read = null;
+            var thread = new Thread(() => read = AppIcon.Read(path, 192));
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            thread.Join();
+            return read;
         });
+        if (source is not null)
+            _image.Source = source;
     }
 
     public void Update(DockApp app)
@@ -168,7 +225,11 @@ internal sealed class DockTile : Grid
         _name = app.Name;
         AutomationProperties.SetName(this, app.Name);
         AutomationProperties.SetItemStatus(this, app.Running ? "Running" : "");
-        Dot.Visibility = app.Running ? Visibility.Visible : Visibility.Hidden;
+        bool launching = !app.Running && DateTime.UtcNow - _launchedAt < TimeSpan.FromSeconds(15);
+        if (app.Running)
+            _launchedAt = DateTime.MinValue;
+        Dot.Opacity = app.Running ? 1 : 0.5;
+        Dot.Visibility = app.Running || launching ? Visibility.Visible : Visibility.Hidden;
     }
 
     /// <summary>The slot's size along and across the shelf for its edge; the icon sits against the edge, its dot under it.</summary>
@@ -177,7 +238,6 @@ internal sealed class DockTile : Grid
         if (IsDivider)
         {
             var line = (Border)Children[0];
-            line.SetResourceReference(Border.BackgroundProperty, "BorderStrongBrush");
             bool across = edge == MacDesktop.DockEdge.Bottom;
             line.Width = across ? 1 : double.NaN;
             line.Height = across ? double.NaN : 1;
@@ -281,7 +341,12 @@ internal sealed class DockTile : Grid
         if (_dock is null)
             return;
         if (App is { } app)
-            _dock.Controller.Click(_dock.Controller.Apps.FirstOrDefault(a => a.Key == app.Key) ?? app);
+        {
+            var now = _dock.Controller.Apps.FirstOrDefault(a => a.Key == app.Key) ?? app;
+            if (!now.Running)
+                MarkLaunching();
+            _dock.Controller.Click(now);
+        }
         else if (_clickMenu && _menu?.Invoke() is { Count: > 0 } items)
             _dock.OpenMenu(this, items);
         else

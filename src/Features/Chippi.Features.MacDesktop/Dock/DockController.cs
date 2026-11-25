@@ -10,6 +10,7 @@ using Chippi.Core.Input;
 using Chippi.Features.MacDesktop.MenuBar;
 using Chippi.Features.MacDesktop.Shell;
 using Chippi.UI.Actions;
+using Chippi.UI.Controls;
 using Chippi.UI.Displays;
 
 namespace Chippi.Features.MacDesktop.Dock;
@@ -214,16 +215,50 @@ internal sealed class DockController : IDisposable
         return items;
     }
 
+    /// <summary>
+    /// The stack of newest downloads, each with its file's icon (read ahead while the pointer is on the tile) and its age
+    /// ("Now", "5m", "3h", "2d").
+    /// </summary>
     public IReadOnlyList<BarMenuItem> DownloadsMenu()
     {
         var folder = Downloads;
-        var items = DockApps.Newest(folder, 12).Select(file => new BarMenuItem(file.Name) { Run = () => Open(file.FullName) }).ToList<BarMenuItem>();
+        var now = DateTime.UtcNow;
+        var items = DockApps.Newest(folder, 12).Select(file => new BarMenuItem(file.Name)
+        {
+            Run = () => Open(file.FullName),
+            Hint = DockApps.Age(now - file.LastWriteTimeUtc),
+            Icon = AppIcon.LoadAsync(file.FullName, 32) is { IsCompletedSuccessfully: true } icon ? icon.Result : null,
+        }).ToList<BarMenuItem>();
         if (items.Count == 0)
             items.Add(new BarMenuItem("Empty") { Enabled = false });
         items.Add(BarMenuItem.Separator);
         items.Add(new BarMenuItem("Open Downloads") { Run = () => Open(folder) });
         return items;
     }
+
+    /// <summary>Starts reading the newest downloads' icons, so the stack opens with them.</summary>
+    public static void PrefetchDownloadIcons()
+    {
+        foreach (var file in DockApps.Newest(Downloads, 12))
+            _ = AppIcon.LoadAsync(file.FullName, 32);
+    }
+
+    /// <summary>Whether the Recycle Bin holds anything; null when Windows can't say.</summary>
+    public static bool? RecycleBinFull()
+    {
+        var info = new RecycleBinInfo { Size = Marshal.SizeOf<RecycleBinInfo>() };
+        return SHQueryRecycleBin(null, ref info) == 0 ? info.Items > 0 : null;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RecycleBinInfo
+    {
+        public int Size;
+        public long Bytes;
+        public long Items;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, EntryPoint = "SHQueryRecycleBinW")] private static extern int SHQueryRecycleBin(string? root, ref RecycleBinInfo info);
 
     public IReadOnlyList<BarMenuItem> RecycleBinMenu() =>
     [
@@ -277,6 +312,7 @@ internal sealed class DockController : IDisposable
             Log.Warn($"Mac-style desktop: emptying the Recycle Bin failed (0x{result:X8})");
             _window?.ShowStatus("Empty failed");
         }
+        _window?.CheckBin();
     }
 
     // ----- Pins -----
@@ -355,6 +391,7 @@ internal sealed class DockController : IDisposable
             Log.Warn($"Mac-style desktop: recycling failed ({result})");
             _window?.ShowStatus("Delete failed");
         }
+        _window?.CheckBin();
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]

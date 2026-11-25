@@ -191,6 +191,16 @@ public static class DockApps
             .ThenBy(p => System.IO.Path.GetFileNameWithoutExtension(p), StringComparer.CurrentCultureIgnoreCase).ToArray();
     }
 
+    /// <summary>A file's age as the stack shows it: "Now" under a minute, then minutes, hours, days, weeks.</summary>
+    public static string Age(TimeSpan age) => age.TotalMinutes switch
+    {
+        < 1 => "Now",
+        < 60 => $"{(int)age.TotalMinutes}m",
+        < 60 * 24 => $"{(int)age.TotalHours}h",
+        < 60 * 24 * 7 => $"{(int)age.TotalDays}d",
+        _ => $"{(int)(age.TotalDays / 7)}w",
+    };
+
     /// <summary>The newest files in a folder, newest first; folders and hidden files left out.</summary>
     public static IReadOnlyList<FileInfo> Newest(string folder, int count)
     {
