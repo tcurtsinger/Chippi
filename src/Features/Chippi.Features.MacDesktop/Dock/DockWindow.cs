@@ -396,6 +396,14 @@ internal sealed class DockWindow : Window
         Seat();
     }
 
+    /// <summary>The red badges again, after the hidden taskbar's buttons changed.</summary>
+    public void RefreshBadges()
+    {
+        foreach (var tile in _tiles)
+            if (tile.App is { } app)
+                tile.SetBadge(_dock.BadgeOf(app));
+    }
+
     // ----- Magnification -----
 
     /// <summary>Sets each icon's size for the pointer (null: all at rest); the frames ease them there.</summary>

@@ -34,6 +34,8 @@ internal sealed class DockController : IDisposable
     private readonly HashSet<nint> _known = [];
     private readonly List<string> _order = [];
     private DockWindow? _window;
+    private TaskbarBadgeReader? _badges;
+    private IReadOnlyList<TaskbarButton> _buttons = [];
     private IInputRegistration? _keys;
     private bool _disposed;
 
@@ -100,6 +102,14 @@ internal sealed class DockController : IDisposable
         _window = new DockWindow(this);
         _window.Show();
         ReadWindows();
+        _badges = new TaskbarBadgeReader(buttons => _dispatcher.BeginInvoke(() =>
+        {
+            if (_disposed)
+                return;
+            _buttons = buttons;
+            _window?.RefreshBadges();
+        }));
+        _badges.Start();
         if (_shell.Context.Input is { } input)
         {
             var keys = new DockKeys(index => _dispatcher.BeginInvoke(() => OpenNumber(index)));
@@ -168,6 +178,24 @@ internal sealed class DockController : IDisposable
         else
             _appIdMisses[window.Handle] = misses + 1;
         return id;
+    }
+
+    /// <summary>
+    /// The red badge on a running app's icon, as its hidden taskbar button has it: null for none, "" for a dot, else the
+    /// count (<see cref="DockBadges.Read"/>).
+    /// </summary>
+    public string? BadgeOf(DockApp app) =>
+        DockBadges.Find(app, _buttons, w => _appIds.GetValueOrDefault(w.Handle), FolderOf) is { } button
+            ? DockBadges.Read(button.Help, app.Windows.Select(w => w.Title))
+            : null;
+
+    private readonly Dictionary<Guid, string?> _folders = [];
+
+    private string? FolderOf(Guid id)
+    {
+        if (!_folders.TryGetValue(id, out var path))
+            _folders[id] = path = KnownFolder(id);
+        return path;
     }
 
     private void Save(MacDesktopSettings settings)
@@ -524,6 +552,8 @@ internal sealed class DockController : IDisposable
             return;
         _disposed = true;
         _settle.Stop();
+        _badges?.Dispose();
+        _badges = null;
         _keys?.Dispose();
         _keys = null;
         foreach (var hook in _hooks)
