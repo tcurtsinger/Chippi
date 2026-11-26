@@ -81,6 +81,8 @@ internal sealed class DockController : IDisposable
 
     public void Start()
     {
+        AppNames.CatalogRead += OnCatalogRead;
+        AppNames.ReadCatalog();
         if (Settings.Pins is null)
         {
             // The first start brings the taskbar's pins over.
@@ -126,6 +128,12 @@ internal sealed class DockController : IDisposable
 
     public void RefreshDisplays() => _window?.Place();
 
+    /// <summary>A running app that isn't pinned is called what the Start menu calls it, as on the menu bar.</summary>
+    private static string? Named(ListedWindow window, string? appId) =>
+        window.Executable.Length > 0 ? AppNames.Name(window.Executable, appId) : null;
+
+    private void OnCatalogRead() => _dispatcher.BeginInvoke(ReadWindows);
+
     private void ReadWindows()
     {
         if (_disposed)
@@ -139,7 +147,7 @@ internal sealed class DockController : IDisposable
             _appIds.Remove(gone);
         foreach (var gone in _appIdMisses.Keys.Where(h => !_known.Contains(h)).ToArray())
             _appIdMisses.Remove(gone);
-        Apps = DockApps.Arrange(DockApps.Compose(pins, windows, AppId), _order);
+        Apps = DockApps.Arrange(DockApps.Compose(pins, windows, AppId, Named), _order);
         _window?.SetApps(Apps);
     }
 
@@ -209,7 +217,7 @@ internal sealed class DockController : IDisposable
     private DockApp? Everywhere(DockApp app)
     {
         var pins = (Settings.Pins ?? []).Select(DockPins.Read).ToArray();
-        return DockApps.Compose(pins, _list.Read(includeOtherDesktops: true), AppId).FirstOrDefault(a => a.Key == app.Key);
+        return DockApps.Compose(pins, _list.Read(includeOtherDesktops: true), AppId, Named).FirstOrDefault(a => a.Key == app.Key);
     }
 
     public void Launch(string target, string arguments = "")
@@ -511,6 +519,7 @@ internal sealed class DockController : IDisposable
 
     public void Dispose()
     {
+        AppNames.CatalogRead -= OnCatalogRead;
         if (_disposed)
             return;
         _disposed = true;

@@ -91,6 +91,11 @@ internal static partial class Native
     [DllImport("user32.dll")] internal static extern int GetSystemMetrics(int index);
     [DllImport("user32.dll")] internal static extern nint GetShellWindow();
     [DllImport("user32.dll")] internal static extern nint GetAncestor(nint window, uint flags);
+    [DllImport("dwmapi.dll")] private static extern int DwmGetWindowAttribute(nint window, int attribute, out int value, int size);
+
+    /// <summary>The window is there to be seen: visible, and not cloaked (Windows keeps its own flyouts cloaked while closed).</summary>
+    internal static bool IsShown(nint window) =>
+        window != 0 && IsWindow(window) && IsWindowVisible(window) && (DwmGetWindowAttribute(window, 14 /* DWMWA_CLOAKED */, out int cloaked, sizeof(int)) != 0 || cloaked == 0);
 
     // Menus
     [DllImport("user32.dll")] internal static extern nint GetMenu(nint window);
@@ -128,6 +133,9 @@ internal static partial class Native
     }
 
     [DllImport("kernel32.dll")][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetSystemPowerStatus(out PowerStatus status);
+
+    /// <summary>Since Windows started, in 100-nanosecond units; kernel time includes idle time.</summary>
+    [DllImport("kernel32.dll")][return: MarshalAs(UnmanagedType.Bool)] internal static extern bool GetSystemTimes(out ulong idle, out ulong kernel, out ulong user);
 
     // WinEvents
     internal delegate void WinEventProc(nint hook, uint eventType, nint window, int objectId, int childId, uint thread, uint time);

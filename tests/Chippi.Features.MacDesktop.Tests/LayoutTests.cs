@@ -97,16 +97,72 @@ public sealed class WallpaperInkTests
         Assert.Equal(WallpaperInk.Threshold, WallpaperInk.Average([]));
     }
 
+    private static readonly Rect Display = new(0, 0, 1920, 1080);
+
     [Fact]
-    public void FillCropsToTheMiddleAndTakesTheBarsShare()
+    public void FillCoversTheDisplayAndCropsTheRest()
     {
-        // A 4000 × 2000 picture filling a 1920 × 1080 display: 3555 × 2000 shown, centered; the bar is 28/1080 of it.
-        var strip = WallpaperInk.UnderBar(4000, 2000, 1920, 1080, 28, WallpaperFit.Fill);
-        Assert.Equal(222, strip.X);
-        Assert.Equal(0, strip.Y);
-        Assert.Equal(52, strip.Height);
-        var top = WallpaperInk.UnderBar(1920, 1080, 1920, 1080, 28, WallpaperFit.Center);
-        Assert.Equal(new Int32Rect(0, 0, 1920, 28), top);
+        // A 4000 × 2000 picture filling a 1920 × 1080 display: drawn 2160 × 1080, 120 off each side.
+        var drawn = WallpaperInk.Drawn(4000, 2000, Display, Display, WallpaperFit.Fill);
+        Assert.Equal(-120, drawn.X, 6);
+        Assert.Equal(0, drawn.Y, 6);
+        Assert.Equal(2160, drawn.Width, 6);
+        Assert.Equal(1080, drawn.Height, 6);
+    }
+
+    [Fact]
+    public void FitAndCenterLeaveTheBackgroundAroundThePicture()
+    {
+        // A wide picture fitted to the display leaves the background above it: the bar is over the colour, not the picture.
+        var fitted = WallpaperInk.Drawn(3440, 1440, Display, Display, WallpaperFit.Fit);
+        Assert.Equal(1920, fitted.Width, 3);
+        Assert.True(fitted.Top > 28);
+        Assert.Equal(new Rect(320, 180, 1280, 720), WallpaperInk.Drawn(1280, 720, Display, Display, WallpaperFit.Center));
+        Assert.Equal(new Rect(0, 0, 1920, 1080), WallpaperInk.Drawn(640, 480, Display, Display, WallpaperFit.Stretch));
+    }
+
+    [Fact]
+    public void SpanGivesEachDisplayItsOwnPartOfOnePicture()
+    {
+        // Two displays side by side, 3440 and 1920 wide, one 5360 × 1440 picture across both.
+        var desktop = new Rect(0, 0, 5360, 1440);
+        var second = new Rect(3440, 0, 1920, 1080);
+        Assert.Equal(new Rect(0, 0, 5360, 1440), WallpaperInk.Drawn(5360, 1440, new Rect(0, 0, 3440, 1440), desktop, WallpaperFit.Span));
+        Assert.Equal(new Rect(-3440, 0, 5360, 1440), WallpaperInk.Drawn(5360, 1440, second, desktop, WallpaperFit.Span));
+    }
+
+    [Fact]
+    public void TheStripReadsThePictureWhereItIsAndTheBackgroundElsewhere()
+    {
+        // A picture dark on its left half and white on its right, centered on a wider display over a mid-grey background.
+        static double Picture(double u, double v) => u < 0.5 ? 0 : 1;
+        var strip = WallpaperInk.Strip(8, 1600, 28, new Rect(400, 0, 800, 600), tile: false, 0.5, Picture);
+        Assert.Equal([0.5, 0.5, 0, 0, 1, 1, 0.5, 0.5], strip);
+        // Tiled, it repeats from where it starts.
+        var tiled = WallpaperInk.Strip(8, 1600, 28, new Rect(0, 0, 400, 300), tile: true, 0.5, Picture);
+        Assert.Equal([0, 1, 0, 1, 0, 1, 0, 1], tiled);
+        // Fitted below the bar, the bar is all background.
+        Assert.All(WallpaperInk.Strip(8, 1600, 28, new Rect(0, 100, 1600, 600), tile: false, 0.5, Picture), column => Assert.Equal(0.5, column));
+    }
+
+    [Fact]
+    public void EachGroupTakesItsInkFromWhatItSitsOver()
+    {
+        // Dark on the left 60%, light on the right 40%: white ink for the menus, dark ink for the clock.
+        var strip = new InkStrip([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.9, 0.9, 0.9, 0.9]);
+        Assert.Equal(BarInk.Light, strip.Ink(0, 0.3));
+        Assert.Equal(BarInk.Dark, strip.Ink(0.8, 1));
+        Assert.Equal(0.42, strip.Average(0, 1), 6);
+        Assert.Equal(BarInk.Light, InkStrip.Flat(0.2).Ink(0.4, 0.6));
+    }
+
+    [Fact]
+    public void AGroupKeepsItsInkNearTheThreshold()
+    {
+        var strip = InkStrip.Flat(0.52);
+        Assert.Equal(BarInk.Dark, strip.Ink(0, 1));
+        Assert.Equal(BarInk.Light, strip.Ink(0, 1, BarInk.Light)); // within the hold: no flip for a title more or less
+        Assert.Equal(BarInk.Dark, InkStrip.Flat(0.6).Ink(0, 1, BarInk.Light));
     }
 }
 

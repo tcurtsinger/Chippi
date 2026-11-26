@@ -38,9 +38,11 @@ public sealed record MacDesktopSettings
     /// <summary>Where the notch's center sits across its display's bar, 0 to 1; 0.5 is the middle.</summary>
     public double NotchPlace { get; init; } = 0.5;
 
-    public bool ShowCpu { get; init; }
-    public bool ShowMemory { get; init; }
-    public bool ShowNetwork { get; init; }
+    /// <summary>
+    /// The menu bar's items, left to right (<see cref="Chippi.Features.MacDesktop.MenuBar.BarItems"/> ids); the clock comes after them. Null until
+    /// the user changes them: the start set then.
+    /// </summary>
+    public IReadOnlyList<string>? BarItems { get; init; }
 
     /// <summary>
     /// The dock's pinned apps, in order (a program's path or a Start menu parsing name). Null until the first start, which
@@ -67,7 +69,7 @@ public sealed record MacDesktopSettings
         && DockHide == other.DockHide && DockPosition == other.DockPosition && Magnify == other.Magnify
         && MagnifiedSize == other.MagnifiedSize && NotchOpensOnHover == other.NotchOpensOnHover
         && NotchDisplay == other.NotchDisplay && NotchPlace.Equals(other.NotchPlace)
-        && ShowCpu == other.ShowCpu && ShowMemory == other.ShowMemory && ShowNetwork == other.ShowNetwork
+        && (BarItems ?? []).SequenceEqual(other.BarItems ?? []) && (BarItems is null) == (other.BarItems is null)
         && (Pins ?? []).SequenceEqual(other.Pins ?? []) && (Pins is null) == (other.Pins is null);
 
     public override int GetHashCode() => HashCode.Combine(Style, MenuBar, Dock, Notch, DockHide, DockPosition, NotchPlace, Pins?.Count);

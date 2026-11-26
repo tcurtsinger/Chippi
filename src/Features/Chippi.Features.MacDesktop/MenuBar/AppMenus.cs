@@ -6,8 +6,11 @@ using Chippi.Features.MacDesktop.Shell;
 
 namespace Chippi.Features.MacDesktop.MenuBar;
 
-/// <summary>One entry of an app's own menu, read from its classic Win32 menu bar.</summary>
-public sealed record AppMenuEntry(string Text, string? Shortcut, uint Id, bool Enabled, bool Checked, bool Separator, nint SubMenu);
+/// <summary>
+/// One entry of an app's own menu, read from its classic Win32 menu bar. <paramref name="Position"/> is its place in the
+/// app's menu, which the app is told when its submenu opens.
+/// </summary>
+public sealed record AppMenuEntry(string Text, string? Shortcut, uint Id, bool Enabled, bool Checked, bool Separator, nint SubMenu, int Position = 0);
 
 /// <summary>
 /// The app's real menus (docs/mac-style/brief.md, Menu bar): a classic menu bar read with <c>GetMenu</c> and run with
@@ -23,8 +26,14 @@ internal static class AppMenus
         nint menu = Native.GetMenu(window);
         if (menu == 0 || !Native.IsMenu(menu))
             return [];
-        return Read(menu).Where(e => !e.Separator && e.Text.Length > 0).ToArray();
+        return Read(menu).Where(e => !e.Separator).ToArray();
     }
+
+    /// <summary>The app has a Window menu of its own: the bar's Window items go into it, not beside it as a second "Window".</summary>
+    public static bool IsWindowTitle(string title) => string.Equals(title.Trim(), "Window", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The app's Help menu ("Help" or "?"), which stays last: the bar's Window goes before it.</summary>
+    public static bool IsHelpTitle(string title) => title.Trim() is "?" || string.Equals(title.Trim(), "Help", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The entries of a submenu, after telling the app it's about to open (<c>WM_INITMENUPOPUP</c>), so it can grey out and
@@ -66,7 +75,7 @@ internal static class AppMenus
                 continue;
             if ((info.Type & Native.MftSeparator) != 0)
             {
-                entries.Add(new AppMenuEntry("", null, 0, false, false, true, 0));
+                entries.Add(new AppMenuEntry("", null, 0, false, false, true, 0, i));
                 continue;
             }
             string text = "";
@@ -86,8 +95,11 @@ internal static class AppMenus
                 Native.GetMenuItemInfo(menu, (uint)i, true, ref info);
             }
             var (label, shortcut) = Label(text);
+            // An entry the app draws itself (a picture, a custom row) has no words to show: it's left out, not shown blank.
+            if (label.Length == 0)
+                continue;
             entries.Add(new AppMenuEntry(label, shortcut, info.Id, (info.State & Native.MfsDisabled) == 0,
-                (info.State & Native.MfsChecked) != 0, false, info.SubMenu));
+                (info.State & Native.MfsChecked) != 0, false, info.SubMenu, i));
         }
         // No separator first, last or twice.
         for (int i = entries.Count - 1; i >= 0; i--)

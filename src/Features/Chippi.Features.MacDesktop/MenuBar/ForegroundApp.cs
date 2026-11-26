@@ -19,6 +19,9 @@ internal sealed class ForegroundApp : IDisposable
     public uint ProcessId { get; private set; }
     public AppIdentity App { get; private set; } = AppIdentity.Desktop;
 
+    /// <summary>Nothing is in front but the desktop.</summary>
+    public bool IsDesktop => App == AppIdentity.Desktop;
+
     public event Action? Changed;
 
     public ForegroundApp()
@@ -33,6 +36,14 @@ internal sealed class ForegroundApp : IDisposable
     /// <summary>Reads the window in front again, as after a window closed or a menu ran.</summary>
     public void Refresh() => Read(Native.GetForegroundWindow());
 
+    /// <summary>Names the window the bar is showing again: a better name for its app has come in.</summary>
+    public void Reread()
+    {
+        if (Window != 0 && !IsDesktop && Native.IsWindow(Window))
+            Read(Window);
+        Refresh();
+    }
+
     private void Read(nint window)
     {
         if (window == 0)
@@ -41,8 +52,7 @@ internal sealed class ForegroundApp : IDisposable
         if (pid == _self)
             return;
         string cls = Native.ClassOf(window);
-        if (cls is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd" or "TopLevelWindowForOverflowXamlIsland" or "NotifyIconOverflowWindow"
-            or "Windows.UI.Core.CoreWindow" or "XamlExplorerHostIslandWindow")
+        if (PassesOver(cls))
             return; // Start, Search, Quick Settings and the taskbar's flyouts pass over the app in front
         if (cls is "Progman" or "WorkerW")
         {
@@ -52,6 +62,10 @@ internal sealed class ForegroundApp : IDisposable
         if (AppNames.Of(window) is { } found)
             Set(window, found.ProcessId, found.App);
     }
+
+    /// <summary>Windows' own surfaces that come and go over the app in front without replacing it.</summary>
+    public static bool PassesOver(string windowClass) => windowClass is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd"
+        or "TopLevelWindowForOverflowXamlIsland" or "NotifyIconOverflowWindow" or "Windows.UI.Core.CoreWindow" or "XamlExplorerHostIslandWindow";
 
     private void Set(nint window, uint pid, AppIdentity app)
     {

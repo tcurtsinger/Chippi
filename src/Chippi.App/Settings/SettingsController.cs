@@ -152,6 +152,18 @@ internal sealed class SettingsController
                                 _window.Width = width;
                                 _window.Height = height;
                             }
+                            if (page.Id == "module:mac-desktop" && Descendants<Chippi.Features.MacDesktop.MacDesktopRows>(_window).FirstOrDefault() is { } macRows)
+                            {
+                                // Its sections as they are with the mode on, the Menu bar's items among them, on a window tall
+                                // enough for all of them.
+                                double height = _window.Height;
+                                _window.WindowState = WindowState.Normal;
+                                _window.Height = 1300;
+                                macRows.ShowAsOnForShot();
+                                await Idle();
+                                Render(_window, System.IO.Path.Combine(directory, $"r6-mac-desktop-on-{name}-{accent}.png"));
+                                _window.Height = height;
+                            }
                             if (page.Id == "module:text-snippets")
                             {
                                 // The narrowest window, where the trigger and Expand columns are tightest (wave 3).

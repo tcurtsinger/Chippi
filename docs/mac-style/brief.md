@@ -20,20 +20,59 @@ An optional mode that gives Windows a top menu bar, a bottom dock and turns the 
 
 - Hidden on every display while the menu bar or dock is on: auto-hide turned on, then the taskbar windows (`Shell_TrayWnd`, `Shell_SecondaryTrayWnd`) made invisible and click-through. `ShowWindow(SW_HIDE)` doesn't last on Windows 11.
 - The user's own auto-hide setting is saved to a file before the first change and deleted only after it is restored, so a crash and restart never mistakes Chippi's auto-hide for the user's. Explorer restarting is detected (`TaskbarCreated`) and the takeover is repeated.
-- The Windows key, Win+A (Quick Settings), Win+N (notifications) and Win+Tab keep working.
+- The Windows key, Win+A (Quick Settings), Win+N (notifications) and Win+Tab keep working. Chippi never moves Windows' own flyouts: they open where Windows opens them.
 
 ## Menu bar
 
-- 28 DIPs, on top of every display, registered as an AppBar so maximized windows start below it. Hidden while a fullscreen app is in front on its display.
+- 28 DIPs, on top of every display, registered as an AppBar so maximized windows start below it.
+- **Fullscreen:** a display's bar hides when a fullscreen app comes to the front on it, and stays hidden while that app still covers the display, whichever display the keyboard is on: a film on one display isn't drawn over because of a click on the other. It comes back when the app stops covering the display or another app comes to the front there (`FullscreenHolds`).
 - **Surface** (Travis, 2026-11-25, matching macOS 26): no fill and no blur. The wallpaper shows through untouched, the same in both themes.
-- **Ink follows the wallpaper, not the theme:** white text and glyphs with a soft dark shadow over a dark wallpaper, `#1A1A1A` with a soft light halo over a light one. Chippi reads the current wallpaper of each display (`IDesktopWallpaper`), averages the luminance of the strip under the bar, and picks white below 0.5. It reads again when the wallpaper or a display changes; a slideshow is read on each change. A solid-color background uses that color. Dropdown menus follow the app theme.
+- **Ink follows the wallpaper, not the theme:** white text and glyphs with a soft dark shadow over a dark wallpaper, `#1A1A1A` with a soft light halo over a light one. Chippi reads the current wallpaper of each display (`IDesktopWallpaper`) as a strip of luminance under the bar, placed as Windows fits the picture (Fill, Fit, Stretch, Tile, Center, Span; the background color where the picture doesn't reach), and each group picks white below 0.5 from the part of the strip it sits over, so a picture dark on the left and light on the right gets white menus and a dark clock. A group keeps its ink within 0.04 of the threshold. It reads again when the wallpaper or a display changes; a slideshow is read on each change. A solid-color background uses that color. Dropdown menus follow the app theme. A window dragged under the bar isn't read.
 - **Left, from the left:**
   - **Chippi mark** (the pet's face at 16): About this PC, Chippi settings, Task Manager, then Lock, Sleep, Restart, Shut down, Sign out.
-  - **App name** of the foreground window, 13 / 600. Its menu: About, Show in Explorer, Hide, Quit (closes the app's windows), End task.
-  - **The app's real menus** when it has a classic Win32 menu, read from `GetMenu` and invoked with `WM_COMMAND`, or a UI Automation menu bar. Most modern apps (Edge, Chrome, Teams, Electron, Settings) have none, and then nothing is shown in their place.
-  - **Window:** Minimize, Maximize, Snap (left, right, the saved layouts), Move to (each display), Bring all to front, Close window. Runs through the shared action PC.
-- **Right, from the right:** date and time (`Wed Nov 25  10:02 AM`, opens Win+N); Controls (opens the notch's home); Wi-Fi, volume and battery (open Quick Settings); input language; the tray chevron (opens Windows' own hidden-icons flyout); Chippi's status badges (Mic muted, Keep awake, Agents). CPU, RAM and network readouts are optional, off by default.
-- Menus are the island's flyout style: 8 corners, 30-DIP rows, 13 text, shortcut hints right-aligned in tertiary.
+  - **App name** of the foreground window, 13 / 600, as the Start menu calls the app (`AppCatalog`: by the window's taskbar identity, then its program, then the one app installed in a folder above it, so Steam's helper is "Steam"); the program's own description only when the Start menu doesn't list it. Its menu: About, Show in Explorer, Hide, Quit (closes the app's windows), End task. With nothing in front but the desktop it reads **Desktop** (Travis, 2026-11-25), with New File Explorer window, Display settings and Personalize.
+  - **The app's real menus** when it has a classic Win32 menu, read from `GetMenu` and invoked with `WM_COMMAND`, or a UI Automation menu bar. Most modern apps (Edge, Chrome, Teams, Electron, Settings) have none, and then nothing is shown in their place. An app running as administrator takes no commands from Chippi, so its menus aren't shown and the rows that act on its window are greyed out. Entries the app draws itself have no words and are left out.
+  - **Window:** Minimize, Maximize, Snap (left, right, the saved layouts), Move to (each display, by its own name; two of the same monitor by their sizes), Bring all to front, Close window. Runs through the shared action PC. It sits before the app's Help; an app with a Window menu of its own gets these items at the top of that menu, not a second "Window".
+- **Right:** Chippi's own items, then the date and time (`Wed Nov 25  10:02 AM`). See Menu bar items below.
+- Menus are the island's flyout style: 8 corners, 30-DIP rows, 13 text, shortcut hints right-aligned in tertiary. One longer than its display scrolls.
+- **After the audit** (Travis, 2026-11-25, "Fix everything"):
+  - **Menus hold the keyboard** while they're open, as the dock's do (`MenuFocus`, one clear pixel, through `BarMenu`): Esc, the arrow keys and a click elsewhere work. A row that acts in the app in front (its own command, Minimize, Close window) gives that app the keyboard back before it runs, so a dialog it opens comes up with the keyboard. The app's title bar shows inactive while a bar menu is open.
+  - **The app in front is read again when a menu closes**, so the bar never names an app whose window the menu just minimized or closed.
+  - **Questions** are Chippi's own, under the title that asked: "Restart?", "Shut down?", "Sign out?", "End chrome.exe?" with Cancel and the verb (`BarQuestion`, shared with the dock's Empty Recycle Bin).
+  - **Edges:** an item takes a press over the bar's whole height, and the mark and the clock reach to the ends of the bar, so the corners and the top row of pixels work.
+  - **Narrow bars:** when both groups don't fit, the app's menus go into », then the right group's items go from the left, then the app's name is cut short. The clock never goes, and nothing is drawn over anything else.
+  - **A second press on an open title closes its menu.**
+  - Left as they are: an item's page opens in the notch where the notch is, and moving along the bar with the keyboard needs a shortcut of its own.
+
+### Menu bar items
+
+Travis, 2026-11-25, after trying Windows' flyouts moved under the bar ("instead of messing with the default windows behavior, we change the formula"): the right side is Chippi's own buttons, each doing one thing at once. Mockup: [design/menu-bar-items.html](design/menu-bar-items.html), approved the same day ("Build it").
+
+- **Chosen in Settings › Mac-style desktop › Menu bar:** a row per item, top to bottom as they sit left to right, each with a grip (drag, or Up and Down on it) and ⋯ (Move up, Move down, Remove); **Add item** lists the rest, Chippi's first, then Windows' own, and a pick goes next to the clock. The clock's row is last and locked. Only what this PC has is offered: an item whose feature isn't installed, Battery without a battery and Language with one input language are left out, saved or not, and come back with what they need.
+- **To start:** Search, Capture, Clipboard, Microphone, Sound, Battery, Language, Hidden icons, Controls.
+
+| Item | A press | Shows |
+|---|---|---|
+| Search | Opens Search with the keyboard in its field | |
+| Capture | Starts a region capture | |
+| Clipboard, Scratchpad, Shelf, Displays, Actions | Opens its page | |
+| Microphone | Mutes, unmutes | A red disc while muted |
+| Sound | Opens Chippi Settings › Output (App volume without Output; Windows' sound settings without either) | The speaker, crossed while muted or at 0; read once a second, never set |
+| Controls | Opens the notch's home | |
+| Record | Opens Screen recording; while recording, stops | A red dot and the time while recording |
+| Copy text, Pick color | Starts it | |
+| Keep awake | Turns it on, off | An accent disc while on |
+| System | Opens its page | The processors' load, read every 2 seconds only while the item is on the bar |
+| Agents | Opens its page | An orange disc while a session works |
+| Hidden icons | Opens Windows' own flyout, where Windows opens it; a second press closes it and the app in front gets the keyboard back | |
+| Network | Opens Windows Settings › Network & internet | Wi-Fi's signal, or the wired glyph |
+| Battery | Opens Windows Settings › Power & battery | The charge |
+| Language | Switches input language (Win+Space) | The language in use |
+| Clock | Opens Windows' notifications, where Windows opens them | Always last |
+
+- **A page opens in the notch,** and a second press on its item closes it. The press itself closes the panel first, as any press off the panel does, so the panel remembers what a press just closed (`PageToggle`).
+- **Names:** each item is named for what a press does now ("Mute microphone", "Stop recording", "Volume 45%"), in its tooltip and for screen readers.
+- **What went:** the Wi-Fi, volume and battery group that opened Quick Settings, and the badges that appeared by themselves (the notch's ears show those activities).
 
 ## Dock
 
@@ -42,7 +81,7 @@ An optional mode that gives Windows a top menu bar, a bottom dock and turns the 
 - **Contents:** Start (opens the Windows Start menu), the apps in one row, a divider, Downloads (a stack menu of the newest files) and Recycle Bin.
 - **Magnification** (on by default, size adjustable): icons near the pointer grow to 72 with a cosine falloff over 3 icons.
 - **Clicks:** an app not running opens; a running one comes to the front, un-minimized if it was; its window in front minimizes, as on the taskbar. An app whose windows are all on another desktop is gone to, not opened again. Several windows show the App switcher's live previews above the icon on hover.
-- **Right click:** Open, New window, Keep in Dock / Remove from Dock, Show in Explorer, Close windows, Quit. Empty Recycle Bin asks "Empty Recycle Bin?" with Cancel and Empty. A clear one-pixel window (`DockFocus`) takes the keyboard before a menu or the question opens and gives it back to the app in front when it closes, so Esc, the arrow keys and a click elsewhere work as in any menu. The menu opens 8 above the icon as it is, grown or not, and the icons stay as they are while it's open. Quit closes the windows the dock shows under the icon, on every desktop. A file dropped on the Recycle Bin that can't be recycled is never deleted for good without Windows asking.
+- **Right click:** Open, New window, Keep in Dock / Remove from Dock, Show in Explorer, Close windows, Quit. Empty Recycle Bin asks "Empty Recycle Bin?" with Cancel and Empty. A clear one-pixel window (`MenuFocus`, shared with the menu bar) takes the keyboard before a menu or the question opens and gives it back to the app in front when it closes, so Esc, the arrow keys and a click elsewhere work as in any menu. The menu opens 8 above the icon as it is, grown or not, and the icons stay as they are while it's open. Quit closes the windows the dock shows under the icon, on every desktop. A file dropped on the Recycle Bin that can't be recycled is never deleted for good without Windows asking.
 - **The row of apps** (Travis, 2026-11-25): pinned apps (brought over from the taskbar's pins on first use) and running apps that aren't pinned share one row. At a start it's the pins, then the running apps in the order they opened; an app keeps its place from then on, so bringing one forward doesn't move it. Any app can be dragged to any place in the row. A running app that's moved is kept from then on, as on a Mac; the others stay as they were, so a pin can sit to the right of a running app until the dock starts again.
 - **Drag:** an icon is picked up where the pointer holds it and lands in the place its middle is over; drag off to remove, drop files on an app to open them with it, on Downloads to move them there, on Recycle Bin to delete them.
 - **Keys:** Win+1 to Win+9 open the dock's apps in its order (the hidden taskbar would answer them in its own). Each tile is a UI Automation button with its name.

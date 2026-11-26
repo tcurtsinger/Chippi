@@ -424,6 +424,7 @@ public sealed class IslandHost : IDisposable
         if (_shell.MacDesktop is not { } mac)
             return;
         mac.OpenNotchHome = () => _window.ShowPages(keyboard: false);
+        mac.ClosePage = key => _window.ClosePressed(key);
         mac.NotchBounds = () => _notch?.BarBounds;
         mac.Changed += () => _dispatcher.BeginInvoke(ApplyNotch);
         ApplyNotch();
