@@ -516,6 +516,8 @@ internal sealed class MenuBarController : IDisposable
     /// notification area the keyboard and Space opens it (Enter's key-up would start the first icon's app). A second press
     /// closes it, and the app that was in front gets the keyboard back. Follows Muelle (MIT).
     /// </summary>
+    private bool _openingHiddenIcons;
+
     private async Task ToggleHiddenIconsAsync()
     {
         if (Overflow() is var open && open != 0)
@@ -524,30 +526,41 @@ internal sealed class MenuBarController : IDisposable
             await Shell.TapAsync(0x1B); // Esc
             return; // the first press's wait gives the keyboard back
         }
+        if (_openingHiddenIcons)
+            return; // a second press before the flyout shows: its keys would land on top of the first's
+        _openingHiddenIcons = true;
         nint before = _front.Window;
-        await Shell.PressAsync("Win+B");
-        var pressed = Stopwatch.StartNew();
-        while (!IsTaskbar(Native.GetForegroundWindow()))
-        {
-            if (pressed.ElapsedMilliseconds > 800)
-                return; // Space would press whatever else has the keyboard
-            await Task.Delay(10);
-        }
-        int wait = 250 - (int)pressed.ElapsedMilliseconds;
-        if (wait > 0)
-            await Task.Delay(wait);
-        await Shell.TapAsync(0x20); // Space
-        // Until it has shown and gone again.
-        var waited = Stopwatch.StartNew();
         bool seen = false;
-        while (!_disposed)
+        try
         {
-            if (Overflow() != 0)
-                seen = true;
-            else if (seen || waited.ElapsedMilliseconds > 1500)
-                break;
-            await Task.Delay(seen ? 100 : 20);
+            await Shell.PressAsync("Win+B");
+            var pressed = Stopwatch.StartNew();
+            while (!IsTaskbar(Native.GetForegroundWindow()))
+            {
+                if (pressed.ElapsedMilliseconds > 800)
+                    return; // Space would press whatever else has the keyboard
+                await Task.Delay(10);
+            }
+            int wait = 250 - (int)pressed.ElapsedMilliseconds;
+            if (wait > 0)
+                await Task.Delay(wait);
+            await Shell.TapAsync(0x20); // Space
+            // Until it has shown.
+            var waited = Stopwatch.StartNew();
+            while (!_disposed && !seen && waited.ElapsedMilliseconds <= 1500)
+            {
+                seen = Overflow() != 0;
+                if (!seen)
+                    await Task.Delay(20);
+            }
         }
+        finally
+        {
+            _openingHiddenIcons = false;
+        }
+        // And until it's gone again.
+        while (!_disposed && seen && Overflow() != 0)
+            await Task.Delay(100);
         // Closed with the keyboard still on the hidden taskbar (Esc, or a second press): the app that was in front gets it
         // back. Anything else that came forward meanwhile keeps it.
         if (!_disposed && IsTaskbar(Native.GetForegroundWindow()) && before != 0 && Native.IsWindow(before) && !Native.IsIconic(before))

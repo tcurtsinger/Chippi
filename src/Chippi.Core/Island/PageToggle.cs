@@ -21,6 +21,13 @@ public sealed class PageToggle
     public void ClosedByPress(string? page, long now) => (_page, _at, _closed) = (page, now, true);
 
     /// <summary>
+    /// A press found the panel already closed: whatever an earlier press closed isn't this press's doing. Without this, a
+    /// press on the desktop that closed a page, then one on its button soon after, would count as the second press and open
+    /// nothing.
+    /// </summary>
+    public void Forget() => _closed = false;
+
+    /// <summary>
     /// Whether a press on the button for <paramref name="key"/> (null for the home) found its page open: open on it now, or
     /// closed by this same press. The press is forgotten either way.
     /// </summary>

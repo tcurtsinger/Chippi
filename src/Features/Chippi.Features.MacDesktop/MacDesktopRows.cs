@@ -224,7 +224,7 @@ public sealed class MacDesktopRows : UserControl
         [
             new("Move up", () => Move(shown, id, index - 1), index > 0),
             new("Move down", () => Move(shown, id, index + 1), index + 1 < shown.Count),
-            new("Remove", () => SaveItems(BarItems.Removed(shown, id)), Divider: true),
+            new("Remove", () => SaveItems(shown, BarItems.Removed(shown, id)), Divider: true),
         ]);
         return Row(handle, id, name, more);
     }
@@ -256,14 +256,16 @@ public sealed class MacDesktopRows : UserControl
         var moved = BarItems.Moved(shown, id, to);
         if (ReferenceEquals(moved, shown))
             return;
-        SaveItems(moved);
+        SaveItems(shown, moved);
         // The grip keeps the keyboard, so Up and Down can be pressed again.
         int at = moved.ToList().IndexOf(id);
         if (_items.Children.OfType<Border>().ElementAtOrDefault(at)?.Child is DockPanel row)
             row.Children.OfType<DragHandle>().FirstOrDefault()?.Focus();
     }
 
-    private void SaveItems(IReadOnlyList<string> items) => Save(s => s with { BarItems = items });
+    /// <summary>Saves an edit of the rows. Items this PC can't show now have no row, and stay saved (<see cref="BarItems.Kept"/>).</summary>
+    private void SaveItems(IReadOnlyList<string> before, IReadOnlyList<string> after) =>
+        Save(s => s with { BarItems = BarItems.Kept(s.BarItems, before, after) });
 
     /// <summary>Add item: what isn't on the bar, Chippi's first, then Windows' own. A pick goes at the right end.</summary>
     private void AddMenu()
@@ -275,7 +277,7 @@ public sealed class MacDesktopRows : UserControl
         {
             if (BarItems.Find(id) is not { } item)
                 continue;
-            choices.Add(new Choice(item.Name, () => SaveItems(BarItems.Added(shown, id)), Glyph: MenuBar.Glyphs.Of(id), Divider: item.Windows && !windows && choices.Count > 0));
+            choices.Add(new Choice(item.Name, () => SaveItems(shown, BarItems.Added(shown, id)), Glyph: MenuBar.Glyphs.Of(id), Divider: item.Windows && !windows && choices.Count > 0));
             windows |= item.Windows;
         }
         if (choices.Count > 0)

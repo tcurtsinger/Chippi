@@ -39,6 +39,8 @@ public sealed class MenuBarItemKeysTests
     public void Each_item_needs_the_feature_that_runs_it()
     {
         Assert.Equal(Chippi.Features.CommandBar.CommandBarModule.Id, Feature(BarItems.Search));
+        Assert.Equal(Chippi.Features.Clipboard.ClipboardHistoryModule.Id, Feature(BarItems.Clipboard));
+        Assert.Equal(Chippi.Features.AgentUsage.AgentUsageModule.Id, Feature(BarItems.Agents));
         Assert.Equal(Chippi.Features.ScreenCapture.ScreenCaptureModule.Id, Feature(BarItems.Capture));
         Assert.Equal(Chippi.Features.Recording.RecordingModule.Id, Feature(BarItems.Record));
         Assert.Equal(Chippi.Features.Sound.Mute.MicMuteModule.Id, Feature(BarItems.Microphone));

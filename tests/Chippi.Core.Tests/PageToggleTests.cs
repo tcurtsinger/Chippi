@@ -45,4 +45,14 @@ public sealed class PageToggleTests
         toggle.ClosedByPress(null, now: 3000);
         Assert.True(toggle.WasOn(null, open: false, current: null, now: 3005));
     }
+
+    [Fact]
+    public void A_press_elsewhere_that_closed_the_page_is_not_the_buttons_second_press()
+    {
+        var toggle = new PageToggle();
+        // A press on the desktop closes Clipboard; the press on its button right after finds the panel closed.
+        toggle.ClosedByPress("clipboard", now: 1000);
+        toggle.Forget();
+        Assert.False(toggle.WasOn("clipboard", open: false, current: "clipboard", now: 1100));
+    }
 }

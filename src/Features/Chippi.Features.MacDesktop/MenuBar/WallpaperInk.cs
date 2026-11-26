@@ -216,7 +216,7 @@ public static class WallpaperInk
             string time = !string.IsNullOrEmpty(path) && File.Exists(path) ? File.GetLastWriteTimeUtc(path).Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture) : "";
             return $"{path}|{time}|{color}|{fit}|{desktop}";
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or COMException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or COMException or InvalidCastException or ArgumentException or NotSupportedException)
         {
             return "";
         }

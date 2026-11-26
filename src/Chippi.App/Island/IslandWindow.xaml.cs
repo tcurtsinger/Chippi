@@ -707,7 +707,12 @@ public partial class IslandWindow : Window
     /// </summary>
     internal void PressedAt(Point physical)
     {
-        if (_peeking || !_panel.IsOpen || _panel.Covers(physical) || (IsVisible && CoversWidget(physical)) || _notch?.Covers(physical) == true
+        if (!_panel.IsOpen)
+        {
+            _pageToggle.Forget();
+            return;
+        }
+        if (_peeking || _panel.Covers(physical) || (IsVisible && CoversWidget(physical)) || _notch?.Covers(physical) == true
             || Menu.IsOpen || Mouse.Captured is not null)
             return;
         _pageToggle.ClosedByPress(_panel.CurrentPage, Environment.TickCount64);

@@ -125,6 +125,33 @@ public static class BarItems
         shown.Contains(id) || Find(id) is null ? shown : [.. shown, id];
 
     public static IReadOnlyList<string> Removed(IReadOnlyList<string> shown, string id) => [.. shown.Where(other => other != id)];
+
+    /// <summary>
+    /// What to save after an edit turned the bar's <paramref name="before"/> into <paramref name="after"/>: the edit, with
+    /// the saved items that can't show on this PC now kept, each after the item it followed (the nearest one still on the
+    /// bar). They come back with what they need: a battery, a second input language, their feature.
+    /// </summary>
+    public static IReadOnlyList<string> Kept(IReadOnlyList<string>? saved, IReadOnlyList<string> before, IReadOnlyList<string> after)
+    {
+        var first = new List<string>();
+        var following = new Dictionary<string, List<string>>();
+        var held = first;
+        foreach (string id in (saved ?? Start).Distinct())
+        {
+            if (after.Contains(id))
+                held = following[id] = [];
+            else if (!before.Contains(id) && Find(id) is not null)
+                held.Add(id);
+        }
+        var kept = new List<string>(first);
+        foreach (string id in after.Distinct())
+        {
+            kept.Add(id);
+            if (following.TryGetValue(id, out var behind))
+                kept.AddRange(behind);
+        }
+        return kept;
+    }
 }
 
 /// <summary>What a press on an item does.</summary>

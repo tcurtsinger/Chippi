@@ -236,6 +236,27 @@ public sealed class BarItemsTests
     }
 
     [Fact]
+    public void AnEditKeepsTheItemsThisPcCantShowNow()
+    {
+        // The start set on a desktop: Battery and Language have no row, and an edit of the rows doesn't lose them.
+        var shown = BarItems.Shown(null, Desktop);
+        var edited = BarItems.Moved(shown, BarItems.Search, shown.Count - 1);
+        var moved = BarItems.Kept(null, shown, edited);
+        Assert.Equal([BarItems.Capture, BarItems.Clipboard, BarItems.Microphone, BarItems.Sound, BarItems.Battery, BarItems.Language, BarItems.HiddenIcons, BarItems.Controls, BarItems.Search], moved);
+        Assert.Equal(edited, BarItems.Shown(moved, Desktop));
+        Assert.Contains(BarItems.Battery, BarItems.Shown(moved, Laptop));
+        // The item they followed is removed: they follow the one before it. What was removed is gone.
+        var removed = BarItems.Kept(null, shown, BarItems.Removed(shown, BarItems.Sound));
+        Assert.Equal([BarItems.Search, BarItems.Capture, BarItems.Clipboard, BarItems.Microphone, BarItems.Battery, BarItems.Language, BarItems.HiddenIcons, BarItems.Controls], removed);
+        // Kept at the left end when nothing before them is on the bar, through an add, and through emptying the bar.
+        IReadOnlyList<string> saved = [BarItems.Battery, BarItems.Sound, "gone", BarItems.Language];
+        Assert.Equal([BarItems.Battery, BarItems.Sound, BarItems.Language, BarItems.Shelf], BarItems.Kept(saved, [BarItems.Sound], [BarItems.Sound, BarItems.Shelf]));
+        Assert.Equal([BarItems.Battery, BarItems.Language], BarItems.Kept(saved, [BarItems.Sound], []));
+        // Nothing hidden: the edit as it is.
+        Assert.Equal([BarItems.Shelf, BarItems.Sound], BarItems.Kept([BarItems.Sound, BarItems.Shelf], [BarItems.Sound, BarItems.Shelf], [BarItems.Shelf, BarItems.Sound]));
+    }
+
+    [Fact]
     public void AddItemOffersTheRestChippisFirst()
     {
         var shown = BarItems.Shown(null, Desktop);
