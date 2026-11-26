@@ -15,7 +15,7 @@ using Chippi.UI.Controls;
 namespace Chippi.Features.MacDesktop;
 
 /// <summary>
-/// Settings › Mac-style desktop: Desktop style, then the Menu bar, Dock and Notch switches and each surface's options. Terse
+/// Settings › Mac-style desktop: Desktop style, then the Menu bar, Dock and Island switches and each surface's options. Terse
 /// labels and values only (AGENTS.md, copy). The Menu bar section is the bar's items, top to bottom as they sit left to
 /// right: a grip to reorder (or Up and Down on it), ⋯ to move or remove, Add item for the rest, and the clock, always last.
 /// </summary>
@@ -23,16 +23,15 @@ public sealed class MacDesktopRows : UserControl
 {
     private readonly MacDesktopModule _module;
     private readonly ComboBox _style = SettingsLayout.Combo(["Windows", "Mac-style"]);
-    private readonly ToggleButton _menuBar = Switch("Menu bar"), _dock = Switch("Dock"), _notch = Switch("Notch");
+    private readonly ToggleButton _menuBar = Switch("Menu bar"), _dock = Switch("Dock"), _island = Switch("Island");
     private readonly ComboBox _hide = SettingsLayout.Combo(["Always shown", "Auto-hide", "When a window touches it"]);
     private readonly ComboBox _position = SettingsLayout.Combo(["Bottom", "Left", "Right"]);
     private readonly ToggleButton _magnify = Switch("Magnification");
     private readonly Slider _size = new() { Minimum = MacDesktopSettings.MinMagnified, Maximum = MacDesktopSettings.MaxMagnified, Width = SettingsLayout.ComboWidth, IsSnapToTickEnabled = true, TickFrequency = 4, VerticalAlignment = VerticalAlignment.Center };
-    private readonly ComboBox _opens = SettingsLayout.Combo(["Hover or click", "Click"]);
     private readonly TextBlock _error = new() { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 8, 0, 0) };
     private readonly Card _items = new();
     private readonly Button _add = new() { VerticalAlignment = VerticalAlignment.Center };
-    private readonly FrameworkElement _surfaces, _barRows, _dockRows, _notchRows;
+    private readonly FrameworkElement _surfaces, _barRows, _dockRows;
     private string _itemsKey = "";
     private bool _updating, _shownAsOn;
 
@@ -43,18 +42,13 @@ public sealed class MacDesktopRows : UserControl
         AutomationProperties.SetName(_hide, "Hide");
         AutomationProperties.SetName(_position, "Position");
         AutomationProperties.SetName(_size, "Magnified size");
-        AutomationProperties.SetName(_opens, "Opens on");
         _error.SetResourceReference(StyleProperty, "CaptionTextStyle");
         _error.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
-
-        var center = new Button { Content = "Center", VerticalAlignment = VerticalAlignment.Center };
-        center.SetResourceReference(StyleProperty, "SecondaryButtonStyle");
-        center.Click += (_, _) => Save(s => s with { NotchDisplay = null, NotchPlace = 0.5 });
 
         _surfaces = SettingsLayout.Card(
             SettingsLayout.Row("Menu bar", _menuBar),
             SettingsLayout.Row("Dock", _dock),
-            SettingsLayout.Row("Notch", _notch));
+            SettingsLayout.Row("Island", _island));
         _surfaces.Margin = new Thickness(0, 8, 0, 0);
         var plus = new LucideIcon { Data = LucideIcons.Plus, Size = 14, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         plus.SetResourceReference(LucideIcon.BrushProperty, "TextPrimaryBrush");
@@ -75,16 +69,6 @@ public sealed class MacDesktopRows : UserControl
                     SettingsLayout.Row("Magnified size", _size)),
             },
         };
-        _notchRows = new StackPanel
-        {
-            Children =
-            {
-                SettingsLayout.Section("Notch"),
-                SettingsLayout.Card(
-                    SettingsLayout.Row("Opens on", _opens),
-                    SettingsLayout.Row("Place", center)),
-            },
-        };
         Content = new StackPanel
         {
             Children =
@@ -94,19 +78,17 @@ public sealed class MacDesktopRows : UserControl
                 _surfaces,
                 _barRows,
                 _dockRows,
-                _notchRows,
             },
         };
 
         _style.SelectionChanged += (_, _) => Save(s => s with { Style = _style.SelectedIndex == 1 ? DesktopStyle.MacStyle : DesktopStyle.Windows });
         Hook(_menuBar, on => s => s with { MenuBar = on });
         Hook(_dock, on => s => s with { Dock = on });
-        Hook(_notch, on => s => s with { Notch = on });
+        Hook(_island, on => s => s with { Island = on });
         Hook(_magnify, on => s => s with { Magnify = on });
         _hide.SelectionChanged += (_, _) => Save(s => s with { DockHide = (DockHiding)Math.Max(0, _hide.SelectedIndex) });
         _position.SelectionChanged += (_, _) => Save(s => s with { DockPosition = (DockEdge)Math.Max(0, _position.SelectedIndex) });
         _size.ValueChanged += (_, _) => Save(s => s with { MagnifiedSize = (int)Math.Round(_size.Value) });
-        _opens.SelectionChanged += (_, _) => Save(s => s with { NotchOpensOnHover = _opens.SelectedIndex != 1 });
 
         Loaded += (_, _) => { module.Changed += Refresh; Refresh(); };
         Unloaded += (_, _) => module.Changed -= Refresh;
@@ -158,18 +140,17 @@ public sealed class MacDesktopRows : UserControl
             _style.SelectedIndex = s.IsMac ? 1 : 0;
             Set(_menuBar, s.MenuBar);
             Set(_dock, s.Dock);
-            Set(_notch, s.Notch);
+            Set(_island, s.Island);
+            _island.IsEnabled = s.MenuBar; // the island is in the menu bar
             Set(_magnify, s.Magnify);
             _hide.SelectedIndex = (int)s.DockHide;
             _position.SelectedIndex = (int)s.DockPosition;
             _size.Value = s.MagnifiedSize;
             _size.IsEnabled = s.Magnify;
-            _opens.SelectedIndex = s.NotchOpensOnHover ? 0 : 1;
             RefreshItems();
             Dim(_surfaces, s.IsMac);
             Dim(_barRows, s.IsMac && s.MenuBar);
             Dim(_dockRows, s.IsMac && s.Dock);
-            Dim(_notchRows, s.IsMac && s.Notch);
             if (_module.Error is { } error)
             {
                 _error.Text = error;

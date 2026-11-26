@@ -2,18 +2,18 @@
 
 Requested by Travis, 2026-11-25. Answers approved the same day: every recommended default, except that the notch can be dragged along the top bar (its color settled later as pure black in both themes). Mockup: [design/mockup.html](design/mockup.html) (dark and light, clickable). Mockup approved by Travis the same day ("Ok great. Let's do it"); the menu bar is final as no fill and no blur, its ink following the wallpaper.
 
-An optional mode that gives Windows a top menu bar, a bottom dock and turns the widget into a notch at the top of the screen. References: [Muelle](https://github.com/crafter-station/Muelle) (MIT) for the Windows shell parts, [vorssaint-utils](https://github.com/vorssaint/vorssaint-utils) for the notch's behavior. Neither's code or assets are copied; Muelle's approach is followed and credited in `THIRD-PARTY-NOTICES.md` if any code is ported.
+An optional mode that gives Windows a top menu bar, a bottom dock and turns the widget into an island in the middle of the menu bar (a notch at first; see Island). References: [Muelle](https://github.com/crafter-station/Muelle) (MIT) for the Windows shell parts, [vorssaint-utils](https://github.com/vorssaint/vorssaint-utils) for the notch's behavior. Neither's code or assets are copied; Muelle's approach is followed and credited in `THIRD-PARTY-NOTICES.md` if any code is ported.
 
 ## Boundaries
 
 - Chippi's own name, mark, icons (Lucide), pet and Segoe UI Variable. No Apple logo, no SF Pro (its license forbids use off Apple hardware), no Vorssaint name, icon or screens (its TRADEMARKS.md covers trade dress).
-- Every feature page is the one that exists today. The mode adds three surfaces around them: the menu bar, the dock and the notch. Nothing is rebuilt per surface.
+- Every feature page is the one that exists today. The mode adds three surfaces around them: the menu bar, the dock and the island. Nothing is rebuilt per surface.
 - DESIGN.md gets a "Mac-style desktop" section once the mockup is approved. Outside the mode, nothing changes.
 
 ## Turning it on
 
 - A feature, **Mac-style desktop**, in Add features (Windows group). Not in Essentials; in Power user and Everything.
-- Settings › Mac-style desktop: **Desktop style** Windows / Mac-style, then switches for **Menu bar**, **Dock** and **Notch**, all on by default.
+- Settings › Mac-style desktop: **Desktop style** Windows / Mac-style, then switches for **Menu bar**, **Dock** and **Island**, all on by default. The island needs the menu bar.
 - Turning it off, quitting, uninstalling the feature, a crash, or `Chippi.exe --restore` puts the taskbar and the work area back.
 
 ## The taskbar
@@ -42,7 +42,7 @@ An optional mode that gives Windows a top menu bar, a bottom dock and turns the 
   - **Edges:** an item takes a press over the bar's whole height, and the mark and the clock reach to the ends of the bar, so the corners and the top row of pixels work.
   - **Narrow bars:** when both groups don't fit, the app's menus go into », then the right group's items go from the left, then the app's name is cut short. The clock never goes, and nothing is drawn over anything else.
   - **A second press on an open title closes its menu.**
-  - Left as they are: an item's page opens in the notch where the notch is, and moving along the bar with the keyboard needs a shortcut of its own.
+  - Left as it is: moving along the bar with the keyboard needs a shortcut of its own. (An item's page opened in the notch then; it opens in the spot now.)
 
 ### Menu bar items
 
@@ -58,7 +58,7 @@ Travis, 2026-11-25, after trying Windows' flyouts moved under the bar ("instead 
 | Clipboard, Scratchpad, Shelf, Displays, Actions | Opens its page | |
 | Microphone | Mutes, unmutes | A red disc while muted |
 | Sound | Opens Chippi Settings › Output (App volume without Output; Windows' sound settings without either) | The speaker, crossed while muted or at 0; read once a second, never set |
-| Controls | Opens the notch's home | |
+| Controls | Opens the home | |
 | Record | Opens Screen recording; while recording, stops | A red dot and the time while recording |
 | Copy text, Pick color | Starts it | |
 | Keep awake | Turns it on, off | An accent disc while on |
@@ -70,9 +70,9 @@ Travis, 2026-11-25, after trying Windows' flyouts moved under the bar ("instead 
 | Language | Switches input language (Win+Space) | The language in use |
 | Clock | Opens Windows' notifications, where Windows opens them | Always last |
 
-- **A page opens in the notch,** and a second press on its item closes it. The press itself closes the panel first, as any press off the panel does, so the panel remembers what a press just closed (`PageToggle`).
+- **A page opens in the spot,** and a second press on its item closes it. A press on an item that opens a page leaves the panel as it is (`KeepsPanel`), so another page's item changes the page in place. A press that did close the panel first is still remembered (`PageToggle`).
 - **Names:** each item is named for what a press does now ("Mute microphone", "Stop recording", "Volume 45%"), in its tooltip and for screen readers.
-- **What went:** the Wi-Fi, volume and battery group that opened Quick Settings, and the badges that appeared by themselves (the notch's ears show those activities).
+- **What went:** the Wi-Fi, volume and battery group that opened Quick Settings, and the badges that appeared by themselves (the island shows those activities).
 
 ## Dock
 
@@ -89,18 +89,29 @@ Travis, 2026-11-25, after trying Windows' flyouts moved under the bar ("instead 
 - **After the audit** (Travis, 2026-11-25, "Fix everything"): every size of an icon is one drawing, its largest artwork trimmed of its clear margins and scaled once to the resting and the magnified size, so icons drawn small in their frame match the ones that fill it; icon pixels are premultiplied before WPF draws them (Windows hands them over straight, which made every edge jagged); the row is put together again only when an app comes, goes or moves; while the icons are magnified the strip they grow into takes the pointer; and a shelf with more apps than the display is wide shrinks to fit.
 - Later, not in this project: jump lists, the minimize animation, app groups, moving along the dock with the keyboard (it needs a shortcut of its own in Settings › Shortcuts).
 
-## Notch
+## Island
 
-The widget's form while the mode is on. Same activities, same panel, same pages.
+Travis, 2026-11-25, after the critique of the notch: the notch is gone ("the island for just the visual", "adapts the menu bar ink", then "color chippi … with the border option"). Mockup: [design/ink-island.html](design/ink-island.html), approved the same day ("Build it").
 
-- **Rest:** centered on the main display's menu bar, attached to the top edge: 28 tall, 184 wide, square top, 10 bottom corners. A tiny Chippi sits in the left ear when nothing is going on.
-- **Color** (Travis, 2026-11-25, final): pure black like a camera notch in both themes, at rest, carried and open, with no edge, shadow or blur. Its text and controls always use the dark island ink, whatever the app theme.
-- **Ears:** the highest activity, as on the bar today: the left ear shows its glyph, cover or provider mark, the right ear its value (the agent's elapsed time, the equalizer, the time left). The notch widens to 280 to make room and narrows back when it ends.
-- **Opening:** hover 300 ms or click. The notch grows down into the 520 × 360 panel, keeping its top edge; it closes 400 ms after the pointer leaves, or on Esc or a click outside. Click only is an option.
-- **Home:** the Tool gallery in 5 columns, each tile with its shortcut under its name when one is set. Pages open inside the notch with Back, as today.
-- **Dragging** (Travis, 2026-11-25): press and move 4 DIPs to pick it up. While carried it is the **pill**: 22 tall, fully round, hugging what it shows (Chippi alone, 38 wide, or the activity's glyph and value side by side). Dragged sideways it rides 3 below the top edge. Pulled 12 DIPs below the bar it detaches and follows the pointer anywhere, lifted (1.06 scale, −3° tilt, deeper shadow), with a 3px accent-fill line on the top edge of the display under the pointer showing the notch's width where it will land (the 2026-10-23 movable tab's landing line). On release it slides up and **lands as the notch** at that place, on any display's bar. Within 40 DIPs of the center it snaps to the center.
-- **Placement:** saved as a display and a fraction of the bar's width, like the puck's place today. The menu bar's items keep clear of it: the left group's app menus collapse into a » menu before they would touch it, and a notch on the right side moves the status items to its left. The items make room during the drag, before the drop.
-- **Opening away from the center:** the panel grows down from the notch, centered on it and kept 8 inside the work area.
+The widget's form while the mode is on with its menu bar. Same activities; its pages open in the spot.
+
+- **Place:** the middle of the main display's menu bar, part of the bar itself. 22 tall inside the 28 bar, fully round, with a 1px edge. It never grows taller: it widens to what it shows, 28 at rest. It doesn't move. With the widget hidden (the tray's Hide widget), it's hidden too.
+- **Ink:** its text, glyphs, equalizer and edge are the bar's ink (the edge at 34%), taken from the wallpaper under the bar's middle as each group takes its own. Chippi (18, in his color, with his moods), a song's cover, the amber disc and the red dot keep their own colors.
+- **What it shows,** the widget bar's choice of activity: Chippi alone at rest; a song as its cover, its title · artist and the equalizer (a pause mark while paused); an activity as its glyph and status ("1 hr left"); a recording as the red dot and its time; something waiting on you (an agent) as its glyph on a 16 amber disc; a 6-second line as its glyph and text. The line is cut at 240.
+- **Badges:** a muted mic (a red disc), Keep awake (its glyph in the ink) and an agent at work (an amber disc) ride beside it when the bar has no icon for that state and the island isn't showing that feature itself.
+- **A press** opens its activity's page in the spot, or the home at rest; a second press closes it. Right click: the tray menu (Open settings, Quit). Nothing opens on hover.
+- The left group's menus fold into » before they'd touch it, 10 clear.
+- Not yet: the equalizer following the real output level (it loops), and a file dragged onto the island opening Shelf.
+
+## The spot
+
+- Every Chippi page opens in one place: under the right end of a display's menu bar, 4 below it and 8 in from the right, 520 × 360 (the home as tall as its rows). It has the widget panel's look, in the app theme.
+- **Which display:** the one whose bar was pressed. A page asked for another way (a shortcut, a notice, the island) opens on the main display, or stays where the panel already is.
+- **Opening:** it unrolls down from its top edge and rolls back up. Esc or a press off it closes it.
+- **The lit icon:** the icon of the page showing is lit, as an open menu's title is; Controls for the home and for a page without an icon on that bar.
+- **A press on another page's icon changes the page in place;** on the lit icon it closes the panel, Controls too while it's lit for a page without an icon. Only the left button: any other press off the panel closes it.
+- The home's Chippi is on the right of the footer, by the bar's icons.
+- With the menu bar off, the widget is the puck again.
 
 ## Delivery
 
@@ -109,5 +120,6 @@ The widget's form while the mode is on. Same activities, same panel, same pages.
 3. Menu bar.
 4. Dock.
 5. Notch and pill.
+6. The island and the spot, in the notch's place.
 
 Each is one pull request with its screens, offscreen shots in dark and light and timings. Hiding the taskbar runs only in Windows Sandbox or an owner-approved away session, never on the owner's desktop while he's at it.

@@ -38,7 +38,10 @@ public sealed class IslandHost : IDisposable
     private bool _disposed;
     private bool _locked, _displayOff; // nobody can see the screen: Chippi and the bar rest (Motion.IsUnseen)
     private PeekController? _peek;
-    private NotchWindow? _notch;
+    private bool _docked; // the Mac-style desktop's island in the menu bar is the widget
+    private bool _widgetOn = true; // AppSettings.IslandEnabled
+    private string? _islandKey;
+    private Action? _islandClick;
     private IReadOnlyList<IslandTileGroup> _tiles = [];
     private IReadOnlyList<(string Label, Action Action)?> _menu = [];
 
@@ -116,7 +119,7 @@ public sealed class IslandHost : IDisposable
         menu.Add(("Quit", () => _shell.Commands.Quit()));
         _window.SetMenu(menu);
         _menu = menu;
-        StartNotch();
+        StartBarIsland();
 
         LoadSettings();
         Refresh();
@@ -404,7 +407,7 @@ public sealed class IslandHost : IDisposable
     {
         var activities = _shell.Island.Activities;
         _window.SetActivities(activities, MoodFor(activities));
-        _notch?.SetActivities(activities, _tiles, _media?.Current, MoodFor(activities));
+        PushIsland(activities);
     }
 
     /// <summary>The running features' island tiles, in grid order.</summary>
@@ -412,66 +415,69 @@ public sealed class IslandHost : IDisposable
     {
         _tiles = IslandTileContribution.Group(_shell.Registry.Features.Where(f => f.IsRunning).SelectMany(f => f.IslandTiles).Concat(_shell.Services.SharedIslandTiles()));
         _window.SetTiles(_tiles);
-        var activities = _shell.Island.Activities;
-        _notch?.SetActivities(activities, _tiles, _media?.Current, MoodFor(activities));
+        PushIsland(_shell.Island.Activities);
     }
 
-    // ----- The Mac-style desktop's notch (docs/mac-style/brief.md) -----
+    // ----- The Mac-style desktop's island (docs/mac-style/brief.md) -----
 
-    /// <summary>The notch takes the widget's place while the Mac-style desktop has one; the menu bar keeps clear of it.</summary>
-    private void StartNotch()
+    /// <summary>
+    /// The island in the menu bar takes the widget's place while the Mac-style desktop has one: it shows the widget bar's
+    /// activity, and every page opens in the one spot under the bar's right end.
+    /// </summary>
+    private void StartBarIsland()
     {
         if (_shell.MacDesktop is not { } mac)
             return;
-        mac.OpenNotchHome = () => _window.ShowPages(keyboard: false);
+        mac.OpenHome = _window.ShowHomeFromBar;
         mac.ClosePage = key => _window.ClosePressed(key);
-        mac.NotchBounds = () => _notch?.BarBounds;
-        mac.Changed += () => _dispatcher.BeginInvoke(ApplyNotch);
-        ApplyNotch();
+        mac.IslandPressed = () => _window.PressFromBar(_islandKey, _islandClick);
+        mac.IslandMenu = () => _menu;
+        _window.SpotShowing += (open, page, monitor) => _shell.MacDesktop?.SetPage(open, page, monitor);
+        mac.Changed += () => _dispatcher.BeginInvoke(ApplyBarIsland);
+        ApplyBarIsland();
     }
 
-    // The tray icon hides with "Hide tray icon" only while the widget, the puck or the notch, is showing.
-    private void UpdateShowing() => _shell.Commands.SetIslandShowing(_window.IsVisible || _notch?.IsVisible == true);
+    // The tray icon hides with "Hide tray icon" only while the widget, the puck or the island, is showing.
+    private void UpdateShowing() => _shell.Commands.SetIslandShowing(_window.IsVisible || (_docked && _widgetOn));
 
-    private void ApplyNotch()
+    private void ApplyBarIsland()
     {
         if (_disposed || _shell.MacDesktop is not { } mac)
             return;
-        if (mac.NotchActive && _notch is null)
+        bool docked = mac.IslandActive;
+        if (docked != _docked)
         {
-            _notch = new NotchWindow(_window, mac.SaveNotchPlace, mac.NotchMoved);
-            _notch.IsVisibleChanged += (_, _) => UpdateShowing();
-            _notch.SetPetColor(_shell.Config.GetSection<AppSettings>(AppSettings.SectionName).PetColor);
-            _notch.SetMenu(_menu);
-            _notch.SetPlace(mac.Settings.NotchDisplay, mac.Settings.NotchPlace, mac.Settings.NotchOpensOnHover);
-            Refresh();
-            _window.SetNotch(_notch);
-            mac.NotchMoved();
-            _logger.LogInformation("Island: the notch");
-        }
-        else if (!mac.NotchActive && _notch is not null)
-        {
-            var notch = _notch;
-            _notch = null;
-            _window.SetNotch(null);
-            notch.Close();
+            _docked = docked;
+            _window.SetSpot(docked ? mac.TakeSpot : null, docked ? mac.KeepsPanel : null);
             UpdateShowing();
-            mac.NotchMoved();
-            _logger.LogInformation("Island: the widget");
+            _logger.LogInformation(docked ? "Island: in the menu bar" : "Island: the widget");
         }
-        _notch?.SetPlace(mac.Settings.NotchDisplay, mac.Settings.NotchPlace, mac.Settings.NotchOpensOnHover);
+        PushIsland(_shell.Island.Activities);
+    }
+
+    /// <summary>Tells the menu bar what its island shows, and keeps what a press on it opens.</summary>
+    private void PushIsland(IReadOnlyList<IslandActivity> activities)
+    {
+        if (!_docked || _disposed || _shell.MacDesktop is not { } mac)
+            return;
+        var (face, key, click) = BarIslandFaces.For(activities, _tiles, _media?.Current, MoodFor(activities));
+        (_islandKey, _islandClick) = (key, click);
+        mac.SetIsland(face);
     }
 
     private void LoadSettings()
     {
         var settings = _shell.Config.GetSection<AppSettings>(AppSettings.SectionName);
         _window.SetPetColor(settings.PetColor);
-        _notch?.SetPetColor(settings.PetColor);
+        PushIsland(_shell.Island.Activities); // Chippi's color
         _window.SetPlacement(settings.IslandX, settings.IslandY);
         _window.SetLastPage(settings.IslandLastPage, settings.IslandAudioShowsMixer, settings.IslandAudioPage);
         _window.SetLayout(IslandLayout.From(settings));
         _window.SetNowPlayingAlwaysShow(settings.NowPlayingAlwaysShow);
         _window.SetEnabled(settings.IslandEnabled);
+        _widgetOn = settings.IslandEnabled;
+        _shell.MacDesktop?.SetWidgetOn(_widgetOn); // hidden, the island in the menu bar hides as the puck does
+        UpdateShowing();
         _tracker.SetPlacement(settings.IslandDisplay, settings.IslandMonitorId);
     }
 
@@ -599,7 +605,6 @@ public sealed class IslandHost : IDisposable
         Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
         _media?.Dispose();
         _tracker.Dispose();
-        _notch?.Close();
         _window.Close();
     }
 }

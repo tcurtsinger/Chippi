@@ -15,7 +15,7 @@ namespace Chippi.Features.MacDesktop;
 
 /// <summary>
 /// Mac-style desktop (docs/mac-style/brief.md): a menu bar across the top of every display, a dock on the main one and the
-/// widget as a notch, with the Windows taskbar hidden meanwhile. Every page is the island's own; this adds the three
+/// widget as an island in the menu bar, with the Windows taskbar hidden meanwhile. Every page is the island's own; this adds the three
 /// surfaces around them. Off (Desktop style: Windows), quitting, uninstalling or a crash gives the taskbar back.
 /// </summary>
 public sealed class MacDesktopModule : IFeatureModule
@@ -49,7 +49,7 @@ public sealed class MacDesktopModule : IFeatureModule
         _taskbars = taskbars ?? (() => new WindowsTaskbars());
     }
 
-    public FeatureDescriptor Descriptor { get; } = new(Id, "Mac-style desktop", "A menu bar, a dock and a notch", FeatureGroup.Windows)
+    public FeatureDescriptor Descriptor { get; } = new(Id, "Mac-style desktop", "A menu bar, a dock and an island", FeatureGroup.Windows)
     {
         Icon = nameof(LucideIcons.PanelBottom),
         Presets = PresetMembership.PowerUser,
@@ -62,29 +62,39 @@ public sealed class MacDesktopModule : IFeatureModule
     /// <summary>Why the taskbar couldn't be hidden, for the Settings page; null when it's fine.</summary>
     public string? Error { get; private set; }
 
-    /// <summary>The widget is the notch: the mode is on with its Notch switch.</summary>
-    public bool NotchActive => IsRunning && Settings.IsMac && Settings.Notch;
+    /// <summary>The island in the menu bar takes the widget's place: the mode is on with its menu bar and its Island switch.</summary>
+    public bool IslandActive => IsRunning && Settings.ShowsIsland;
 
     /// <summary>Raised on the UI thread when the settings or the surfaces change.</summary>
     public event Action? Changed;
 
-    /// <summary>Opens the notch's home: set by the shell, which owns the notch.</summary>
-    public Action OpenNotchHome
+    /// <summary>Opens the home in the spot: set by the shell, which owns the panel.</summary>
+    public Action OpenHome
     {
         set
         {
-            (_pending ??= new()).OpenNotchHome = value;
-            if (_shell is not null) _shell.OpenNotchHome = value;
+            (_pending ??= new()).OpenHome = value;
+            if (_shell is not null) _shell.OpenHome = value;
         }
     }
 
-    /// <summary>The notch's monitor and edges in physical pixels, for the menu bar to keep clear of; set by the shell.</summary>
-    public Func<(nint Monitor, double Left, double Right)?> NotchBounds
+    /// <summary>A press on the island: its activity's page in the spot, or the home; set by the shell.</summary>
+    public Action IslandPressed
     {
         set
         {
-            (_pending ??= new()).Notch = value;
-            if (_shell is not null) _shell.Notch = value;
+            (_pending ??= new()).IslandPressed = value;
+            if (_shell is not null) _shell.IslandPressed = value;
+        }
+    }
+
+    /// <summary>The island's right-click menu (the tray icon's); set by the shell.</summary>
+    public Func<IReadOnlyList<(string Label, Action Action)?>> IslandMenu
+    {
+        set
+        {
+            (_pending ??= new()).IslandMenu = value;
+            if (_shell is not null) _shell.IslandMenu = value;
         }
     }
 
@@ -115,27 +125,50 @@ public sealed class MacDesktopModule : IFeatureModule
 
     private sealed class PendingShell
     {
-        public Action? OpenNotchHome;
+        public Action? OpenHome, IslandPressed;
         public Func<string?, bool>? ClosePage;
-        public Func<(nint Monitor, double Left, double Right)?>? Notch;
+        public Func<IReadOnlyList<(string Label, Action Action)?>>? IslandMenu;
     }
 
     private PendingShell? _pending;
+    private BarIslandFace? _face;
+    private (bool Open, string? Page, nint Monitor) _page;
 
-    /// <summary>The notch moved (or is being dragged): the menu bars make room for it at once.</summary>
-    public void NotchMoved() => _menuBar?.NotchMoved();
-
-    /// <summary>The notch's display (null for the main one) and its place across the bar, 0 to 1, as the shell saves it.</summary>
-    public void SaveNotchPlace(string? display, double place)
+    /// <summary>What the island shows now: the shell tells it as the activities change.</summary>
+    public void SetIsland(BarIslandFace face)
     {
-        if (_context is null)
+        _face = face;
+        _menuBar?.SetIsland(face);
+    }
+
+    /// <summary>
+    /// The page showing in the spot on <paramref name="monitor"/>'s display (null for the home), or none: that bar lights
+    /// the page's icon, or Controls.
+    /// </summary>
+    public void SetPage(bool open, string? page, nint monitor)
+    {
+        _page = (open, page, monitor);
+        _menuBar?.SetPage(open, page, monitor);
+    }
+
+    /// <summary>
+    /// Whether a press at <paramref name="physical"/> is on the island or on a bar icon that opens a page: the panel stays
+    /// as it is under it, and the press changes its page or closes it.
+    /// </summary>
+    public bool KeepsPanel(System.Windows.Point physical) => _menuBar?.KeepsPanel(physical) == true;
+
+    /// <summary>The display whose bar was just pressed for a page, once: 0 when the page was asked for another way.</summary>
+    public nint TakeSpot() => _shell?.Pressed.Take(Environment.TickCount64) ?? 0;
+
+    private bool _widgetOn = true;
+
+    /// <summary>The widget is on or hidden (the tray's Hide widget): hidden, the island is too, as the puck would be.</summary>
+    public void SetWidgetOn(bool on)
+    {
+        if (on == _widgetOn)
             return;
-        var next = Settings with { NotchDisplay = display, NotchPlace = Math.Clamp(place, 0, 1) };
-        if (next == Settings)
-            return;
-        Settings = next;
-        try { _context.Settings.Save(Settings); }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException) { _context.Logger.LogWarning(ex, "Saving the notch's place failed"); }
+        _widgetOn = on;
+        _menuBar?.SettingsChanged();
     }
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
@@ -149,10 +182,12 @@ public sealed class MacDesktopModule : IFeatureModule
         _shell = new MacShell(context, _activities);
         if (_pending is { } pending)
         {
-            if (pending.OpenNotchHome is { } home) _shell.OpenNotchHome = home;
-            if (pending.Notch is { } notch) _shell.Notch = notch;
+            if (pending.OpenHome is { } home) _shell.OpenHome = home;
+            if (pending.IslandPressed is { } pressed) _shell.IslandPressed = pressed;
+            if (pending.IslandMenu is { } menu) _shell.IslandMenu = menu;
             if (pending.ClosePage is { } close) _shell.ClosePage = close;
         }
+        _shell.IslandOn = () => Settings.ShowsIsland && _widgetOn;
         _shell.BarItems = () => Settings.BarItems;
         // A dev profile or a test never touches the real taskbar, not even to give it back.
         _takeover = _canTakeTaskbar() ? new TaskbarTakeover(_taskbars(), new TaskbarJournal(TaskbarJournal.DefaultPath)) : null;
@@ -171,7 +206,7 @@ public sealed class MacDesktopModule : IFeatureModule
         [
             new ChippiCommand("mac-desktop/toggle", Settings.IsMac ? "Windows desktop" : "Mac-style desktop", nameof(LucideIcons.PanelBottom),
                 () => ApplyAsync(Settings with { Style = Settings.IsMac ? DesktopStyle.Windows : DesktopStyle.MacStyle }))
-            { Words = "mac dock menu bar notch taskbar desktop style" },
+            { Words = "mac dock menu bar island taskbar desktop style" },
         ]);
         Apply();
         return Task.CompletedTask;
@@ -216,6 +251,9 @@ public sealed class MacDesktopModule : IFeatureModule
             {
                 _menuBar = new MenuBarController(_shell);
                 _menuBar.Start();
+                if (_face is { } face)
+                    _menuBar.SetIsland(face);
+                _menuBar.SetPage(_page.Open, _page.Page, _page.Monitor);
             }
             else
                 _menuBar.SettingsChanged();
@@ -243,8 +281,8 @@ public sealed class MacDesktopModule : IFeatureModule
         }
         if (_menuBar is null && _dock is null)
             MenuFocus.CloseShared(); // the window their menus hold the keyboard with
-        _context.Logger.LogInformation("Mac-style desktop: {Style}, menu bar {MenuBar}, dock {Dock}, notch {Notch}", Settings.Style,
-            _menuBar is not null, _dock is not null, NotchActive);
+        _context.Logger.LogInformation("Mac-style desktop: {Style}, menu bar {MenuBar}, dock {Dock}, island {Island}", Settings.Style,
+            _menuBar is not null, _dock is not null, IslandActive);
         Changed?.Invoke();
     }
 

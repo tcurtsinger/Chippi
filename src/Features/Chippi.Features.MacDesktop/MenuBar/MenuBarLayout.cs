@@ -15,24 +15,24 @@ public readonly record struct BarArrangement(double LeftStart, int MenusShown, d
 }
 
 /// <summary>
-/// The menu bar's items keep clear of the notch and of each other (docs/mac-style/brief.md, Placement): the app's menus
-/// collapse into » before they'd touch the notch; a notch over the right group moves that group to its left; a notch at
-/// the far left starts the left group after it. On a bar too narrow for all of it, the right group's lesser items go one
-/// at a time, then the app's name is cut short; nothing is drawn over anything else. Pure, so it's tested without
-/// windows. DIPs throughout.
+/// The menu bar's items keep clear of the island and of each other (docs/mac-style/brief.md, Island): the app's menus
+/// collapse into » before they'd touch the island in the bar's middle. On a bar too narrow for all of it, the right
+/// group's lesser items go one at a time, then the app's name is cut short; nothing is drawn over anything else. The
+/// arithmetic holds for a gap anywhere on the bar: over the right group it moves that group to its left, at the far
+/// left it starts the left group after it. Pure, so it's tested without windows. DIPs throughout.
 /// </summary>
 public static class MenuBarLayout
 {
     /// <summary>The bar's padding at each end.</summary>
     public const double Pad = 8;
 
-    /// <summary>The room kept on each side of the notch.</summary>
-    public const double NotchClearance = 10;
+    /// <summary>The room kept on each side of the island.</summary>
+    public const double IslandClearance = 10;
 
     /// <summary>The space kept between the left group and the right one when they meet.</summary>
     public const double GroupGap = 12;
 
-    /// <summary>A notch closer than this to the left edge has the left group start after it.</summary>
+    /// <summary>An island closer than this to the left edge has the left group start after it.</summary>
     public const double LeftRoom = 140;
 
     /// <param name="width">The bar's width.</param>
@@ -40,11 +40,11 @@ public static class MenuBarLayout
     /// <param name="menus">Each of the app's menu titles' width, in order.</param>
     /// <param name="overflow">The » title's width.</param>
     /// <param name="right">The right group's width, all of it.</param>
-    /// <param name="notch">The notch's left and right edges on this bar, or null when it isn't on it.</param>
+    /// <param name="island">The island's left and right edges on this bar, or null when it isn't on it.</param>
     /// <param name="rightOptional">The widths of the right group's items that can go, in the order they go; the clock never does.</param>
     /// <param name="nameSlack">How much of the app's name can be cut, within <paramref name="fixedLeft"/>.</param>
     public static BarArrangement Arrange(double width, double fixedLeft, IReadOnlyList<double> menus, double overflow, double right,
-        (double Left, double Right)? notch, IReadOnlyList<double>? rightOptional = null, double nameSlack = 0)
+        (double Left, double Right)? island, IReadOnlyList<double>? rightOptional = null, double nameSlack = 0)
     {
         var optional = rightOptional ?? [];
         double leftStart = Pad, rightEnd = width - Pad, limit = 0, kept = right;
@@ -65,9 +65,9 @@ public static class MenuBarLayout
             limit = rightEnd - kept - GroupGap;
         }
 
-        if (notch is { } n)
+        if (island is { } n)
         {
-            double before = n.Left - NotchClearance, after = n.Right + NotchClearance;
+            double before = n.Left - IslandClearance, after = n.Right + IslandClearance;
             if (before < Pad + LeftRoom)
             {
                 // At the far left: both groups share the stretch after it.
@@ -75,22 +75,22 @@ public static class MenuBarLayout
                 ShareOneStretch();
             }
             else if (after <= rightEnd - right)
-                limit = before; // clear of the right group where it is: the left group ends before the notch
+                limit = before; // clear of the right group where it is: the left group ends before the island
             else if (leftStart + least + GroupGap + right <= before)
             {
-                // Over the right group, with room for all of it on the notch's left.
+                // Over the right group, with room for all of it on the island's left.
                 rightEnd = before;
                 limit = rightEnd - right - GroupGap;
             }
             else
             {
-                // A narrow bar: the right group stays on the right and gives up items until it's clear of the notch.
+                // A narrow bar: the right group stays on the right and gives up items until it's clear of the island.
                 DropUntil(() => after <= rightEnd - kept);
                 if (after <= rightEnd - kept)
                     limit = before;
                 else
                 {
-                    // Not even the clock fits there (the notch is at the far right): everything shares the notch's left.
+                    // Not even the clock fits there (the island is at the far right): everything shares the island's left.
                     (dropped, kept, rightEnd) = (0, right, before);
                     ShareOneStretch();
                 }

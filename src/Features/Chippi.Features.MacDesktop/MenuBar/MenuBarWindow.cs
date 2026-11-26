@@ -10,6 +10,7 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
+using Chippi.Core.Config;
 using Chippi.Features.MacDesktop.Shell;
 using Chippi.UI.Controls;
 using Chippi.UI.Pet;
@@ -47,6 +48,13 @@ internal sealed class MenuBarWindow : Window
     private WifiGlyph? _wifi;
     private BatteryGlyph? _battery;
     private readonly ChippiPet _pet = new() { Size = 17, IsDecorative = true, Mood = PetMood.Idle };
+    private readonly BarIsland _island = new() { Visibility = Visibility.Collapsed };
+    private BarIslandFace? _face;
+    private PetColor _faceColor;
+    private BarInk? _islandInk;
+    private (double From, double To) _islandSpan = (0.45, 0.55);
+    private bool _pageOpen;
+    private string? _page;
     private AppBar? _appBar;
     private nint _hwnd;
     private InkStrip _strip;
@@ -84,6 +92,10 @@ internal sealed class MenuBarWindow : Window
         Content = _root;
         _root.Children.Add(_left);
         _root.Children.Add(_right);
+        _root.Children.Add(_island);
+        Canvas.SetTop(_island, BarIsland.Top);
+        _island.Pressed += () => _bar.IslandPressed();
+        _island.MenuAsked += IslandMenu;
 
         _pet.PetColor = bar.Shell.PetColor;
         _mark = new BarItem(_pet, "Chippi", inset: 6);
@@ -178,8 +190,20 @@ internal sealed class MenuBarWindow : Window
     /// <summary>The ink each group has now, for the shots and tests.</summary>
     internal (BarInk Left, BarInk Right) Inks => (_leftInk ?? BarInk.Light, _rightInk ?? BarInk.Light);
 
+    /// <summary>The island's ink, from the wallpaper under the bar's middle.</summary>
+    internal BarInk IslandInk => _islandInk ?? BarInk.Light;
+
+    /// <summary>The island's place on the bar, DIPs from its left, as last laid out; null on a bar without it.</summary>
+    internal Rect? IslandAt => _island.Visibility == Visibility.Visible ? new Rect(Canvas.GetLeft(_island), BarIsland.Top, _island.ActualWidth, BarIsland.Tall) : null;
+
     private void ApplyInk(bool force)
     {
+        var island = _strip.Ink(_islandSpan.From, _islandSpan.To, _islandInk);
+        if (force || island != _islandInk)
+        {
+            _islandInk = island;
+            _island.SetInk(island);
+        }
         var left = _strip.Ink(_leftSpan.From, _leftSpan.To, _leftInk);
         var right = _strip.Ink(_rightSpan.From, _rightSpan.To, _rightInk);
         if (!force && left == _leftInk && right == _rightInk)
@@ -269,6 +293,84 @@ internal sealed class MenuBarWindow : Window
         Refresh();
     }
 
+    // ----- The island and the spot -----
+
+    /// <summary>What the island shows, or null on a bar without it: a second display's, or with the island switched off.</summary>
+    public void SetIsland(BarIslandFace? face, PetColor color)
+    {
+        (_face, _faceColor) = (face, color);
+        ShowIsland();
+        Arrange();
+    }
+
+    private void ShowIsland()
+    {
+        if (_face is not { } face)
+        {
+            _island.Visibility = Visibility.Collapsed;
+            return;
+        }
+        _island.Visibility = Visibility.Visible;
+        _island.Show(face, IslandBadges(face, _states, _ids), _faceColor);
+        _island.SetInk(IslandInk);
+    }
+
+    /// <summary>A state rides beside the island unless the bar has its icon, or the island itself is showing it.</summary>
+    internal static IReadOnlyList<IslandBadge> IslandBadges(BarIslandFace face, BarStates states, IReadOnlyList<string> items)
+    {
+        var badges = new List<IslandBadge>(3);
+        if (states.MicMuted && !items.Contains(BarItems.Microphone))
+            badges.Add(IslandBadge.MicMuted);
+        if (states.Awake && face.Module != "keep-awake" && !items.Contains(BarItems.KeepAwake))
+            badges.Add(IslandBadge.Awake);
+        if (states.AgentWorking && face.Module != "agent-usage" && !items.Contains(BarItems.Agents))
+            badges.Add(IslandBadge.Agent);
+        return badges;
+    }
+
+    /// <summary>
+    /// The page showing in the spot on this bar's display (null for the home), or none: the page's own icon is lit, or
+    /// Controls for a page without one.
+    /// </summary>
+    public void SetPage(bool open, string? page)
+    {
+        (_pageOpen, _page) = (open, page);
+        ApplyLit();
+    }
+
+    private void ApplyLit()
+    {
+        string? lit = _pageOpen ? BarItems.Lit(_page, ItemsShowing, _states.Recording is not null) : null;
+        foreach (var (id, item) in _items)
+            item.SetOpen(id == lit);
+    }
+
+    /// <summary>The item lit now, for the tests.</summary>
+    internal string? Lit => _pageOpen ? BarItems.Lit(_page, ItemsShowing, _states.Recording is not null) : null;
+
+    /// <summary>
+    /// Whether <paramref name="physical"/> is on the island or on an icon whose press opens a page: the panel stays as it
+    /// is under such a press, and the press changes its page or closes it.
+    /// </summary>
+    public bool KeepsPanel(Point physical)
+    {
+        if (_hidden || PresentationSource.FromVisual(_root) is null)
+            return false;
+        var local = _root.PointFromScreen(physical);
+        if (local.Y < 0 || local.Y > Height28)
+            return false;
+        bool Over(FrameworkElement element) =>
+            element.Visibility == Visibility.Visible && new Rect(element.TranslatePoint(new Point(), _root), element.RenderSize).Contains(local);
+        return Over(_island) || _items.Any(i => Over(i.Item) && BarItems.OpensPage(i.Id, _states.Recording is not null));
+    }
+
+    private void IslandMenu()
+    {
+        var items = _bar.IslandMenu();
+        if (items.Count > 0)
+            BarMenu.Open(_island, items, closed: _bar.MenuClosed);
+    }
+
     /// <summary>
     /// Brings the items in line with what they stand for. They're built again only when which glyphs show changes; a
     /// recording's time, the processors' load, the battery and the names change in place.
@@ -313,6 +415,7 @@ internal sealed class MenuBarWindow : Window
         }
         foreach (var (id, item) in _items)
             item.Named(Tip(id, _states, status));
+        ShowIsland();
         Arrange();
     }
 
@@ -364,7 +467,7 @@ internal sealed class MenuBarWindow : Window
                 break;
         }
         var item = new BarItem(face, id, keepsColor: disc, inset: disc ? 5 : 8, tip: true);
-        item.Pressed += () => _bar.Press(id);
+        item.Pressed += () => _bar.Press(id, Monitor);
         return item;
     }
 
@@ -410,9 +513,9 @@ internal sealed class MenuBarWindow : Window
     }
 
     /// <summary>
-    /// Lays the two groups out, clear of the notch when it's on this bar and of each other: the app's menus that don't fit
-    /// go into », then the right group's items go from the left, then the app's name is cut short (MenuBarLayout). Called again
-    /// while the notch is dragged, so the items make room before the drop.
+    /// Lays the two groups out, clear of the island when it's on this bar and of each other: the app's menus that don't fit
+    /// go into », then the right group's items go from the left, then the app's name is cut short (MenuBarLayout). The
+    /// island sits in the bar's middle, as wide as what it shows.
     /// </summary>
     public void Arrange()
     {
@@ -440,10 +543,15 @@ internal sealed class MenuBarWindow : Window
         double overflow = Width(_overflow);
         var canGo = _items.Select(i => Width(i.Item)).ToArray();
         double right = Width(_right);
-        (double, double)? notch = null;
-        if (_bar.Shell.Notch() is { } n && n.Monitor == Monitor && Scale > 0)
-            notch = ((n.Left - Bounds.Left) / Scale, (n.Right - Bounds.Left) / Scale);
-        var arrangement = MenuBarLayout.Arrange(_root.Width, fixedLeft, widths, overflow, right, notch, canGo, Math.Max(0, name - LeastName));
+        (double, double)? island = null;
+        if (_island.Visibility == Visibility.Visible)
+        {
+            double wide = Width(_island), at = Math.Round((_root.Width - wide) / 2);
+            island = (at, at + wide);
+            Canvas.SetLeft(_island, at);
+            _islandSpan = (at / _root.Width, (at + wide) / _root.Width);
+        }
+        var arrangement = MenuBarLayout.Arrange(_root.Width, fixedLeft, widths, overflow, right, island, canGo, Math.Max(0, name - LeastName));
 
         for (int i = 0; i < _menus.Count; i++)
             _menus[i].Visibility = i < arrangement.MenusShown ? Visibility.Visible : Visibility.Collapsed;
@@ -464,6 +572,7 @@ internal sealed class MenuBarWindow : Window
         _leftSpan = (arrangement.LeftStart / _root.Width, (arrangement.LeftStart + leftWidth) / _root.Width);
         _rightSpan = ((arrangement.RightEnd - rightWidth) / _root.Width, arrangement.RightEnd / _root.Width);
         ApplyInk(force: false);
+        ApplyLit();
     }
 
     /// <summary>Lays the bar out <paramref name="width"/> DIPs wide without a window, for the offscreen shots and tests.</summary>

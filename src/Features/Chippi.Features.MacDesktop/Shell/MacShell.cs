@@ -10,7 +10,7 @@ namespace Chippi.Features.MacDesktop.Shell;
 
 /// <summary>
 /// What the menu bar and the dock need from Chippi: the shared action PC (they never send keys, move windows or start
-/// programs themselves), Settings, the notch and the island's activities.
+/// programs themselves), Settings, the island's pages and its activities.
 /// </summary>
 internal sealed class MacShell(ModuleContext context, IslandActivityHub? activities)
 {
@@ -27,8 +27,20 @@ internal sealed class MacShell(ModuleContext context, IslandActivityHub? activit
 
     public PetColor PetColor => Context.ChippiColor();
 
-    /// <summary>Opens the notch's home (the menu bar's Controls). Set by the shell.</summary>
-    public Action OpenNotchHome { get; set; } = () => { };
+    /// <summary>Opens the home in the spot (the menu bar's Controls). Set by the shell.</summary>
+    public Action OpenHome { get; set; } = () => { };
+
+    /// <summary>A press on the island: its activity's page in the spot, or the home; a second press closes it. Set by the shell.</summary>
+    public Action IslandPressed { get; set; } = () => { };
+
+    /// <summary>The island's right-click menu (the tray icon's), so Quit stays reachable. Set by the shell.</summary>
+    public Func<IReadOnlyList<(string Label, Action Action)?>> IslandMenu { get; set; } = () => [];
+
+    /// <summary>Whether the island shows on the main display's bar.</summary>
+    public Func<bool> IslandOn { get; set; } = () => false;
+
+    /// <summary>The display whose bar was just pressed: a page that press opens goes to the spot on that display.</summary>
+    public SpotPress Pressed { get; } = new();
 
     /// <summary>
     /// A press on a menu bar item that opens an island page (null for the home): true when the page was open and the press
@@ -45,9 +57,6 @@ internal sealed class MacShell(ModuleContext context, IslandActivityHub? activit
         bool battery = MenuBar.StatusReadings.HasBattery(), languages = MenuBar.StatusReadings.HasLanguages();
         return id => MenuBar.BarItems.Available(id, Context.IsFeatureRunning, battery, languages);
     }
-
-    /// <summary>The notch on a display's bar: its monitor and left and right edges in physical pixels; null without one.</summary>
-    public Func<(nint Monitor, double Left, double Right)?> Notch { get; set; } = () => null;
 
     /// <summary>Runs keys in the app in front through the shared PC (Win+A, Win+N…), logging a refusal.</summary>
     public async Task PressAsync(string keys)

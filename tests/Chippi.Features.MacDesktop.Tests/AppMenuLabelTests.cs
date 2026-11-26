@@ -16,9 +16,13 @@ public sealed class AppMenuLabelTests
         Assert.Equal((label, shortcut), AppMenus.Label(text));
 
     [Fact]
-    public void SettingsRejectAPlaceOffTheBar()
+    public void SettingsRejectASizeOutOfRangeAndTheIslandNeedsTheMenuBar()
     {
-        Assert.Throws<ArgumentException>(() => new MacDesktopSettings { NotchPlace = 1.5 }.Validate());
+        Assert.Throws<ArgumentException>(() => new MacDesktopSettings { MagnifiedSize = MacDesktopSettings.MaxMagnified + 1 }.Validate());
+        Assert.False(new MacDesktopSettings().ShowsIsland); // the Windows desktop
+        Assert.True(new MacDesktopSettings { Style = DesktopStyle.MacStyle }.ShowsIsland);
+        Assert.False(new MacDesktopSettings { Style = DesktopStyle.MacStyle, MenuBar = false }.ShowsIsland);
+        Assert.False(new MacDesktopSettings { Style = DesktopStyle.MacStyle, Island = false }.ShowsIsland);
         new MacDesktopSettings().Validate();
         Assert.False(new MacDesktopSettings().HidesTaskbar);
         Assert.True(new MacDesktopSettings { Style = DesktopStyle.MacStyle }.HidesTaskbar);
