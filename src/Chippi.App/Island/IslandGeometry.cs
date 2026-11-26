@@ -103,20 +103,36 @@ public static class IslandGeometry
         return new Rect(PanelOrigin(puck, size, work, scale), size);
     }
 
+    /// <summary>How far below a display's menu bar the spot's panel hangs, in DIPs.</summary>
+    public const double SpotDrop = 4;
+
     /// <summary>
-    /// The panel grown down out of the Mac-style desktop's notch (docs/mac-style/brief.md): its top edge is the notch's,
-    /// centered on it, and kept 8 inside the work area across; fitted to the room below the notch.
+    /// The panel in the Mac-style desktop's one spot (docs/mac-style/brief.md, The spot): under the right end of a
+    /// display's menu bar, <see cref="SpotDrop"/> below it and 8 in from the right; fitted to the room under the bar.
+    /// <paramref name="work"/> starts under the bar, which reserves its strip.
     /// </summary>
-    public static Rect NotchPanelRect(Rect notch, Rect work, double scale, double height = IslandPage.Height)
+    public static Rect SpotPanelRect(Rect work, double scale, double height = IslandPage.Height)
     {
-        double inset = Gap * scale;
+        double inset = Gap * scale, drop = SpotDrop * scale;
         double fit = Math.Min(scale, Math.Min(
             Math.Max(1, work.Width - 2 * inset) / IslandPage.Width,
-            Math.Max(1, work.Bottom - inset - notch.Top) / IslandPage.Height));
+            Math.Max(1, work.Height - drop - inset) / IslandPage.Height));
         var size = new Size(IslandPage.Width * fit, height * fit);
-        double x = notch.Left + notch.Width / 2 - size.Width / 2;
-        x = Math.Clamp(x, work.Left + inset, Math.Max(work.Left + inset, work.Right - inset - size.Width));
-        return new Rect(new Point(x, notch.Top), size);
+        return new Rect(new Point(Math.Max(work.Left + inset, work.Right - inset - size.Width), work.Top + drop), size);
+    }
+
+    /// <summary>What the spot's panel unrolls from and rolls back into: its own top edge, a DIP tall.</summary>
+    public static Rect SpotSource(Rect work, double scale)
+    {
+        var panel = SpotPanelRect(work, scale);
+        return new Rect(panel.X, panel.Y, panel.Width, Math.Max(1, scale));
+    }
+
+    /// <summary>The spot's top right corner: the home's Chippi sits on that side of the footer, by the bar's icons.</summary>
+    public static Rect SpotCorner(Rect work, double scale)
+    {
+        var panel = SpotPanelRect(work, scale);
+        return new Rect(panel.Right - 1, panel.Y, 1, 1);
     }
 
     /// <summary>

@@ -39,7 +39,7 @@ public sealed class MenuBarLayoutTests
     private static readonly double[] Menus = [40, 40, 40, 40, 40, 40];
 
     [Fact]
-    public void EverythingFitsWithoutANotch()
+    public void EverythingFitsWithoutAnIsland()
     {
         var arrangement = MenuBarLayout.Arrange(1920, 200, Menus, 24, 300, null);
         Assert.Equal(Menus.Length, arrangement.MenusShown);
@@ -48,23 +48,23 @@ public sealed class MenuBarLayoutTests
     }
 
     [Fact]
-    public void MenusCollapseIntoOverflowBeforeTheCenteredNotch()
+    public void MenusCollapseIntoOverflowBeforeTheCenteredIsland()
     {
-        // The notch at 400–584: the left group may end at 390.
+        // The island at 400–584: the left group may end at 390.
         var arrangement = MenuBarLayout.Arrange(984, 200, Menus, 24, 200, (400, 584));
         Assert.True(arrangement.Overflows(Menus.Length));
         Assert.True(arrangement.LeftStart + MenuBarLayout.LeftWidth(200, Menus, 24, arrangement.MenusShown) <= 390);
     }
 
     [Fact]
-    public void ANotchOverTheRightGroupMovesItLeft()
+    public void AnIslandOverTheRightGroupMovesItLeft()
     {
         var arrangement = MenuBarLayout.Arrange(1920, 200, Menus, 24, 300, (1700, 1884));
         Assert.Equal(1690, arrangement.RightEnd);
     }
 
     [Fact]
-    public void ANotchAtTheFarLeftStartsTheLeftGroupAfterIt()
+    public void AnIslandAtTheFarLeftStartsTheLeftGroupAfterIt()
     {
         var arrangement = MenuBarLayout.Arrange(1920, 200, Menus, 24, 300, (0, 184));
         Assert.Equal(194, arrangement.LeftStart);

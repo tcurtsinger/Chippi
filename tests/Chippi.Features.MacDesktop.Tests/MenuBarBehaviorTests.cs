@@ -12,6 +12,7 @@ using Chippi.Core.Modules;
 using Chippi.Features.MacDesktop.MenuBar;
 using Chippi.Features.MacDesktop.Shell;
 using Chippi.UI.Controls;
+using Chippi.UI.Pet;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Chippi.Features.MacDesktop.Tests;
@@ -31,14 +32,14 @@ public sealed class NarrowBarTests
     }
 
     [Fact]
-    public void ACenteredNotchOnANarrowBarDropsItemsInsteadOfMovingTheGroupOntoTheMenus()
+    public void TheIslandOnANarrowBarDropsItemsInsteadOfMovingTheGroupOntoTheMenus()
     {
-        // 960 wide (a 1920 laptop at 200%), the notch 388–572, every status item showing: 435 doesn't fit right of it.
+        // 960 wide (a 1920 laptop at 200%), the island 388–572, every status item showing: 435 doesn't fit right of it.
         var a = MenuBarLayout.Arrange(960, 185, Menus, 24, 435, (388, 572), CanGo, 39);
         var (leftEnd, rightStart) = Ends(a, 185, 435);
         Assert.Equal(960 - MenuBarLayout.Pad, a.RightEnd); // it stays on the right
-        Assert.True(rightStart >= 572 + MenuBarLayout.NotchClearance);
-        Assert.True(leftEnd <= 388 - MenuBarLayout.NotchClearance);
+        Assert.True(rightStart >= 572 + MenuBarLayout.IslandClearance);
+        Assert.True(leftEnd <= 388 - MenuBarLayout.IslandClearance);
         Assert.InRange(a.RightDropped, 1, CanGo.Length);
     }
 
@@ -50,7 +51,7 @@ public sealed class NarrowBarTests
     }
 
     [Fact]
-    public void WithoutANotchTheGroupsNeverOverlap()
+    public void WithoutAnIslandTheGroupsNeverOverlap()
     {
         foreach (double width in new[] { 1920.0, 1280, 960, 768, 640, 560, 480, 420 })
         {
@@ -75,9 +76,9 @@ public sealed class NarrowBarTests
     }
 
     [Fact]
-    public void ANotchAtTheFarRightOfANarrowBarSharesItsLeft()
+    public void AnIslandAtTheFarRightOfANarrowBarSharesItsLeft()
     {
-        // The notch against the right end of a 960 bar: not even the clock fits past it.
+        // The island against the right end of a 960 bar: not even the clock fits past it.
         var a = MenuBarLayout.Arrange(960, 185, Menus, 24, 435, (760, 944), CanGo, 39);
         var (leftEnd, rightStart) = Ends(a, 185, 435);
         Assert.Equal(750, a.RightEnd);
@@ -435,6 +436,93 @@ public sealed class MenuBarOffscreenTests
     private static readonly string[] EveryItem = [.. BarItems.All.Select(item => item.Id)];
     private static readonly BarStates Busy = new(MicMuted: true, Awake: true, AgentWorking: true, Recording: "0:42");
 
+    // What the island shows. The glyphs are frozen, so any thread's bar can draw them.
+    private static readonly BarIslandFace Rest = BarIslandFace.Rest(PetMood.Idle);
+    private static readonly BarIslandFace Song = new(PetMood.Listening, IslandLead.Cover, null, null, "Midnight City", "M83", IslandTail.Equalizer, "now-playing", "Now Playing");
+    private static readonly BarIslandFace Waiting = new(PetMood.Idle, IslandLead.Attention, LucideIcons.Gauge, null, "Waiting on you", "", IslandTail.None, "agent-usage", "Agents");
+    private static readonly BarIslandFace Recording = new(PetMood.Idle, IslandLead.Recording, null, null, "0:42", "", IslandTail.None, "screen-recording", "Screen recording");
+    private static readonly BarIslandFace Awake = new(PetMood.Idle, IslandLead.Glyph, LucideIcons.Coffee, null, "1 hr left", "", IslandTail.None, "keep-awake", "Keep awake");
+
+    [Fact]
+    public void TheIslandSitsInTheMiddleInTheInkOfTheWallpaperUnderIt() => OnBar((_, controller) =>
+    {
+        // Dark on the left 55%, light after: the middle of a 1920 bar is still over the dark part.
+        var strip = new InkStrip(Enumerable.Range(0, 96).Select(i => i < 53 ? 0.07 : 0.95).ToArray());
+        var bar = Bar(controller, strip, "Paint", ["File", "Edit"], StartItems, Status(laptop: false));
+        Assert.Null(bar.IslandAt); // a second display's bar, or the island switched off
+        bar.SetIsland(Rest, default);
+        bar.LayOut(1920);
+        var rest = bar.IslandAt!.Value;
+        Assert.Equal(960, rest.Left + rest.Width / 2, 0);
+        Assert.Equal((BarIsland.Top, BarIsland.Tall), (rest.Top, rest.Height));
+        Assert.True(rest.Bottom <= 28, "never taller than the bar");
+        Assert.Equal(BarInk.Light, bar.IslandInk);
+        Assert.Equal((BarInk.Light, BarInk.Dark), bar.Inks);
+
+        bar.SetIsland(Song, default);
+        bar.LayOut(1920);
+        var song = bar.IslandAt!.Value;
+        Assert.True(song.Width > rest.Width + 100, $"a song is {song.Width} wide, rest {rest.Width}");
+        Assert.Equal(960, song.Left + song.Width / 2, 0.5); // it only widens, about the same middle
+        Assert.Equal(rest.Height, song.Height);
+
+        bar.SetInk(InkStrip.Flat(0.95));
+        Assert.Equal(BarInk.Dark, bar.IslandInk);
+        bar.SetIsland(null, default);
+        bar.LayOut(1920);
+        Assert.Null(bar.IslandAt);
+    });
+
+    [Fact]
+    public void TheIconOfThePageShowingIsLitAndControlsForTheRest() => OnBar((_, controller) =>
+    {
+        var bar = Bar(controller, InkStrip.Flat(0), "Notepad", ["File"], StartItems, Status(laptop: false));
+        bar.LayOut(1920);
+        Assert.Null(bar.Lit);
+        bar.SetPage(true, "clipboard");
+        Assert.Equal(BarItems.Clipboard, bar.Lit);
+        bar.SetPage(true, "scratchpad"); // no icon of its own on this bar
+        Assert.Equal(BarItems.Controls, bar.Lit);
+        bar.SetPage(true, null); // the home
+        Assert.Equal(BarItems.Controls, bar.Lit);
+        bar.SetPage(false, "clipboard");
+        Assert.Null(bar.Lit);
+    });
+
+    [Fact]
+    public void LitAndOpensPageFollowWhatAPressDoes()
+    {
+        string[] shown = [BarItems.Search, BarItems.Clipboard, BarItems.Record, BarItems.Sound, BarItems.Controls];
+        Assert.Equal(BarItems.Clipboard, BarItems.Lit("clipboard", shown, recording: false));
+        Assert.Equal(BarItems.Search, BarItems.Lit("command-bar", shown, recording: false));
+        Assert.Equal(BarItems.Record, BarItems.Lit("recording", shown, recording: false));
+        Assert.Equal(BarItems.Controls, BarItems.Lit("recording", shown, recording: true)); // Record is the Stop button then
+        Assert.Equal(BarItems.Controls, BarItems.Lit("shelf", shown, recording: false));
+        Assert.Equal(BarItems.Controls, BarItems.Lit(null, shown, recording: false));
+        Assert.Null(BarItems.Lit("shelf", [BarItems.Sound], recording: false));
+
+        Assert.True(BarItems.OpensPage(BarItems.Clipboard, recording: false));
+        Assert.True(BarItems.OpensPage(BarItems.Controls, recording: false));
+        Assert.True(BarItems.OpensPage(BarItems.Search, recording: false));
+        Assert.True(BarItems.OpensPage(BarItems.Record, recording: false));
+        Assert.False(BarItems.OpensPage(BarItems.Record, recording: true));
+        Assert.False(BarItems.OpensPage(BarItems.Microphone, recording: false));
+        Assert.False(BarItems.OpensPage(BarItems.Sound, recording: false));
+        Assert.False(BarItems.OpensPage("nothing", recording: false));
+    }
+
+    [Fact]
+    public void AStateRidesBesideTheIslandUnlessTheBarHasItsIconOrTheIslandShowsIt()
+    {
+        var all = new BarStates(MicMuted: true, Awake: true, AgentWorking: true, Recording: null);
+        Assert.Equal([IslandBadge.MicMuted, IslandBadge.Awake, IslandBadge.Agent], MenuBarWindow.IslandBadges(Rest, all, [BarItems.Sound]));
+        Assert.Equal([IslandBadge.Awake, IslandBadge.Agent], MenuBarWindow.IslandBadges(Rest, all, StartItems)); // the bar's Microphone shows the mic
+        Assert.Empty(MenuBarWindow.IslandBadges(Rest, all, EveryItem));
+        Assert.Equal([IslandBadge.Agent], MenuBarWindow.IslandBadges(Awake, all, StartItems)); // the island is showing Keep awake
+        Assert.Equal([IslandBadge.Awake], MenuBarWindow.IslandBadges(Waiting, all, StartItems));
+        Assert.Empty(MenuBarWindow.IslandBadges(Song, default, StartItems));
+    }
+
     private static MenuBarWindow Bar(MenuBarController controller, InkStrip ink, string app, string[] menus, string[] items, StatusReadings status, BarStates states = default)
     {
         var bar = new MenuBarWindow(controller, 0, ink);
@@ -470,14 +558,16 @@ public sealed class MenuBarOffscreenTests
     });
 
     [Fact]
-    public void ANarrowBarWithTheNotchKeepsItsGroupsApart() => OnBar((shell, controller) =>
+    public void ANarrowBarWithTheIslandKeepsItsGroupsApart() => OnBar((shell, controller) =>
     {
-        shell.Notch = () => (0, 388, 572);
         var bar = Bar(controller, InkStrip.Flat(0), "Notepad++", Menus, EveryItem, Status(laptop: true), Busy);
+        bar.SetIsland(Song, default);
         bar.LayOut(960);
         var (left, right) = bar.Groups;
-        Assert.True(left.Right <= 388 - MenuBarLayout.NotchClearance + 0.5, $"left ends at {left.Right}");
-        Assert.True(right.Left >= 572 + MenuBarLayout.NotchClearance - 0.5, $"right starts at {right.Left}");
+        var island = bar.IslandAt!.Value;
+        Assert.Equal(480, island.Left + island.Width / 2, 0); // the bar's middle, on a whole pixel
+        Assert.True(left.Right <= island.Left - MenuBarLayout.IslandClearance + 0.5, $"left ends at {left.Right}");
+        Assert.True(right.Left >= island.Right + MenuBarLayout.IslandClearance - 0.5, $"right starts at {right.Left}");
         Assert.Contains("Notifications", bar.Showing); // the clock never goes
         // The items go from the left: what's left is the end of the list, next to the clock.
         var kept = bar.ItemsShowing;
@@ -560,17 +650,23 @@ public sealed class MenuBarOffscreenTests
         }, 0);
         var splitStrip = new InkStrip(Enumerable.Range(0, 96).Select(i => i < 53 ? 0.07 : 0.95).ToArray());
         string[] laptopStart = [.. BarItems.Start];
-        var rows = new List<(string Name, double Width, InkStrip Ink, Brush Back, double? Notch, string[] Items, BarStates States, bool Laptop, bool Muted, string App, string[] Menus)>
+        var rows = new List<(string Name, double Width, InkStrip Ink, Brush Back, BarIslandFace? Island, string[] Items, BarStates States, bool Laptop, bool Muted, string App, string[] Menus)>
         {
-            ("white wallpaper, the start set", 1920, InkStrip.Flat(0.99), white, 184, StartItems, default, false, false, "Notepad++", Menus),
-            ("dark wallpaper, the start set on a laptop", 1920, InkStrip.Flat(0.1), dark, 184, laptopStart, default, true, false, "Notepad++", Menus),
+            ("white wallpaper, the start set", 1920, InkStrip.Flat(0.99), white, Rest, StartItems, default, false, false, "Notepad++", Menus),
+            ("white wallpaper, a song", 1920, InkStrip.Flat(0.99), white, Song, StartItems, default, false, false, "Notepad++", Menus),
+            ("dark wallpaper, a song paused, Clipboard showing", 1920, InkStrip.Flat(0.1), dark, Song with { Tail = IslandTail.Paused, Mood = PetMood.Idle }, StartItems, default, false, false, "Notepad++", Menus),
+            ("dark wallpaper, an agent waiting", 1920, InkStrip.Flat(0.1), dark, Waiting, StartItems, new BarStates(false, false, true, null), false, false, "Notepad++", Menus),
+            ("dark wallpaper, recording, Keep awake on, an agent at work", 1920, InkStrip.Flat(0.1), dark, Recording, StartItems, new BarStates(false, true, true, "0:42"), false, false, "Notepad++", Menus),
+            ("dark wallpaper, Keep awake", 1920, InkStrip.Flat(0.1), dark, Awake, StartItems, new BarStates(false, true, false, null), false, false, "Notepad++", Menus),
+            ("dark left, light right, a song", 1920, splitStrip, split, Song, StartItems, default, false, false, "Paint", ["File", "Edit", "View", "Help"]),
+            ("dark wallpaper, the start set on a laptop", 1920, InkStrip.Flat(0.1), dark, Rest, laptopStart, default, true, false, "Notepad++", Menus),
             ("dark wallpaper, every item at rest", 1920, InkStrip.Flat(0.1), dark, null, EveryItem, default, true, false, "Google Chrome", []),
             ("dark wallpaper, every item, all on", 1920, InkStrip.Flat(0.1), dark, null, EveryItem, Busy, true, true, "Google Chrome", []),
             ("white wallpaper, every item, all on", 1920, InkStrip.Flat(0.99), white, null, EveryItem, Busy, true, true, "Google Chrome", []),
             ("grey 0.49, muted, Wi-Fi 2 of 4", 1920, InkStrip.Flat(0.49), grey, null, [BarItems.Network, BarItems.Sound, BarItems.Microphone], new BarStates(true, false, false, null), true, true, "Google Chrome", []),
             ("dark left, light right", 1920, splitStrip, split, null, StartItems, default, false, false, "Paint", ["File", "Edit", "View", "Help"]),
-            ("960 wide, notch, every item", 960, InkStrip.Flat(0.1), dark, 184, EveryItem, Busy, true, false, "Notepad++", Menus),
-            ("960 wide, notch 280, the start set", 960, InkStrip.Flat(0.1), dark, 280, StartItems, default, false, false, "Notepad++", Menus),
+            ("960 wide, the island, every item", 960, InkStrip.Flat(0.1), dark, Rest, EveryItem, Busy, true, false, "Notepad++", Menus),
+            ("960 wide, a song, the start set", 960, InkStrip.Flat(0.1), dark, Song, StartItems, default, false, false, "Notepad++", Menus),
             ("640 wide, long name", 640, InkStrip.Flat(0.99), white, null, StartItems, default, false, false, "Steam Client WebHelper", ["File", "Edit"]),
             ("only the clock", 640, InkStrip.Flat(0.1), dark, null, [], default, false, false, "Notepad", ["File", "Edit"]),
         };
@@ -587,22 +683,20 @@ public sealed class MenuBarOffscreenTests
             {
                 var row = rows[i];
                 double top = 8 + i * 40;
-                (double Left, double Right)? notch = row.Notch is { } n ? ((row.Width - n) / 2, (row.Width + n) / 2) : null;
-                shell.Notch = () => notch is { } at ? (0, at.Left, at.Right) : null;
                 var bar = Bar(controller, row.Ink, row.App, row.Menus, row.Items, Status(row.Laptop, row.Muted, row.Muted ? 2 : null, cpu: 12), row.States);
+                bar.SetIsland(row.Island, default);
+                bar.SetPage(row.Name.Contains("Clipboard showing"), "clipboard");
                 var root = bar.LayOut(row.Width);
                 var layer = new DrawingVisual();
                 using (var dc = layer.RenderOpen())
                 {
                     dc.DrawRectangle(row.Back, null, new Rect(0, top, row.Width, 28));
-                    if (notch is { } at)
-                        dc.DrawRoundedRectangle(Brushes.Black, null, new Rect(at.Left, top - 10, at.Right - at.Left, 38), 10, 10);
                     dc.DrawRectangle(new VisualBrush(root) { Stretch = Stretch.None, AlignmentX = AlignmentX.Left, AlignmentY = AlignmentY.Top, ViewboxUnits = BrushMappingMode.Absolute, Viewbox = new Rect(0, 0, row.Width, 28) },
                         null, new Rect(0, top, row.Width, 28));
                 }
                 bitmap.Render(layer);
                 if (scale == 1.0)
-                    report.AppendLine($"{row.Name} ({row.Width}): left {bar.Groups.Left.Left:0}..{bar.Groups.Left.Right:0}, right {bar.Groups.Right.Left:0}..{bar.Groups.Right.Right:0}, inks {bar.Inks}")
+                    report.AppendLine($"{row.Name} ({row.Width}): left {bar.Groups.Left.Left:0}..{bar.Groups.Left.Right:0}, right {bar.Groups.Right.Left:0}..{bar.Groups.Right.Right:0}, inks {bar.Inks}, island {bar.IslandAt?.Left:0}..{bar.IslandAt?.Right:0} {bar.IslandInk}, lit {bar.Lit}")
                         .AppendLine("  " + string.Join(" | ", bar.Showing));
             }
             Save(bitmap, Path.Combine(output, scale == 1.0 ? "menu-bar.png" : "menu-bar-2x.png"));

@@ -20,7 +20,9 @@ public sealed record MacDesktopSettings
 
     public bool MenuBar { get; init; } = true;
     public bool Dock { get; init; } = true;
-    public bool Notch { get; init; } = true;
+
+    /// <summary>The island in the middle of the main display's menu bar. It needs the menu bar.</summary>
+    public bool Island { get; init; } = true;
 
     public DockHiding DockHide { get; init; } = DockHiding.AlwaysShown;
     public DockEdge DockPosition { get; init; } = DockEdge.Bottom;
@@ -28,15 +30,6 @@ public sealed record MacDesktopSettings
 
     /// <summary>The size icons near the pointer grow to, in DIPs (48 at rest).</summary>
     public int MagnifiedSize { get; init; } = 72;
-
-    /// <summary>The notch opens on a 300 ms hover as well as a click; false opens it on a click only.</summary>
-    public bool NotchOpensOnHover { get; init; } = true;
-
-    /// <summary>The display the notch sits on (<c>\\?\DISPLAY#…</c>); null for the main display.</summary>
-    public string? NotchDisplay { get; init; }
-
-    /// <summary>Where the notch's center sits across its display's bar, 0 to 1; 0.5 is the middle.</summary>
-    public double NotchPlace { get; init; } = 0.5;
 
     /// <summary>
     /// The menu bar's items, left to right (<see cref="Chippi.Features.MacDesktop.MenuBar.BarItems"/> ids); the clock comes after them. Null until
@@ -55,7 +48,7 @@ public sealed record MacDesktopSettings
     public void Validate()
     {
         if (!Enum.IsDefined(Style) || !Enum.IsDefined(DockHide) || !Enum.IsDefined(DockPosition)
-            || MagnifiedSize is < MinMagnified or > MaxMagnified || !double.IsFinite(NotchPlace) || NotchPlace is < 0 or > 1)
+            || MagnifiedSize is < MinMagnified or > MaxMagnified)
             throw new ArgumentException("Invalid Mac-style desktop settings");
     }
 
@@ -64,13 +57,15 @@ public sealed record MacDesktopSettings
     /// <summary>The taskbar hides while the menu bar or the dock stands in for it.</summary>
     public bool HidesTaskbar => IsMac && (MenuBar || Dock);
 
+    /// <summary>The island takes the widget's place: the mode is on with its menu bar and its Island switch.</summary>
+    public bool ShowsIsland => IsMac && MenuBar && Island;
+
     public bool Equals(MacDesktopSettings? other) => other is not null
-        && Style == other.Style && MenuBar == other.MenuBar && Dock == other.Dock && Notch == other.Notch
+        && Style == other.Style && MenuBar == other.MenuBar && Dock == other.Dock && Island == other.Island
         && DockHide == other.DockHide && DockPosition == other.DockPosition && Magnify == other.Magnify
-        && MagnifiedSize == other.MagnifiedSize && NotchOpensOnHover == other.NotchOpensOnHover
-        && NotchDisplay == other.NotchDisplay && NotchPlace.Equals(other.NotchPlace)
+        && MagnifiedSize == other.MagnifiedSize
         && (BarItems ?? []).SequenceEqual(other.BarItems ?? []) && (BarItems is null) == (other.BarItems is null)
         && (Pins ?? []).SequenceEqual(other.Pins ?? []) && (Pins is null) == (other.Pins is null);
 
-    public override int GetHashCode() => HashCode.Combine(Style, MenuBar, Dock, Notch, DockHide, DockPosition, NotchPlace, Pins?.Count);
+    public override int GetHashCode() => HashCode.Combine(Style, MenuBar, Dock, Island, DockHide, DockPosition, MagnifiedSize, Pins?.Count);
 }

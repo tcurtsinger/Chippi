@@ -39,6 +39,8 @@ internal sealed class MenuBarController : IDisposable
     private IReadOnlyList<AppMenuEntry> _titles = [];
     private IReadOnlyList<string> _items = [];
     private BarStates _states;
+    private BarIslandFace? _face;
+    private (bool Open, string? Page, nint Monitor) _page;
     private nint _titlesWindow;
     private bool _elevated, _disposed;
 
@@ -111,6 +113,8 @@ internal sealed class MenuBarController : IDisposable
             bar.SetApp(_front.App.Name, _titles.Select(t => t.Text).ToArray());
             bar.SetClock(ClockText(DateTime.Now));
         }
+        ApplyIsland();
+        ForEach(b => b.SetPage(_page.Open && b.Monitor == _page.Monitor, _page.Page));
         FullscreenChanged();
         _ = ReadInkAsync(onlyChanged: false);
     }
@@ -122,8 +126,47 @@ internal sealed class MenuBarController : IDisposable
         _front.Reread();
     });
 
-    /// <summary>The notch moved or changed size: the bars make room for it.</summary>
-    public void NotchMoved() => ForEach(b => b.Arrange());
+    // ----- The island and the spot -----
+
+    /// <summary>What the island shows now.</summary>
+    public void SetIsland(BarIslandFace face)
+    {
+        _face = face;
+        ApplyIsland();
+    }
+
+    /// <summary>The island is on the main display's bar alone, while its switch is on.</summary>
+    private void ApplyIsland()
+    {
+        if (_disposed)
+            return;
+        var face = Shell.IslandOn() ? _face ?? BarIslandFace.Rest(Chippi.UI.Pet.PetMood.Idle) : null;
+        nint main = DisplayCatalog.Main;
+        ForEach(b => b.SetIsland(b.Monitor == main ? face : null, Shell.PetColor));
+    }
+
+    /// <summary>The page showing in the spot on <paramref name="monitor"/>'s display: that bar lights its icon.</summary>
+    public void SetPage(bool open, string? page, nint monitor)
+    {
+        _page = (open, page, monitor == 0 ? DisplayCatalog.Main : monitor);
+        ForEach(b => b.SetPage(_page.Open && b.Monitor == _page.Monitor, page));
+    }
+
+    /// <summary>Whether a press at <paramref name="physical"/> is on the island or on an icon that opens a page.</summary>
+    public bool KeepsPanel(Point physical) => !_disposed && _bars.Values.Any(b => b.KeepsPanel(physical));
+
+    /// <summary>A press on the island: its page opens in the spot on its own display.</summary>
+    public void IslandPressed()
+    {
+        if (_disposed)
+            return;
+        Shell.PressedOn = DisplayCatalog.Main;
+        Shell.IslandPressed();
+    }
+
+    /// <summary>The island's right-click menu: the tray icon's.</summary>
+    public IReadOnlyList<BarMenuItem> IslandMenu() => Opening(
+        [.. Shell.IslandMenu().Select(entry => entry is { } item ? new BarMenuItem(item.Label) { Run = item.Action } : BarMenuItem.Separator)]);
 
     // ----- The app in front -----
 
@@ -413,7 +456,11 @@ internal sealed class MenuBarController : IDisposable
     public const string Clock = "clock";
 
     /// <summary>The saved items changed: the bars show them.</summary>
-    public void SettingsChanged() => RefreshItems();
+    public void SettingsChanged()
+    {
+        RefreshItems();
+        ApplyIsland();
+    }
 
     private void RefreshItems()
     {
@@ -431,10 +478,11 @@ internal sealed class MenuBarController : IDisposable
     /// A press on one of the right side's items, or on the clock: each does one thing at once. An item that opens an
     /// island page closes it on a second press.
     /// </summary>
-    public void Press(string id)
+    public void Press(string id, nint monitor = 0)
     {
         if (_disposed)
             return;
+        Shell.PressedOn = monitor; // a page this press opens goes to the spot on this display
         if (id == Clock)
         {
             // Windows' own notifications, where Windows opens them.
@@ -457,7 +505,7 @@ internal sealed class MenuBarController : IDisposable
                 break;
             case BarPressKind.Home:
                 if (!Shell.ClosePage(null))
-                    Shell.OpenNotchHome();
+                    Shell.OpenHome();
                 break;
             case BarPressKind.Record:
                 // While recording, the item is the Stop button.

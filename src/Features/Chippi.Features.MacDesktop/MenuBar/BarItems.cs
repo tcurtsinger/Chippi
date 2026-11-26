@@ -86,6 +86,37 @@ public static class BarItems
         _ => throw new ArgumentOutOfRangeException(nameof(id), id, "Not a menu bar item"),
     };
 
+    /// <summary>
+    /// Whether a press on <paramref name="id"/> opens a page in the spot: the panel stays as it is under such a press, and
+    /// the press changes its page or closes it. Record stops a recording instead while one runs.
+    /// </summary>
+    public static bool OpensPage(string id, bool recording) => Find(id) is not null && Press(id).Kind switch
+    {
+        BarPressKind.Page or BarPressKind.Home or BarPressKind.Search => true,
+        BarPressKind.Record => !recording,
+        _ => false,
+    };
+
+    /// <summary>
+    /// The item lit while <paramref name="page"/> shows in the spot (null for the home): the page's own when it's among
+    /// <paramref name="shown"/>, else Controls, else none.
+    /// </summary>
+    public static string? Lit(string? page, IReadOnlyList<string> shown, bool recording)
+    {
+        if (page is not null)
+        {
+            foreach (string id in shown)
+            {
+                if (Find(id) is null)
+                    continue;
+                var press = Press(id);
+                if (press.Target == page && (press.Kind is BarPressKind.Page or BarPressKind.Search || (press.Kind == BarPressKind.Record && !recording)))
+                    return id;
+            }
+        }
+        return shown.Contains(Controls) ? Controls : null;
+    }
+
     /// <summary>Whether an item can show on this PC now: its feature runs, the PC has a battery, a second input language.</summary>
     public static bool Available(string id, Func<string, bool> running, bool battery, bool languages) => Find(id) switch
     {
@@ -163,7 +194,7 @@ public enum BarPressKind
     Page,
     /// <summary>Opens Search with the keyboard in its field; a second press closes it. The target is its page.</summary>
     Search,
-    /// <summary>Opens the notch's home; a second press closes it.</summary>
+    /// <summary>Opens the home in the spot; a second press closes it.</summary>
     Home,
     /// <summary>Opens Screen recording (the target); while recording, stops.</summary>
     Record,

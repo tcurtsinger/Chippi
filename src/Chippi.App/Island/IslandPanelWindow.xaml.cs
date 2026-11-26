@@ -245,43 +245,29 @@ public partial class IslandPanelWindow : Window
 
     public void Initialize() => _hwnd = IslandNative.MakeNoActivate(this);
 
-    // ----- The notch (docs/mac-style/brief.md) -----
+    // ----- The spot (docs/mac-style/brief.md) -----
 
-    private ResourceDictionary? _notchLook;
+    /// <summary>
+    /// Opens in the Mac-style desktop's one spot, under the right end of a display's menu bar, and not on the puck's
+    /// corner: it unrolls down from its own top edge.
+    /// </summary>
+    internal bool AtSpot { get; private set; }
 
-    /// <summary>Opens out of the Mac-style desktop's notch: pure black, the dark island ink, grown down from the notch's top edge.</summary>
-    internal bool FromNotch { get; private set; }
-
-    internal void SetNotch(bool notch)
+    internal void SetSpot(bool spot)
     {
-        if (notch == FromNotch)
+        if (spot == AtSpot)
             return;
         if (IsVisible)
             CloseIsland(immediate: true);
-        FromNotch = notch;
-        if (notch)
-            Resources.MergedDictionaries.Add(_notchLook ??= NotchLook());
-        else if (_notchLook is not null)
-            Resources.MergedDictionaries.Remove(_notchLook);
-        PointSharedKeys();
+        AtSpot = spot;
     }
 
-    /// <summary>The dark theme with a black body and no edge or shadow, whatever the app theme.</summary>
-    internal static ResourceDictionary NotchLook()
-    {
-        var look = new ResourceDictionary();
-        look.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/Chippi.UI;component/Themes/Dark.xaml", UriKind.Absolute) });
-        look["IslandBrush"] = Brushes.Black;
-        look["IslandBorderBrush"] = Brushes.Transparent;
-        var none = new System.Windows.Media.Effects.DropShadowEffect { Opacity = 0, BlurRadius = 0, ShadowDepth = 0 };
-        none.Freeze();
-        look["IslandExpandedShadow"] = none;
-        return look;
-    }
+    /// <summary>Raised when the panel opens or closes, or its page changes: the menu bar lights the page's icon.</summary>
+    internal event Action? ShowingChanged;
 
-    /// <summary>The page's place: out of the notch, or on the puck's corner.</summary>
-    private Rect PanelFor(double height) => FromNotch
-        ? IslandGeometry.NotchPanelRect(_puck, _area.Work, _area.Scale, height)
+    /// <summary>The page's place: the spot, or the puck's corner.</summary>
+    private Rect PanelFor(double height) => AtSpot
+        ? IslandGeometry.SpotPanelRect(_area.Work, _area.Scale, height)
         : IslandGeometry.PanelRect(_puck, _area.Work, _area.Scale, height);
 
     /// <summary>
@@ -326,7 +312,7 @@ public partial class IslandPanelWindow : Window
     private void PointSharedKeys()
     {
         foreach (var (key, island) in SharedKeys)
-            Resources[key] = FromNotch ? TryFindResource(island) : Application.Current?.TryFindResource(island);
+            Resources[key] = Application.Current?.TryFindResource(island);
         if (TryFindResource("IslandBorderBrush") is SolidColorBrush panel)
         {
             _widgetEdge = Colors.Transparent;
@@ -484,6 +470,7 @@ public partial class IslandPanelWindow : Window
         Place();
         Begin(Morph.Open);
         Show(); // the first visible surface already has the source outline and source ink
+        ShowingChanged?.Invoke();
         if (TakesKeyboard(_page))
             TakeKeyboard();
     }
@@ -500,6 +487,7 @@ public partial class IslandPanelWindow : Window
             return;
         }
         IsOpen = false;
+        ShowingChanged?.Invoke();
         if (widget is { } now && _hwnd != default)
         {
             _widget = now;
@@ -565,6 +553,7 @@ public partial class IslandPanelWindow : Window
         _page = key;
         if (!IsOpen)
             return;
+        ShowingChanged?.Invoke();
         Attach(key);
         if (changeTab)
         {
@@ -1257,7 +1246,7 @@ public partial class IslandPanelWindow : Window
         Canvas.SetTop(Shape, _drawn.Y);
         Shape.Width = Math.Max(0, _drawn.Width);
         Shape.Height = Math.Max(0, _drawn.Height);
-        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = FromNotch ? new CornerRadius(0, 0, _radius, _radius) : new CornerRadius(_radius);
+        ShapeShadow.CornerRadius = ShapeFill.CornerRadius = new CornerRadius(_radius);
         // Mid-morph the content already sits at its final place; only what's inside the shape shows.
         // The clip belongs to the card, before its transform into the shape's coordinate system.
         var inside = new Rect((_drawn.X - _target.X) / _pageScale, (_drawn.Y - _target.Y) / _pageScale,
