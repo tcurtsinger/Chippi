@@ -11,6 +11,9 @@ public static class DockLayout
 {
     public const double Icon = 48, Gap = 6, Shelf = 64, Padding = 8, Corner = 16, EdgeGap = 6;
 
+    /// <summary>The divider's length along the shelf: its 1 line and 4 each side.</summary>
+    public const double Divider = 9;
+
     /// <summary>The shelf's edge line. Its tiles sit inside it, in a slot this much shallower than the shelf on each side.</summary>
     public const double Edge = 1;
 
@@ -51,6 +54,71 @@ public static class DockLayout
         return sizes;
     }
 
+    /// <summary>
+    /// Where each tile goes for one frame of magnification. Sizes are exact, so an icon grows and moves by fractions of a
+    /// pixel; a tile's slot in the row is whole pixels, as layout rounds it. Rounding each slot on its own made every icon's
+    /// size and place step a pixel at a different moment, which read as a stutter under a slow pointer.
+    /// </summary>
+    /// <remarks>
+    /// The row grows about its middle, an even number of pixels at a time, a pixel to each side. Each icon is drawn at its
+    /// exact size and place inside its slot. Once nothing has moved for a moment (<paramref name="still"/>), the icons at
+    /// rest on both sides are put on whole pixels, where they're sharp; the grown ones between them stay exact.
+    /// </remarks>
+    /// <param name="sizes">Each tile's size along the shelf now, in DIPs.</param>
+    /// <param name="rests">Each tile's size at rest, in DIPs: 48 for an icon, 9 for the divider.</param>
+    /// <param name="pixels">Device pixels per DIP.</param>
+    /// <param name="still">Whether the icons have stopped moving: the ones at rest then sit on whole pixels.</param>
+    /// <param name="grown">How much longer the row is than at rest, in DIPs.</param>
+    public static DockSlot[] Slots(IReadOnlyList<double> sizes, IReadOnlyList<double> rests, double pixels, bool still, out double grown)
+    {
+        if (!(pixels > 0) || !double.IsFinite(pixels))
+            pixels = 1;
+        int count = sizes.Count;
+        var slots = new DockSlot[count];
+        // Growth before each tile, in pixels: before[i] is what the tiles ahead of it have grown by.
+        var before = new double[count + 1];
+        for (int i = 0; i < count; i++)
+        {
+            double more = (sizes[i] - rests[i]) * pixels;
+            before[i + 1] = before[i] + (double.IsFinite(more) && more > 0 ? more : 0);
+        }
+        double total = before[count];
+        for (int i = 0; i < count; i++)
+        {
+            double rest = Math.Max(1, Math.Round(rests[i] * pixels)); // as layout rounds a size
+            double more = before[i + 1] - before[i];
+            // The slot's edges, from the row's middle: whole pixels either side of it.
+            double start = before[i] - total / 2, edge = Whole(start);
+            double extent = rest + Whole(before[i + 1] - total / 2) - edge;
+            // Still, a tile at rest with nothing grown on one side of it sits on its pixel; one among the grown ones is exact.
+            double among = still ? Math.Clamp(Math.Min(before[i + 1], total - before[i]), 0, 1) : 1;
+            double shift = among * (start - edge) + more / 2;
+            slots[i] = new DockSlot(extent / pixels, shift / pixels, (rest + more) / rest);
+        }
+        grown = 2 * Whole(total / 2) / pixels;
+        return slots;
+    }
+
+    /// <summary>
+    /// The room the shelf keeps each side of itself to grow into, in DIPs: half of what its icons grow by at
+    /// <paramref name="max"/>, in an even number of pixels. The shelf's margins are this less half of what it has grown,
+    /// so its length with them stays the same and its middle stays put. Even, so the shelf at rest is on the pixel that
+    /// centering it on its own length puts it on.
+    /// </summary>
+    public static double Room(double max, double pixels)
+    {
+        if (!(pixels > 0) || !double.IsFinite(pixels))
+            pixels = 1;
+        double half = Math.Ceiling(Growth(max) * pixels / 2) + 1;
+        return (half + half % 2) / pixels;
+    }
+
+    /// <summary>
+    /// The nearest whole number, the same for a value and its negative, with a half rounded toward zero from just short of
+    /// it: sizes that sum to exactly a half land a hair either side of it, and must not flip the row a pixel.
+    /// </summary>
+    private static double Whole(double value) => Math.Sign(value) * Math.Floor(Math.Abs(value) + 0.5 - 1e-6);
+
     /// <summary>The shelf's length for icons of these sizes, with <paramref name="dividers"/> dividers of 9 (1 and 4 each side).</summary>
     public static double Length(IReadOnlyList<double> sizes, int dividers) =>
         2 * Padding + sizes.Sum() + Gap * Math.Max(0, sizes.Count - 1) + dividers * (9 + Gap);
@@ -77,6 +145,12 @@ public static class DockLayout
     public static double Fit(double length, double available) =>
         !(length > 0) || !(available > 0) || length <= available ? 1 : Math.Max(0.4, available / length);
 }
+
+/// <summary>
+/// A tile's place for one frame (DockLayout.Slots), in DIPs: its slot's length along the shelf, in whole pixels; how far
+/// its icon's middle is drawn from where the slot puts it at rest; and the icon's size over its size at rest.
+/// </summary>
+public readonly record struct DockSlot(double Extent, double Shift, double Scale);
 
 /// <summary>What a click on an app's icon does.</summary>
 public enum DockClick { Launch, Minimize, Show }
