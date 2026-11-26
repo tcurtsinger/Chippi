@@ -152,6 +152,16 @@ internal sealed class MenuBarController : IDisposable
         ForEach(b => b.SetPage(_page.Open && b.Monitor == _page.Monitor, page));
     }
 
+    /// <summary>The icon lit on <paramref name="monitor"/>'s bar now (0 for the main display's), or null.</summary>
+    private string? LitOn(nint monitor)
+    {
+        nint on = monitor == 0 ? DisplayCatalog.Main : monitor;
+        if (!_page.Open || on != _page.Monitor)
+            return null;
+        var shown = _bars.TryGetValue(on, out var bar) ? bar.ItemsShowing : BarItems.Shown(Shell.BarItems(), Shell.Availability());
+        return BarItems.Lit(_page.Page, shown, _states.Recording is not null);
+    }
+
     /// <summary>Whether a press at <paramref name="physical"/> is on the island or on an icon that opens a page.</summary>
     public bool KeepsPanel(Point physical) => !_disposed && _bars.Values.Any(b => b.KeepsPanel(physical));
 
@@ -160,7 +170,7 @@ internal sealed class MenuBarController : IDisposable
     {
         if (_disposed)
             return;
-        Shell.PressedOn = DisplayCatalog.Main;
+        Shell.Pressed.Set(DisplayCatalog.Main, Environment.TickCount64);
         Shell.IslandPressed();
     }
 
@@ -482,7 +492,7 @@ internal sealed class MenuBarController : IDisposable
     {
         if (_disposed)
             return;
-        Shell.PressedOn = monitor; // a page this press opens goes to the spot on this display
+        Shell.Pressed.Set(monitor, Environment.TickCount64); // a page this press opens goes to the spot on this display
         if (id == Clock)
         {
             // Windows' own notifications, where Windows opens them.
@@ -504,8 +514,10 @@ internal sealed class MenuBarController : IDisposable
                     Run(BarItems.SearchCommand);
                 break;
             case BarPressKind.Home:
-                if (!Shell.ClosePage(null))
-                    Shell.OpenHome();
+                // The lit icon closes the panel: Controls is lit for the home, and for a page with no icon on this bar.
+                if (Shell.ClosePage(null) || (LitOn(monitor) == BarItems.Controls && Shell.ClosePage(_page.Page)))
+                    break;
+                Shell.OpenHome();
                 break;
             case BarPressKind.Record:
                 // While recording, the item is the Stop button.

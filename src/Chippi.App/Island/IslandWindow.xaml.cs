@@ -696,7 +696,7 @@ public partial class IslandWindow : Window
         if (WatchesInput && code >= 0 && message is PInvoke.WM_LBUTTONDOWN or PInvoke.WM_RBUTTONDOWN or PInvoke.WM_MBUTTONDOWN or PInvoke.WM_XBUTTONDOWN)
         {
             var at = ((MSLLHOOKSTRUCT*)lParam.Value)->pt;
-            PressedAt(new Point(at.X, at.Y));
+            PressedAt(new Point(at.X, at.Y), message == PInvoke.WM_LBUTTONDOWN);
         }
         return PInvoke.CallNextHookEx(_clickHook, code, wParam, lParam);
     }
@@ -705,14 +705,14 @@ public partial class IslandWindow : Window
     /// A press at <paramref name="physical"/> while the panel is open: off the panel and the widget it
     /// closes the panel, unless a list or menu the panel opened has the mouse.
     /// </summary>
-    internal void PressedAt(Point physical)
+    internal void PressedAt(Point physical, bool left = true)
     {
         if (!_panel.IsOpen)
         {
             _pageToggle.Forget();
             return;
         }
-        if (_peeking || _panel.Covers(physical) || (IsVisible && CoversWidget(physical)) || _keepsPanel?.Invoke(physical) == true
+        if (_peeking || _panel.Covers(physical) || (IsVisible && CoversWidget(physical)) || (left && _keepsPanel?.Invoke(physical) == true)
             || Menu.IsOpen || Mouse.Captured is not null)
             return;
         _pageToggle.ClosedByPress(_panel.CurrentPage, Environment.TickCount64);

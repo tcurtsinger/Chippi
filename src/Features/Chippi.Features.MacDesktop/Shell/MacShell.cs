@@ -39,8 +39,8 @@ internal sealed class MacShell(ModuleContext context, IslandActivityHub? activit
     /// <summary>Whether the island shows on the main display's bar.</summary>
     public Func<bool> IslandOn { get; set; } = () => false;
 
-    /// <summary>The display whose bar was just pressed for a page (0 for none): the spot opens on that display.</summary>
-    public nint PressedOn { get; set; }
+    /// <summary>The display whose bar was just pressed: a page that press opens goes to the spot on that display.</summary>
+    public SpotPress Pressed { get; } = new();
 
     /// <summary>
     /// A press on a menu bar item that opens an island page (null for the home): true when the page was open and the press

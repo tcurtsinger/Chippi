@@ -512,6 +512,51 @@ public sealed class MenuBarOffscreenTests
     }
 
     [Fact]
+    public void APressedBarsDisplayIsTakenOnceAndGoesStale()
+    {
+        var press = new SpotPress();
+        Assert.Equal(0, press.Take(100));
+        press.Set(7, 1000);
+        Assert.Equal(7, press.Take(1000 + SpotPress.Milliseconds));
+        Assert.Equal(0, press.Take(1001)); // taken once
+        press.Set(7, 5000);
+        Assert.Equal(0, press.Take(5001 + SpotPress.Milliseconds)); // Sound or the clock was pressed: a later page isn't this press's
+        press.Set(7, 9000);
+        press.Set(0, 9010); // a bar without a display of its own
+        Assert.Equal(0, press.Take(9020));
+    }
+
+    [Fact]
+    public void ControlsClosesThePanelWhileItIsTheLitIcon() => OnBar((shell, controller) =>
+    {
+        string? showing = "shelf";
+        bool open = true;
+        var asked = new List<string?>();
+        int homes = 0;
+        shell.ClosePage = key =>
+        {
+            asked.Add(key);
+            if (!open || showing != key)
+                return false;
+            open = false;
+            return true;
+        };
+        shell.OpenHome = () => homes++;
+
+        // Shelf has no icon on the bar: Controls is lit for it, and a press on Controls closes it.
+        controller.SetPage(true, "shelf", 0);
+        controller.Press(BarItems.Controls);
+        Assert.False(open);
+        Assert.Equal(0, homes);
+        Assert.Equal([null, "shelf"], asked);
+
+        // Nothing showing: Controls opens the home.
+        controller.SetPage(false, null, 0);
+        controller.Press(BarItems.Controls);
+        Assert.Equal(1, homes);
+    });
+
+    [Fact]
     public void AStateRidesBesideTheIslandUnlessTheBarHasItsIconOrTheIslandShowsIt()
     {
         var all = new BarStates(MicMuted: true, Awake: true, AgentWorking: true, Recording: null);

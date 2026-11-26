@@ -449,6 +449,7 @@ public partial class IslandPanelWindow : Window
         if (IsOpen)
         {
             Place();
+            ShowingChanged?.Invoke(); // it may have moved to another display's spot
             return;
         }
         _cameFrom = null;

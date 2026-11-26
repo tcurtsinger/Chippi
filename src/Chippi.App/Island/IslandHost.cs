@@ -39,6 +39,7 @@ public sealed class IslandHost : IDisposable
     private bool _locked, _displayOff; // nobody can see the screen: Chippi and the bar rest (Motion.IsUnseen)
     private PeekController? _peek;
     private bool _docked; // the Mac-style desktop's island in the menu bar is the widget
+    private bool _widgetOn = true; // AppSettings.IslandEnabled
     private string? _islandKey;
     private Action? _islandClick;
     private IReadOnlyList<IslandTileGroup> _tiles = [];
@@ -437,7 +438,7 @@ public sealed class IslandHost : IDisposable
     }
 
     // The tray icon hides with "Hide tray icon" only while the widget, the puck or the island, is showing.
-    private void UpdateShowing() => _shell.Commands.SetIslandShowing(_window.IsVisible || _docked);
+    private void UpdateShowing() => _shell.Commands.SetIslandShowing(_window.IsVisible || (_docked && _widgetOn));
 
     private void ApplyBarIsland()
     {
@@ -474,6 +475,9 @@ public sealed class IslandHost : IDisposable
         _window.SetLayout(IslandLayout.From(settings));
         _window.SetNowPlayingAlwaysShow(settings.NowPlayingAlwaysShow);
         _window.SetEnabled(settings.IslandEnabled);
+        _widgetOn = settings.IslandEnabled;
+        _shell.MacDesktop?.SetWidgetOn(_widgetOn); // hidden, the island in the menu bar hides as the puck does
+        UpdateShowing();
         _tracker.SetPlacement(settings.IslandDisplay, settings.IslandMonitorId);
     }
 

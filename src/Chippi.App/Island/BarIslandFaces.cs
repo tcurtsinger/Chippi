@@ -37,7 +37,7 @@ internal static class BarIslandFaces
         if (top.Kind == IslandActivityKind.Media)
         {
             if (song is not { } track)
-                return (new(mood, IslandLead.Glyph, LucideIcons.Music, null, top.Title, "", IslandTail.None, top.ModuleId, "Now Playing"), IslandPanelWindow.NowPlayingKey, null);
+                return (new(mood, top.NeedsAttention ? IslandLead.Attention : IslandLead.Glyph, LucideIcons.Music, null, top.Title, "", IslandTail.None, top.ModuleId, "Now Playing"), IslandPanelWindow.NowPlayingKey, null);
             return (new(track.Playing ? PetMood.Listening : mood, IslandLead.Cover, LucideIcons.Music, track.Artwork, track.Title, track.Artist,
                 track.Playing ? IslandTail.Equalizer : IslandTail.Paused, top.ModuleId, "Now Playing"), IslandPanelWindow.NowPlayingKey, null);
         }

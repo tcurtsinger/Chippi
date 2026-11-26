@@ -95,7 +95,7 @@ Travis, 2026-11-25, after the critique of the notch: the notch is gone ("the isl
 
 The widget's form while the mode is on with its menu bar. Same activities; its pages open in the spot.
 
-- **Place:** the middle of the main display's menu bar, part of the bar itself. 22 tall inside the 28 bar, fully round, with a 1px edge. It never grows taller: it widens to what it shows, 30 at rest. It doesn't move.
+- **Place:** the middle of the main display's menu bar, part of the bar itself. 22 tall inside the 28 bar, fully round, with a 1px edge. It never grows taller: it widens to what it shows, 28 at rest. It doesn't move. With the widget hidden (the tray's Hide widget), it's hidden too.
 - **Ink:** its text, glyphs, equalizer and edge are the bar's ink (the edge at 34%), taken from the wallpaper under the bar's middle as each group takes its own. Chippi (18, in his color, with his moods), a song's cover, the amber disc and the red dot keep their own colors.
 - **What it shows,** the widget bar's choice of activity: Chippi alone at rest; a song as its cover, its title · artist and the equalizer (a pause mark while paused); an activity as its glyph and status ("1 hr left"); a recording as the red dot and its time; something waiting on you (an agent) as its glyph on a 16 amber disc; a 6-second line as its glyph and text. The line is cut at 240.
 - **Badges:** a muted mic (a red disc), Keep awake (its glyph in the ink) and an agent at work (an amber disc) ride beside it when the bar has no icon for that state and the island isn't showing that feature itself.
@@ -109,7 +109,7 @@ The widget's form while the mode is on with its menu bar. Same activities; its p
 - **Which display:** the one whose bar was pressed. A page asked for another way (a shortcut, a notice, the island) opens on the main display, or stays where the panel already is.
 - **Opening:** it unrolls down from its top edge and rolls back up. Esc or a press off it closes it.
 - **The lit icon:** the icon of the page showing is lit, as an open menu's title is; Controls for the home and for a page without an icon on that bar.
-- **A press on another page's icon changes the page in place;** on the lit icon it closes the panel.
+- **A press on another page's icon changes the page in place;** on the lit icon it closes the panel, Controls too while it's lit for a page without an icon. Only the left button: any other press off the panel closes it.
 - The home's Chippi is on the right of the footer, by the bar's icons.
 - With the menu bar off, the widget is the puck again.
 

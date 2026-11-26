@@ -158,13 +158,17 @@ public sealed class MacDesktopModule : IFeatureModule
     public bool KeepsPanel(System.Windows.Point physical) => _menuBar?.KeepsPanel(physical) == true;
 
     /// <summary>The display whose bar was just pressed for a page, once: 0 when the page was asked for another way.</summary>
-    public nint TakeSpot()
+    public nint TakeSpot() => _shell?.Pressed.Take(Environment.TickCount64) ?? 0;
+
+    private bool _widgetOn = true;
+
+    /// <summary>The widget is on or hidden (the tray's Hide widget): hidden, the island is too, as the puck would be.</summary>
+    public void SetWidgetOn(bool on)
     {
-        if (_shell is not { } shell)
-            return 0;
-        nint monitor = shell.PressedOn;
-        shell.PressedOn = 0;
-        return monitor;
+        if (on == _widgetOn)
+            return;
+        _widgetOn = on;
+        _menuBar?.SettingsChanged();
     }
 
     public Task StartAsync(ModuleContext context, CancellationToken ct)
@@ -183,7 +187,7 @@ public sealed class MacDesktopModule : IFeatureModule
             if (pending.IslandMenu is { } menu) _shell.IslandMenu = menu;
             if (pending.ClosePage is { } close) _shell.ClosePage = close;
         }
-        _shell.IslandOn = () => Settings.ShowsIsland;
+        _shell.IslandOn = () => Settings.ShowsIsland && _widgetOn;
         _shell.BarItems = () => Settings.BarItems;
         // A dev profile or a test never touches the real taskbar, not even to give it back.
         _takeover = _canTakeTaskbar() ? new TaskbarTakeover(_taskbars(), new TaskbarJournal(TaskbarJournal.DefaultPath)) : null;
