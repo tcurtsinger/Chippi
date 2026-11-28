@@ -280,12 +280,81 @@ internal sealed class DockTile : Grid
         App = app;
         _name = app.Name;
         AutomationProperties.SetName(this, app.Name);
-        AutomationProperties.SetItemStatus(this, app.Running ? "Running" : "");
+        SetBadge(_dock?.Controller.BadgeOf(app));
         bool launching = !app.Running && DateTime.UtcNow - _launchedAt < TimeSpan.FromSeconds(15);
         if (app.Running)
             _launchedAt = DateTime.MinValue;
         Dot.Opacity = app.Running ? 1 : 0.5;
         Dot.Visibility = app.Running || launching ? Visibility.Visible : Visibility.Hidden;
+    }
+
+    // ----- Badge -----
+
+    /// <summary>Critical (DESIGN.md §2) in both themes, with white text, as on the menu bar's muted mic.</summary>
+    private static readonly Brush BadgeFill = Frozen(new SolidColorBrush(Color.FromRgb(0xC4, 0x2B, 0x1C)));
+
+    private Border? _badge;
+
+    /// <summary>The badge it shows now: null for none, "" for a dot, else a count.</summary>
+    public string? Badge { get; private set; }
+
+    /// <summary>
+    /// The red badge on the icon's top-right corner: an 18 disc with the count (11 / 600, a pill past one digit), or a 10 dot
+    /// when the app gives no number. It's part of the icon's drawing, so it grows with the magnification.
+    /// </summary>
+    public void SetBadge(string? badge)
+    {
+        string status = App is { Running: true } ? "Running" : "";
+        if (badge is not null)
+            status = (status.Length > 0 ? status + ", " : "") + (badge.Length == 0 ? "needs attention" : badge + " unread");
+        AutomationProperties.SetItemStatus(this, status);
+        if (badge == Badge)
+            return;
+        Badge = badge;
+        if (badge is null)
+        {
+            if (_badge is not null)
+                _badge.Visibility = Visibility.Collapsed;
+            return;
+        }
+        _badge ??= MakeBadge();
+        bool dot = badge.Length == 0;
+        var text = (TextBlock)_badge.Child;
+        text.Text = badge;
+        text.Visibility = dot ? Visibility.Collapsed : Visibility.Visible;
+        _badge.Height = _badge.MinWidth = dot ? 10 : 18;
+        _badge.CornerRadius = new CornerRadius(dot ? 5 : 9);
+        _badge.Padding = dot ? new Thickness(0) : new Thickness(5, 0, 5, 0);
+        _badge.Margin = dot ? new Thickness(0, 1, 1, 0) : new Thickness(0, -3, -3, 0);
+        _badge.Visibility = Visibility.Visible;
+    }
+
+    private Border MakeBadge()
+    {
+        var badge = new Border
+        {
+            Background = BadgeFill,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Top,
+            IsHitTestVisible = false,
+            Child = new TextBlock
+            {
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+            },
+        };
+        _art.Children.Add(badge);
+        return badge;
+    }
+
+    private static Brush Frozen(Brush brush)
+    {
+        brush.Freeze();
+        return brush;
     }
 
     /// <summary>The slot's size along and across the shelf for its edge; the icon sits against the edge, its dot under it.</summary>
